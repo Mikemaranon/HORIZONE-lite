@@ -197,6 +197,11 @@
     .modal__body {
         padding: 16px;
     }
+
+    .chat-export__option-top {
+        flex-direction: column;
+        align-items: flex-start;
+    }
 }
 
 @media (max-width: 460px) {

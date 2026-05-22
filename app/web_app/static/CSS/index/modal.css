@@ -241,3 +241,62 @@
 .project-create-dialog__form {
     padding-top: 22px;
 }
+
+.chat-export {
+    display: grid;
+    gap: 16px;
+}
+
+.chat-export h4,
+.chat-export__summary,
+.chat-export__status {
+    margin: 0;
+}
+
+.chat-export__summary,
+.chat-export__status {
+    color: var(--text-soft);
+    line-height: 1.6;
+}
+
+.chat-export__grid {
+    display: grid;
+    gap: 12px;
+}
+
+.chat-export__option {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.64);
+    padding: 16px 18px;
+    text-align: left;
+    cursor: pointer;
+    display: grid;
+    gap: 8px;
+    transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.chat-export__option:hover:not(:disabled) {
+    border-color: rgba(28, 139, 89, 0.28);
+    background: rgba(28, 139, 89, 0.08);
+}
+
+.chat-export__option-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.chat-export__option-top span:last-child {
+    color: var(--text-soft);
+    font-size: 0.84rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.chat-export__option-copy {
+    color: var(--text-soft);
+    line-height: 1.55;
+}

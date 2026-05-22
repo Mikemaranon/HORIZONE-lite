@@ -64,6 +64,16 @@ export function closeProfileModal() {
 }
 
 
+export function openChatExportModal() {
+    openModal(elements.chatExportModal);
+}
+
+
+export function closeChatExportModal() {
+    closeModal(elements.chatExportModal);
+}
+
+
 export function openSessionProfileModal() {
     openModal(elements.sessionProfileModal);
 }

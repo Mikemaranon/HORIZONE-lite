@@ -1,5 +1,6 @@
 import { elements } from "../dom.js";
 import { createModelAvatarMarkup, escapeHtml } from "../html.js";
+import { syncChatExportState } from "../controllers/export-controller.js";
 import { PROFILE_SETTINGS_PREVIEW_TAGS } from "../profile-helpers.js";
 import { getProviderTypeDisplayName } from "../provider-helpers.js";
 import {
@@ -259,6 +260,7 @@ export function renderChatPanel() {
     renderModelSwitchModal();
     renderChatProfileCard();
     renderProfileSwitchModal();
+    syncChatExportState();
 }
 
 

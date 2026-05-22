@@ -1,5 +1,6 @@
 from api_m.services import (
     ChatContextBuilder,
+    ChatExportService,
     ChatPersistenceService,
     ChatService,
     ChatStreamService,
@@ -40,6 +41,10 @@ class ServiceRegistry:
         )
 
         self.chat_context_builder = ChatContextBuilder(db_manager)
+        self.chat_export_service = ChatExportService(
+            db_manager,
+            self.chat_context_builder,
+        )
         self.chat_persistence_service = ChatPersistenceService(
             db_manager,
             model_manager,

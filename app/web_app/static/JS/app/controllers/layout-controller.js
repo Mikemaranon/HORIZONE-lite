@@ -2,6 +2,7 @@ import { elements } from "../dom.js";
 import { setChatPanelOpen } from "../state-actions.js";
 import { state } from "../state.js";
 import {
+    closeChatExportModal,
     closeDocumentsModal,
     closeModelModal,
     closeModelSwitchModal,
@@ -258,6 +259,11 @@ export function handleDocumentKeyDown(event) {
         event.stopPropagation();
         return;
     }
+    if (elements.chatExportModal && !elements.chatExportModal.hidden) {
+        closeChatExportModal();
+        event.stopPropagation();
+        return;
+    }
 
     if (closeChatPanel()) {
         event.stopPropagation();
@@ -357,11 +363,5 @@ function syncSidebarToggleAria() {
         elements.sidebarToggleButton.title = isOpen
             ? "Ocultar barra lateral"
             : "Mostrar barra lateral";
-    }
-
-    if (elements.sidebarToggleIcon) {
-        const openSrc = elements.sidebarToggleIcon.dataset.openSrc;
-        const closedSrc = elements.sidebarToggleIcon.dataset.closedSrc;
-        elements.sidebarToggleIcon.src = isOpen ? openSrc : closedSrc;
     }
 }

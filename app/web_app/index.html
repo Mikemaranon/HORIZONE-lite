@@ -141,8 +141,6 @@
                                             id="sidebar-toggle-icon"
                                             src="/static/assets/icons/sidebar-left.png"
                                             alt=""
-                                            data-open-src="/static/assets/icons/sidebar-left.png"
-                                            data-closed-src="/static/assets/icons/sidebar-right.png"
                                         >
                                     </span>
                                 </button>
@@ -419,11 +417,23 @@
 
                 <aside id="chat-side-panel" class="chat-side-panel" aria-label="Panel lateral del chat" aria-hidden="true">
                     <div class="chat-side-panel__header">
-                        <div>
-                            <h3>Ajustes del chat</h3>
-                            <p class="chat-side-panel__subtitle">
-                                Todo lo que afecta al chat actual, agrupado por secciones.
-                            </p>
+                        <div class="chat-side-panel__header-row">
+                            <div>
+                                <h3>Ajustes del chat</h3>
+                                <p class="chat-side-panel__subtitle">
+                                    Todo lo que afecta al chat actual, agrupado por secciones.
+                                </p>
+                            </div>
+                            <button
+                                id="chat-export-button"
+                                class="icon-button chat-side-panel__download-button"
+                                type="button"
+                                aria-label="Exportar chat"
+                                title="Exportar chat"
+                                disabled
+                            >
+                                <img src="/static/assets/icons/download-chat.png" alt="">
+                            </button>
                         </div>
                     </div>
 
@@ -516,6 +526,58 @@
                     <div id="model-switch-no-results" class="profile-switch__empty" hidden>
                         No hay modelos que coincidan con la búsqueda actual.
                     </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-export-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-chat-export-modal="true"></div>
+        <div class="modal__panel modal__panel--narrow">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Exportar</p>
+                    <h3>Descargar conversación</h3>
+                </div>
+                <button id="close-chat-export-button" class="icon-button" type="button" aria-label="Cerrar exportación">×</button>
+            </div>
+
+            <div class="modal__body">
+                <section class="settings-block chat-export">
+                    <h4>Formatos disponibles</h4>
+                    <p id="chat-export-summary" class="chat-export__summary">
+                        Elige cómo quieres descargar el historial del chat actual.
+                    </p>
+                    <div class="chat-export__grid">
+                        <button id="chat-export-json-button" class="chat-export__option" type="button">
+                            <span class="chat-export__option-top">
+                                <strong>JSON completo</strong>
+                                <span>.json</span>
+                            </span>
+                            <span class="chat-export__option-copy">
+                                Incluye mensajes, autores, modelo, perfil, prompts reconstruidos, tools y metadata.
+                            </span>
+                        </button>
+                        <button id="chat-export-html-button" class="chat-export__option" type="button">
+                            <span class="chat-export__option-top">
+                                <strong>HTML visual</strong>
+                                <span>.html</span>
+                            </span>
+                            <span class="chat-export__option-copy">
+                                Exporta el chat con estilos inline inspirados directamente en la interfaz actual.
+                            </span>
+                        </button>
+                        <button id="chat-export-markdown-button" class="chat-export__option" type="button">
+                            <span class="chat-export__option-top">
+                                <strong>Markdown simple</strong>
+                                <span>.md</span>
+                            </span>
+                            <span class="chat-export__option-copy">
+                                Guarda solo las interacciones, con participante y mensaje en un formato ligero.
+                            </span>
+                        </button>
+                    </div>
+                    <p id="chat-export-status" class="chat-export__status" hidden></p>
                 </section>
             </div>
         </div>

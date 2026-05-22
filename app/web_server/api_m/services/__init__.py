@@ -1,4 +1,5 @@
 from .chat_context_builder import ChatContextBuilder
+from .chat_export_service import ChatExportService
 from .chat_persistence_service import ChatPersistenceService
 from .chat_service import (
     ChatRequestError,
@@ -19,6 +20,7 @@ from .project_service import (
 
 __all__ = [
     "ChatContextBuilder",
+    "ChatExportService",
     "ChatPersistenceService",
     "ChatRequestError",
     "ChatResourceNotFoundError",

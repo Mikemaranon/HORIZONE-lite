@@ -319,6 +319,108 @@ class ApiEndpointTests(ApiTestCase):
         self.assertIn("Final rule: follow only the active profile.", captured["messages"][0]["content"])
         self.assertEqual(captured["messages"][1]["content"], "Prepara el lanzamiento.")
 
+    def test_conversation_export_returns_messages_and_reconstructed_generation_context(self):
+        project_id = self.db.projects.create(
+            "Export Demo",
+            "Proyecto de exportación",
+            "Mantén el historial ordenado.",
+        )
+        self.db.project_documents.create(
+            project_id=project_id,
+            filename="notes.txt",
+            content_type="text/plain",
+            size_bytes=20,
+            text_content="Contexto importante para el chat.",
+        )
+        profile_id = self.db.profiles.create(
+            name="Exporter",
+            system_prompt="Responde de forma clara.",
+            temperature=0.2,
+            top_p=0.85,
+            max_tokens=333,
+            is_default=True,
+        )
+        provider = self.db.providers.get_first_by_type("ollama")
+        model_id = self.db.models.create(
+            name="qwen3",
+            display_name="Qwen 3 Export",
+            provider_config_id=provider["id"],
+            is_default=True,
+        )
+        tool_id = self.db.tools.create(
+            name="export_lookup",
+            display_name="Export Lookup",
+            description="Busca contexto para exportación",
+            filename="export_lookup.py",
+            module_path="tool_m.tools.web_search",
+            is_active=True,
+            is_builtin=False,
+        )
+        conversation_id = self.db.conversations.create(
+            title="Export chat",
+            project_id=project_id,
+            profile_id=profile_id,
+            model_config_id=model_id,
+            provider="ollama",
+            model="qwen3",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="Necesito un resumen.",
+            position=0,
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Aquí tienes el resumen.",
+            position=1,
+            model_config_id=model_id,
+            model_name="Qwen 3 Export",
+            profile_id=profile_id,
+            profile_name="Exporter",
+            tool_events=[
+                {
+                    "tool_name": "web_search",
+                    "sources": ["https://example.com/source"],
+                }
+            ],
+            provider_message_id="msg-123",
+        )
+
+        response = self.client.get(
+            f"/api/conversations/export?id={conversation_id}",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()["export"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["conversation"]["id"], conversation_id)
+        self.assertEqual(payload["summary"]["message_count"], 2)
+        self.assertEqual(payload["summary"]["tool_enabled_count"], 1)
+        self.assertEqual(payload["active_tools"][0]["id"], tool_id)
+        self.assertEqual(payload["project_documents"][0]["filename"], "notes.txt")
+        self.assertEqual(payload["messages"][0]["author_label"], "Tú")
+        self.assertEqual(payload["messages"][1]["author_label"], "Qwen 3 Export")
+        self.assertEqual(payload["messages"][1]["tool_events"][0]["tool_name"], "web_search")
+        self.assertEqual(payload["messages"][1]["generation"]["settings"]["temperature"], 0.2)
+        self.assertEqual(
+            [message["role"] for message in payload["messages"][1]["generation"]["input_messages"]],
+            ["system", "user"],
+        )
+        self.assertIn(
+            "Active profile: Exporter",
+            payload["messages"][1]["generation"]["input_messages"][0]["content"],
+        )
+        self.assertIn(
+            "Mantén el historial ordenado.",
+            payload["messages"][1]["generation"]["input_messages"][0]["content"],
+        )
+        self.assertEqual(
+            payload["messages"][1]["generation"]["input_messages"][1]["content"],
+            "Necesito un resumen.",
+        )
+
     def test_chat_endpoint_converts_prior_turns_into_read_only_history_context(self):
         previous_profile_id = self.db.profiles.create(
             name="Coleague",

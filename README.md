@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/web_app/static/assets/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE AI" width="650">
+  <img src="app/web_app/static/assets/logos/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE AI" width="650">
 </p>
 
 <p align="center">

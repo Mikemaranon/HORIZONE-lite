@@ -1,10 +1,25 @@
 from flask import request
 
 from api_m.domains.base_api import BaseAPI
+from api_m.services import ChatContextBuilder, ChatExportService
 
 
 class ConversationsAPI(BaseAPI):
+    def __init__(self, app, user_manager=None, db=None, model_manager=None, services=None):
+        super().__init__(app, user_manager, db, model_manager, services=services)
+        if self.services:
+            self.chat_export_service = self.services.chat_export_service
+            return
+
+        context_builder = ChatContextBuilder(self.db)
+        self.chat_export_service = ChatExportService(self.db, context_builder)
+
     def register(self):
+        self.app.add_url_rule(
+            "/api/conversations/export",
+            view_func=self.handle_conversations_export_get,
+            methods=["GET"],
+        )
         self.app.add_url_rule(
             "/api/conversations",
             view_func=self.handle_conversations_get,
@@ -56,6 +71,24 @@ class ConversationsAPI(BaseAPI):
 
         conversations = self.db.conversations.all(parsed_project_id)
         return self.ok({"conversations": conversations})
+
+    def handle_conversations_export_get(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        try:
+            conversation_id = self.parse_int(request.args.get("id"), "id")
+            self.require_fields({"id": conversation_id}, "id")
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        try:
+            export_payload = self.chat_export_service.build_conversation_export(conversation_id)
+        except LookupError as error:
+            return self.error(str(error), 404)
+
+        return self.ok({"export": export_payload})
 
     def handle_conversations_post(self):
         auth = self.authenticate_request(request)

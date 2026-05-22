@@ -13,6 +13,10 @@ import {
     syncMessagesAutoScrollState,
 } from "./controllers/chat-controller.js";
 import {
+    handleChatExportDownload,
+    openChatExportDialog,
+} from "./controllers/export-controller.js";
+import {
     bindSidebarViewportChangeListener,
     closeChatPanel,
     closeSidebar,
@@ -84,6 +88,7 @@ import {
 } from "./controllers/session-controller.js";
 import { elements } from "./dom.js";
 import {
+    closeChatExportModal,
     closeDocumentsModal,
     closeModelModal,
     closeModelSwitchModal,
@@ -187,6 +192,10 @@ export function bindUI() {
     elements.workspaceSettingsButton?.addEventListener("click", () => handleWorkspaceSettingsOpen({ closeSidebarOnMobile }));
     elements.chatSettingsButton?.addEventListener("click", toggleChatPanel);
     elements.chatPanelBackdrop?.addEventListener("click", closeChatPanel);
+    elements.chatExportButton?.addEventListener("click", openChatExportDialog);
+    elements.chatExportJsonButton?.addEventListener("click", () => handleChatExportDownload("json"));
+    elements.chatExportHtmlButton?.addEventListener("click", () => handleChatExportDownload("html"));
+    elements.chatExportMarkdownButton?.addEventListener("click", () => handleChatExportDownload("md"));
     elements.chatSidePanel?.addEventListener("click", handleChatSidebarClick);
     elements.backToProjectButton?.addEventListener("click", handleBackToProject);
     elements.changeModelButton?.addEventListener("click", () => openModelSwitcher("chat-settings"));
@@ -206,6 +215,7 @@ export function bindUI() {
     elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
     elements.closeModelSwitchButton?.addEventListener("click", closeModelSwitchModal);
+    elements.closeChatExportButton?.addEventListener("click", closeChatExportModal);
     elements.closeModelButton?.addEventListener("click", closeModelModal);
     elements.closeProviderButton?.addEventListener("click", closeProviderModal);
     elements.closeProfileSwitchButton?.addEventListener("click", closeProfileSwitchModal);
@@ -241,6 +251,7 @@ export function bindUI() {
     elements.modelModal?.addEventListener("click", handleModelModalClick);
     elements.providerModal?.addEventListener("click", handleProviderModalClick);
     elements.profileSwitchModal?.addEventListener("click", handleProfileSwitchModalClick);
+    elements.chatExportModal?.addEventListener("click", handleChatExportModalClick);
     elements.profileModal?.addEventListener("click", handleProfileModalClick);
     elements.sessionProfileModal?.addEventListener("click", handleSessionProfileModalClick);
     elements.projectCustomizeModal?.addEventListener("click", handleProjectModalClick);
@@ -292,6 +303,13 @@ function handleProviderModalClick(event) {
 function handleProfileSwitchModalClick(event) {
     if (event.target.dataset.closeProfileSwitchModal === "true") {
         closeProfileSwitchModal();
+    }
+}
+
+
+function handleChatExportModalClick(event) {
+    if (event.target.dataset.closeChatExportModal === "true") {
+        closeChatExportModal();
     }
 }
 

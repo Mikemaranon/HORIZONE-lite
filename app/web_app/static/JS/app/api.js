@@ -63,6 +63,14 @@ export async function loadConversationDetailData(conversationId) {
 }
 
 
+export async function loadConversationExportData(conversationId) {
+    return apiRequestJson(
+        "GET",
+        `/api/conversations/export?id=${encodeURIComponent(conversationId)}`
+    );
+}
+
+
 export async function loadModelsData() {
     return apiRequestJson("GET", "/api/models");
 }
