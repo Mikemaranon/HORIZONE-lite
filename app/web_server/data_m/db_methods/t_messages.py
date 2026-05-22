@@ -1,3 +1,6 @@
+import json
+
+
 class MessagesTable:
     def __init__(self, db):
         self.db = db
@@ -12,6 +15,7 @@ class MessagesTable:
         model_name="",
         profile_id=None,
         profile_name="",
+        tool_events=None,
         provider_message_id=None,
     ):
         if position is None:
@@ -22,9 +26,9 @@ class MessagesTable:
             """
             INSERT INTO messages (
                 conversation_id, role, content, position, model_config_id, model_name,
-                profile_id, profile_name, provider_message_id
+                profile_id, profile_name, tool_events, provider_message_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 conversation_id,
@@ -35,6 +39,7 @@ class MessagesTable:
                 model_name,
                 profile_id,
                 profile_name,
+                self._serialize_tool_events(tool_events),
                 provider_message_id,
             ),
             lastrowid=True
@@ -46,7 +51,7 @@ class MessagesTable:
             """
             SELECT id, conversation_id, role, content, position,
                    model_config_id, model_name, profile_id, profile_name,
-                   provider_message_id, created_at
+                   tool_events, provider_message_id, created_at
             FROM messages
             WHERE id = ?
             """,
@@ -60,7 +65,7 @@ class MessagesTable:
             """
             SELECT id, conversation_id, role, content, position,
                    model_config_id, model_name, profile_id, profile_name,
-                   provider_message_id, created_at
+                   tool_events, provider_message_id, created_at
             FROM messages
             WHERE conversation_id = ?
             ORDER BY position ASC, id ASC
@@ -132,6 +137,22 @@ class MessagesTable:
             "model_name": row[6] or "",
             "profile_id": row[7],
             "profile_name": row[8] or "",
-            "provider_message_id": row[9],
-            "created_at": row[10],
+            "tool_events": self._parse_tool_events(row[9]),
+            "provider_message_id": row[10],
+            "created_at": row[11],
         }
+
+    def _serialize_tool_events(self, tool_events):
+        normalized = tool_events if isinstance(tool_events, list) else []
+        return json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+
+    def _parse_tool_events(self, raw_value):
+        if not raw_value:
+            return []
+
+        try:
+            value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return []
+
+        return value if isinstance(value, list) else []

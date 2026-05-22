@@ -11,7 +11,6 @@ import {
     applyConversationsPayload,
     applyProfilesPayload,
     patchActiveConversation,
-    setChatToolEnabled,
     setPendingProfileId,
     setProfileModalState,
     setSelectedSettingsProfileId,
@@ -260,14 +259,6 @@ export function handleDocumentClick(event, { handleProjectDocumentDelete }) {
         return;
     }
 
-    const toggleToolButton = event.target.closest("[data-chat-tool-toggle]");
-    if (toggleToolButton) {
-        const toolId = String(toggleToolButton.dataset.chatToolToggle || "");
-        const isEnabled = toggleToolButton.getAttribute("aria-pressed") !== "true";
-        setChatToolEnabled(toolId, isEnabled);
-        renderChatPanel();
-        return;
-    }
 }
 
 

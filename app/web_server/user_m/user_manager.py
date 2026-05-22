@@ -98,6 +98,64 @@ class UserManager:
         )
 
         return True
+
+    def update_user_credentials(
+        self,
+        token: str,
+        current_password: str,
+        new_username: str | None = None,
+        new_password: str | None = None,
+    ):
+        session = self.db.sessions.get(token)
+        if session is None:
+            raise ValueError("Unauthorized")
+
+        current_username = session["username"]
+        user = self.db.users.get(current_username)
+        if user is None:
+            raise ValueError("User not found")
+
+        if not current_password or not check_password_hash(user["password"], current_password):
+            raise ValueError("La contraseña actual no es correcta.")
+
+        normalized_username = (new_username or current_username).strip()
+        if not normalized_username:
+            raise ValueError("El nombre de usuario no puede estar vacío.")
+
+        normalized_password = (new_password or "").strip()
+        if normalized_username != current_username and self.db.users.get(normalized_username):
+            raise ValueError("Ese nombre de usuario ya está en uso.")
+
+        if normalized_username == current_username and not normalized_password:
+            return (
+                {
+                    "username": current_username,
+                    "role": user["role"],
+                },
+                token,
+            )
+
+        password_hash = user["password"]
+        if normalized_password:
+            password_hash = generate_password_hash(normalized_password)
+
+        self.db.users.update_credentials(
+            current_username=current_username,
+            new_username=normalized_username,
+            password_hash=password_hash,
+        )
+        self.db.sessions.delete_for_username(current_username)
+
+        refreshed_token = self.generate_token(normalized_username)
+        self.db.sessions.create(username=normalized_username, token=refreshed_token)
+
+        return (
+            {
+                "username": normalized_username,
+                "role": user["role"],
+            },
+            refreshed_token,
+        )
     
     def login(self, username: str, password: str):
         if self.authenticate(username, password):

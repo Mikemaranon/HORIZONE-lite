@@ -43,12 +43,16 @@
 .brand {
     display: flex;
     align-items: flex-start;
-    padding: 4px 8px 2px;
+    padding: 6px 8px 4px;
     width: 100%;
 }
 
-.brand__title {
-    font-size: 1.08rem;
+.brand__logo-full {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
 }
 
 .sidebar-links {
@@ -336,4 +340,26 @@
 
 .sidebar-settings-button__label {
     line-height: 1;
+}
+
+.sidebar__credit {
+    margin: 6px auto 0;
+    max-width: 220px;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--text-soft);
+    text-wrap: balance;
+    text-align: center;
+}
+
+.sidebar__credit a {
+    color: inherit;
+    display: inline-block;
+    text-decoration-color: rgba(30, 31, 25, 0.24);
+    text-underline-offset: 0.16em;
+}
+
+.sidebar__credit a:hover {
+    color: var(--text);
+    text-decoration-color: currentColor;
 }

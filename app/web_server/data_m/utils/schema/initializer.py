@@ -3,6 +3,7 @@ from .core_tables import CORE_SCHEMA_STATEMENTS
 from .migrations import SCHEMA_MIGRATIONS
 from .project_tables import PROJECT_SCHEMA_STATEMENTS
 from .settings_tables import SETTINGS_SCHEMA_STATEMENTS
+from .tool_tables import TOOL_SCHEMA_STATEMENTS
 
 
 class DatabaseSchemaInitializer:
@@ -12,6 +13,7 @@ class DatabaseSchemaInitializer:
             + PROJECT_SCHEMA_STATEMENTS
             + CHAT_SCHEMA_STATEMENTS
             + SETTINGS_SCHEMA_STATEMENTS
+            + TOOL_SCHEMA_STATEMENTS
         )
         self.migrations = SCHEMA_MIGRATIONS
 

@@ -42,9 +42,23 @@ class ModelManager:
         provider_name: str,
         model: str,
         first_user_message: str,
+        settings: dict | None = None,
     ) -> str:
         return self.provider_manager.generate_conversation_title(
             provider_name,
             model,
             first_user_message,
+            settings or {},
+        )
+
+    def resolve_provider_configuration(
+        self,
+        provider_type: str,
+        endpoint: str = "",
+        api_key: str = "",
+    ) -> dict:
+        return self.provider_manager.resolve_provider_configuration(
+            provider_type,
+            endpoint,
+            api_key,
         )

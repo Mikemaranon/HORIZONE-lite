@@ -64,6 +64,16 @@ export function closeProfileModal() {
 }
 
 
+export function openSessionProfileModal() {
+    openModal(elements.sessionProfileModal);
+}
+
+
+export function closeSessionProfileModal() {
+    closeModal(elements.sessionProfileModal);
+}
+
+
 export function openModelModal() {
     openModal(elements.modelModal);
 }
@@ -101,4 +111,14 @@ export function openDocumentsModal() {
 
 export function closeDocumentsModal() {
     closeModal(elements.documentsModal);
+}
+
+
+export function openToolUploadModal() {
+    openModal(elements.toolUploadModal);
+}
+
+
+export function closeToolUploadModal() {
+    closeModal(elements.toolUploadModal);
 }

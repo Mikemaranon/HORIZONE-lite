@@ -2,11 +2,9 @@ import { getDefaultModelConfigId, getModelConfigById, getSelectedModelConfigId }
 import { state } from "./state.js";
 
 const PROVIDER_TYPE_LABELS = {
-    anthropic: "Anthropic",
-    google: "Google",
+    cloud: "Cloud",
     mlx: "MLX",
     ollama: "Ollama",
-    openai: "OpenAI",
 };
 
 

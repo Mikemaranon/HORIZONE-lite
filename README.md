@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="app/web_app/static/assets/POLAR.AI-t-small.png" alt="POLAR AI" width="150">
+  <img src="app/web_app/static/assets/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE AI" width="650">
 </p>
-
-<h1 align="center">POLAR lite</h1>
 
 <p align="center">
   A local-first AI chat app built for working with different models, keeping conversations organized, and offering a simple, lightweight, pleasant experience.
@@ -11,11 +9,11 @@
 
 ## AI That Feels Close, Fast, and Yours
 
-POLAR lite is a chat experience inspired by the comfort of modern conversational tools, but designed to give you more control. The app is meant to run in your own environment, keep your conversations organized, and let you choose how you want to work with AI at any moment.
+HORIZONE lite is a chat experience inspired by the comfort of modern conversational tools, but designed to give you more control. The app is meant to run in your own environment, keep your conversations organized, and let you choose how you want to work with AI at any moment.
 
-This is not just about sending prompts back and forth. POLAR lite aims to be a space where you can think, write, explore ideas, and keep context without friction.
+This is not just about sending prompts back and forth. HORIZONE lite aims to be a space where you can think, write, explore ideas, and keep context without friction.
 
-## What You Can Do With POLAR lite
+## What You Can Do With HORIZONE lite
 
 - Chat with different models from a single interface, without switching tools.
 - Choose between local and remote providers depending on what each conversation needs.
@@ -42,7 +40,7 @@ The goal is for it to feel light, direct, and friendly. Less friction, more cont
 
 ## Supported Providers
 
-POLAR lite can work with multiple AI paths inside the same app:
+HORIZONE lite can work with multiple AI paths inside the same app:
 
 - `MLX`: for local inference on Apple Silicon.
 - `Ollama`: for connecting to models served on `localhost`.
@@ -59,8 +57,8 @@ python app/web_server/main.py
 
 Then open the interface in your browser and start creating projects, profiles, and conversations.
 
-By default, POLAR lite stores its runtime SQLite database in `.polar-lite/flask.db` at the project root so local usage data stays out of the versioned source tree. If you need an isolated path for tests or a custom environment, set `APP_DB_PATH`.
+By default, HORIZONE lite stores its runtime SQLite database in `.horizone-lite/flask.db` at the project root so local usage data stays out of the versioned source tree. If you need an isolated path for tests or a custom environment, set `APP_DB_PATH`.
 
 ## In One Line
 
-POLAR lite is a local-first, flexible, pleasant AI conversation space built to help you choose your models, organize your work, and keep the experience simple from beginning to end.
+HORIZONE lite is a local-first, flexible, pleasant AI conversation space built to help you choose your models, organize your work, and keep the experience simple from beginning to end.

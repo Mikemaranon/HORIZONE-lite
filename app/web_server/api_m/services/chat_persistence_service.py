@@ -45,6 +45,7 @@ class ChatPersistenceService:
             model_name=assistant_message.get("model_name", ""),
             profile_id=assistant_message.get("profile_id"),
             profile_name=assistant_message.get("profile_name", ""),
+            tool_events=(response.get("raw") or {}).get("tool_events", []),
             provider_message_id=response.get("message_id"),
         )
 
@@ -78,6 +79,9 @@ class ChatPersistenceService:
                 provider,
                 model,
                 first_user_message,
+                {
+                    "_model_config_id": conversation.get("model_config_id"),
+                },
             )
         except Exception:
             return

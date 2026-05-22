@@ -424,7 +424,7 @@ class ModelsTable:
         _, row = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, is_builtin, builtin_key,
-                   created_at, updated_at
+                   resolved_adapter, resolved_metadata, created_at, updated_at
             FROM providers
             WHERE id = ?
             """,
@@ -440,7 +440,7 @@ class ModelsTable:
         _, row = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, is_builtin, builtin_key,
-                   created_at, updated_at
+                   resolved_adapter, resolved_metadata, created_at, updated_at
             FROM providers
             WHERE builtin_key = ?
             LIMIT 1
@@ -483,6 +483,8 @@ class ModelsTable:
             "api_key": row[4] or "",
             "is_builtin": bool(row[5]),
             "builtin_key": row[6] or "",
-            "created_at": row[7],
-            "updated_at": row[8],
+            "resolved_adapter": row[7] or "",
+            "resolved_metadata": row[8] or "",
+            "created_at": row[9],
+            "updated_at": row[10],
         }

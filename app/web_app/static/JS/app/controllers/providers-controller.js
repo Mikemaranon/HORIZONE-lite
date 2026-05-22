@@ -15,7 +15,7 @@ import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
 import { loadConversations, loadModels, loadProviders } from "../store.js";
 
-const PROVIDER_TYPE_OPTIONS = ["mlx", "ollama", "openai", "anthropic", "google"];
+const PROVIDER_TYPE_OPTIONS = ["mlx", "ollama", "cloud"];
 
 
 export async function handleProviderSubmit(event) {
@@ -183,8 +183,8 @@ function populateProviderModal(provider = null) {
     elements.providerBuiltinInput.value = isEditing && provider.is_builtin ? "true" : "false";
     elements.providerBuiltinKeyInput.value = isEditing ? (provider.builtin_key || "") : "";
     elements.providerNameInput.value = provider?.name || "";
-    elements.providerTypeSelect.innerHTML = getProviderTypeOptionsMarkup(provider?.provider_type || "openai");
-    elements.providerTypeSelect.value = provider?.provider_type || "openai";
+    elements.providerTypeSelect.innerHTML = getProviderTypeOptionsMarkup(provider?.provider_type || "cloud");
+    elements.providerTypeSelect.value = provider?.provider_type || "cloud";
     elements.providerEndpointInput.value = provider?.endpoint || "";
     elements.providerApiKeyInput.value = provider?.api_key || "";
 }

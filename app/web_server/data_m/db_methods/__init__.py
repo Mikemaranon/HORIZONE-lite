@@ -12,6 +12,7 @@ from .t_models import ModelsTable
 from .t_providers import ProvidersTable
 from .t_settings import SettingsTable
 from .t_models_cache import ModelsCacheTable
+from .t_tools import ToolsTable
 
 __all__ = [
     "UsersTable",
@@ -26,4 +27,5 @@ __all__ = [
     "ProvidersTable",
     "SettingsTable",
     "ModelsCacheTable",
+    "ToolsTable",
 ]

@@ -12,7 +12,7 @@ class ConfigManager:
         return RuntimeConfig(
             secret_key=os.environ.get(
                 "SECRET_KEY",
-                "polar-studio-local-dev-secret-key-2026",
+                "horizone-studio-local-dev-secret-key-2026",
             ),
             host=os.environ.get("HOST", "0.0.0.0"),
             port=self._get_env_int("PORT", 5050),

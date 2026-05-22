@@ -1,3 +1,6 @@
+import json
+
+
 class ChatContextBuilder:
     READ_ONLY_CONTEXT_NOTICE = (
         "Use this only for facts and continuity. Do not copy its tone, "
@@ -9,6 +12,11 @@ class ChatContextBuilder:
     FINAL_PROFILE_REMINDER = (
         "Final rule: follow only the active profile. Do not imitate tone, "
         "emojis, emotion, formatting, or writing style from the context."
+    )
+    TOOL_PROVENANCE_REMINDER = (
+        "Tool provenance rule: never claim that you consulted sources, used web search, "
+        "or used any external tool unless that usage appears in the read-only context "
+        "for this conversation or in the current tool results."
     )
     DEFAULT_PROFILE_NAME = "Default Assistant"
 
@@ -102,6 +110,7 @@ class ChatContextBuilder:
                 )
             )
 
+        parts.append(self.TOOL_PROVENANCE_REMINDER)
         parts.append(self.FINAL_PROFILE_REMINDER)
         return "\n\n".join(part for part in parts if part)
 
@@ -227,21 +236,28 @@ class ChatContextBuilder:
     def _build_history_message_block(self, message, content):
         role = str(message.get("role") or "unknown").strip() or "unknown"
         profile_name = str(message.get("profile_name") or "").strip()
+        tool_events_block = self._build_tool_events_context(message.get("tool_events"))
 
         if role == "assistant" and profile_name:
-            return (
+            parts = [
                 "[Previous assistant message]\n"
                 f"Profile: {profile_name}\n"
                 "Content:\n"
                 f"{content}"
-            )
+            ]
+            if tool_events_block:
+                parts.append(tool_events_block)
+            return "\n\n".join(parts)
 
         if role == "assistant":
-            return (
+            parts = [
                 "[Previous assistant message]\n"
                 "Content:\n"
                 f"{content}"
-            )
+            ]
+            if tool_events_block:
+                parts.append(tool_events_block)
+            return "\n\n".join(parts)
 
         if role == "user":
             return (
@@ -254,6 +270,21 @@ class ChatContextBuilder:
             f"[Previous {role} message]\n"
             "Content:\n"
             f"{content}"
+        )
+
+    def _build_tool_events_context(self, tool_events):
+        if not isinstance(tool_events, list) or not tool_events:
+            return ""
+
+        serialized = json.dumps(tool_events, ensure_ascii=False, sort_keys=True)
+        if len(serialized) > 4000:
+            serialized = serialized[:4000].rstrip() + "..."
+
+        return (
+            "[Previous tool usage]\n"
+            "These tool results belong to the assistant message above and can be used "
+            "to answer follow-up questions about sources, consulted data, or how the answer was produced.\n"
+            f"{serialized}"
         )
 
     def _normalize_message_content(self, content):

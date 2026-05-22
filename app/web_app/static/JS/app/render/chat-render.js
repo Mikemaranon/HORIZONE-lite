@@ -73,7 +73,7 @@ export function renderConversationHeader() {
     if (state.workspaceMode === "settings") {
         elements.workspaceEyebrow.textContent = "Configuración";
         elements.conversationTitle.textContent = "Ajustes generales";
-        elements.conversationSubtitle.textContent = "Gestiona aquí proveedores, modelos, perfiles y la sesión de POLAR lite.";
+        elements.conversationSubtitle.textContent = "Gestiona aquí proveedores, modelos, perfiles y la sesión de HORIZONE lite.";
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
         elements.conversationSubtitle.hidden = false;

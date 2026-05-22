@@ -14,6 +14,8 @@ export async function apiRequestJson(method, endpoint, body = null) {
         && !payload.projects
         && !payload.profiles
         && !payload.conversations
+        && !payload.tool
+        && !payload.tools
         && !payload.setting
         && !payload.settings
     ) {
@@ -66,6 +68,11 @@ export async function loadModelsData() {
 }
 
 
+export async function loadToolsData() {
+    return apiRequestJson("GET", "/api/tools");
+}
+
+
 export async function createModel(data) {
     return apiRequestJson("POST", "/api/models", data);
 }
@@ -83,6 +90,11 @@ export async function deleteModel(modelId) {
 
 export async function loadSettingsData() {
     return apiRequestJson("GET", "/api/settings");
+}
+
+
+export async function loadCurrentUserData() {
+    return apiRequestJson("GET", "/api/users/me");
 }
 
 
@@ -239,6 +251,28 @@ export async function persistSetting(key, value) {
 }
 
 
+export async function updateCurrentUser(data) {
+    return apiRequestJson("PATCH", "/api/users/me", data);
+}
+
+
+export async function updateTool(data) {
+    return apiRequestJson("PATCH", "/api/tools", data);
+}
+
+
+export async function reloadToolsData() {
+    return apiRequestJson("POST", "/api/tools/reload", {});
+}
+
+
+export async function uploadToolFile(file, filename = file?.name) {
+    const formData = new FormData();
+    formData.append("file", file, filename);
+    return apiRequestFormData("POST", "/api/tools", formData);
+}
+
+
 function ensureSuccessfulResponse(response, payload) {
     if (!response.ok) {
         const errorMessage = payload.error?.message
@@ -323,6 +357,16 @@ function handleStreamEvent(event, handlers) {
 
     if (event.event === "delta") {
         handlers.onDelta?.(event.payload.delta || "", event.payload);
+        return null;
+    }
+
+    if (event.event === "tool_start") {
+        handlers.onToolStart?.(event.payload, event.payload);
+        return null;
+    }
+
+    if (event.event === "tool_result") {
+        handlers.onToolResult?.(event.payload, event.payload);
         return null;
     }
 

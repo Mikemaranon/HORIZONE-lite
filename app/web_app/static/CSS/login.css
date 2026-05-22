@@ -180,44 +180,19 @@ input:focus {
 .brand {
     display: inline-flex;
     align-items: center;
-    gap: 24px;
     max-width: 100%;
 }
 
 .auth-brand__signature {
+    display: block;
     width: 100%;
-    justify-content: flex-start;
 }
 
 .brand__logo {
     display: block;
-    width: 136px;
+    width: 100%;
     height: auto;
     object-fit: contain;
-    flex-shrink: 0;
-}
-
-.brand__divider {
-    width: 1px;
-    align-self: stretch;
-    background: var(--auth-border-strong);
-    flex-shrink: 0;
-}
-
-.brand-copy {
-    margin: 0;
-    display: grid;
-    gap: 6px;
-    color: var(--auth-muted);
-    line-height: 1.15;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 1rem;
-    font-weight: 700;
-}
-
-.brand-copy span {
-    display: block;
 }
 
 .section-heading {

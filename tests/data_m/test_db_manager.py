@@ -83,10 +83,47 @@ class DBManagerTests(IsolatedDatabaseTestCase):
             messages[1]["model_name"],
             default_model["display_name"] if default_model else "gemma-3",
         )
+        self.assertEqual(messages[1]["tool_events"], [])
 
         db.conversations.rename(conversation_id, "Workspace kickoff")
         renamed_conversation = db.conversations.get(conversation_id)
         self.assertEqual(renamed_conversation["title"], "Workspace kickoff")
+
+    def test_messages_persist_tool_events(self):
+        db = DBManager()
+        profile = db.profiles.get_default()
+        conversation_id = db.conversations.create(
+            title="Sources",
+            profile_id=profile["id"],
+            provider="mlx",
+            model="gemma-3",
+        )
+
+        db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Respuesta con fuentes",
+            tool_events=[
+                {
+                    "tool_name": "web_search",
+                    "arguments": {"query": "lol followers"},
+                    "ok": True,
+                    "result": {
+                        "results": [
+                            {"title": "Fuente", "url": "https://example.com"}
+                        ]
+                    },
+                }
+            ],
+        )
+
+        message = db.messages.for_conversation(conversation_id)[0]
+
+        self.assertEqual(message["tool_events"][0]["tool_name"], "web_search")
+        self.assertEqual(
+            message["tool_events"][0]["result"]["results"][0]["url"],
+            "https://example.com",
+        )
 
     def test_settings_and_model_cache_support_upsert(self):
         db = DBManager()
@@ -189,6 +226,38 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(model["provider_type"], "ollama")
         self.assertEqual(model["icon_image"], "")
         self.assertEqual(model["display_name"], "Qwen 3")
+
+    def test_legacy_cloud_provider_types_are_migrated_to_cloud(self):
+        db = DBManager()
+        profile = db.profiles.get_default()
+        legacy_provider_id = db.providers.create(
+            name="Legacy OpenAI",
+            provider_type="openai",
+            endpoint="https://api.openai.com/v1",
+        )
+        model_id = db.models.create(
+            name="gpt-4.1",
+            provider_config_id=legacy_provider_id,
+            display_name="GPT-4.1",
+        )
+        conversation_id = db.conversations.create(
+            title="Legacy cloud",
+            profile_id=profile["id"],
+            model_config_id=model_id,
+            provider="openai",
+            model="gpt-4.1",
+        )
+
+        db.providers.ensure_seed_providers()
+
+        provider = db.providers.get(legacy_provider_id)
+        model = db.models.get(model_id)
+        conversation = db.conversations.get(conversation_id)
+
+        self.assertEqual(provider["provider_type"], "cloud")
+        self.assertEqual(provider["resolved_adapter"], "openai_compatible")
+        self.assertEqual(model["provider"], "cloud")
+        self.assertEqual(conversation["provider"], "cloud")
 
     def test_seeded_mlx_model_uses_canonical_repo_id_on_apple(self):
         with patch("data_m.db_methods.t_models.platform.system", return_value="Darwin"):

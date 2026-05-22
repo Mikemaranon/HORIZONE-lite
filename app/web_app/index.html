@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POLAR lite</title>
+    <title>HORIZONE lite</title>
     <link rel="stylesheet" href="/static/CSS/index.css">
     <script type="module" src="/static/JS/app/main.js"></script>
 </head>
@@ -21,15 +21,12 @@
             <div class="sidebar__inner">
                 <div class="sidebar__top">
                     <div class="brand">
-                        <div>
-                            <p class="brand__eyebrow">Local-first AI</p>
-                            <h1 class="brand__title">POLAR lite</h1>
-                        </div>
+                        <img class="brand__logo-full" src="/static/assets/logos/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE lite">
                     </div>
                     <nav class="sidebar-links" aria-label="Accesos rápidos">
                         <a
                             class="sidebar-link"
-                            href="https://github.com/Mikemaranon/POLAR-lite"
+                            href="https://github.com/Mikemaranon/HORIZONE-lite"
                             rel="noreferrer"
                         >
                             <span class="sidebar-link__label">
@@ -107,6 +104,11 @@
                         </span>
                         <span class="sidebar-settings-button__label">Ajustes</span>
                     </button>
+                    <p class="sidebar__credit">
+                        <a href="https://www.flaticon.com/free-icons/ui" title="ui icons" rel="noreferrer" target="_blank">
+                            Ui icons created by Azland Studio - Flaticon
+                        </a>
+                    </p>
                 </div>
             </div>
         </aside>
@@ -132,11 +134,16 @@
                                     aria-label="Abrir navegación lateral"
                                     aria-controls="app-sidebar"
                                     aria-expanded="false"
+                                    title="Mostrar u ocultar barra lateral"
                                 >
-                                    <span class="sidebar-toggle__lines" aria-hidden="true">
-                                        <span></span>
-                                        <span></span>
-                                        <span></span>
+                                    <span class="sidebar-toggle__icon" aria-hidden="true">
+                                        <img
+                                            id="sidebar-toggle-icon"
+                                            src="/static/assets/icons/sidebar-left.png"
+                                            alt=""
+                                            data-open-src="/static/assets/icons/sidebar-left.png"
+                                            data-closed-src="/static/assets/icons/sidebar-right.png"
+                                        >
                                     </span>
                                 </button>
 
@@ -154,10 +161,14 @@
                                     id="chat-settings-button"
                                     class="ghost-button workspace__settings-button"
                                     type="button"
+                                    aria-label="Ajustes del chat"
                                     aria-controls="chat-side-panel"
                                     aria-expanded="false"
+                                    title="Ajustes del chat"
                                 >
-                                    Ajustes
+                                    <span class="workspace__settings-button-icon" aria-hidden="true">
+                                        <img src="/static/assets/icons/sidebar-right.png" alt="">
+                                    </span>
                                 </button>
                             </div>
                         </div>
@@ -192,7 +203,7 @@
 
                     <section class="chat-surface">
                         <div id="empty-state" class="empty-state">
-                            <p class="empty-state__eyebrow">POLAR lite</p>
+                            <p class="empty-state__eyebrow">HORIZONE lite</p>
                             <h3>Tu espacio local para conversar con modelos.</h3>
                             <p>
                                 Crea un chat, abre ajustes generales para el modelo y usa el panel del chat para elegir perfil y preparar herramientas sin salir de esta vista.
@@ -276,7 +287,7 @@
                                     <p class="settings-space__eyebrow">Configuración</p>
                                     <h3 class="settings-space__title">Ajustes generales</h3>
                                     <p class="settings-space__description">
-                                        Gestiona aquí proveedores, modelos y perfiles de comportamiento.
+                                        Gestiona aqui proveedores, modelos, perfiles y tools globales.
                                     </p>
                                 </div>
                             </section>
@@ -330,12 +341,43 @@
                                     </div>
                                 </section>
 
+                                <section class="settings-block settings-block--tools">
+                                    <div class="settings-block__header-row">
+                                        <div>
+                                            <h4>Tools</h4>
+                                            <p class="settings-block__copy">
+                                                Activa o desactiva herramientas globales y sube archivos Python con el contrato de HORIZONE lite.
+                                            </p>
+                                        </div>
+                                        <div class="settings-block__actions settings-block__actions--tools">
+                                            <button id="settings-filter-tools-button" class="ghost-button settings-filter-toggle" type="button" aria-pressed="false">Activas</button>
+                                            <button id="settings-new-tool-button" class="action-button settings-tools-upload-button" type="button" aria-label="Subir .py" title="Subir .py">
+                                                <span class="settings-tools-upload-button__icon" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" fill="none" focusable="false" role="img">
+                                                        <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/>
+                                                        <path d="M14 2v5h5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/>
+                                                        <path d="M12 17V10" stroke="currentColor" stroke-linecap="round" stroke-width="1.7"/>
+                                                        <path d="m8.75 13.25 3.25-3.25 3.25 3.25" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/>
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="profiles-manager">
+                                        <div id="settings-tools-list" class="profiles-manager__list" aria-live="polite"></div>
+                                    </div>
+                                </section>
+
                                 <section class="settings-block settings-block--session settings-space__session">
                                     <h4>Sesión</h4>
                                     <p class="settings-block__copy">
                                         Cierra la sesión actual cuando hayas terminado de trabajar en este equipo.
                                     </p>
-                                    <button class="ghost-button" id="logout-button" type="button">Cerrar sesión</button>
+                                    <div class="settings-block__actions settings-block__actions--flush">
+                                        <button class="ghost-button" id="edit-session-profile-button" type="button">Modificar perfil</button>
+                                        <button class="ghost-button" id="logout-button" type="button">Cerrar sesión</button>
+                                    </div>
                                 </section>
                             </div>
                         </div>
@@ -369,7 +411,7 @@
                                 </div>
                             </div>
                             <p class="composer__footer-note">
-                                POLAR lite puede responder usando MLX, Ollama u OpenAI según tu configuración activa.
+                                HORIZONE lite puede responder usando MLX, Ollama u OpenAI según tu configuración activa.
                             </p>
                         </form>
                     </footer>
@@ -430,7 +472,7 @@
                         >
                             <summary class="chat-sidebar-section__summary">
                                 <span class="chat-sidebar-section__label">Tools</span>
-                                <span class="chat-sidebar-section__meta">Preparadas para la siguiente fase</span>
+                                <span class="chat-sidebar-section__meta">Catalogo global activo para este espacio</span>
                             </summary>
                             <div class="chat-sidebar-section__content">
                                 <div class="chat-sidebar-section__content-inner">
@@ -565,7 +607,7 @@
                         <input id="provider-builtin-key-input" type="hidden" value="">
                         <label class="field field--stacked">
                             <span>Nombre</span>
-                            <input id="provider-name-input" type="text" placeholder="Ej. OpenAI principal, Anthropic staging o Ollama local">
+                            <input id="provider-name-input" type="text" placeholder="Ej. Cloud principal, Ollama local o MLX del Mac">
                         </label>
                         <label class="field field--stacked">
                             <span>Tipo de proveedor</span>
@@ -573,7 +615,7 @@
                         </label>
                         <label class="field field--stacked">
                             <span>Endpoint</span>
-                            <input id="provider-endpoint-input" type="url" placeholder="https://api.openai.com/v1">
+                            <input id="provider-endpoint-input" type="url" placeholder="https://api.openai.com/v1 o http://localhost:11434/api">
                         </label>
                         <label class="field field--stacked">
                             <span>API key</span>
@@ -683,6 +725,69 @@
         </div>
     </div>
 
+    <div id="session-profile-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-session-profile-modal="true"></div>
+        <div class="modal__panel modal__panel--narrow">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Sesión</p>
+                    <h3>Modificar perfil</h3>
+                </div>
+                <button id="close-session-profile-button" class="icon-button" type="button" aria-label="Cerrar edición de sesión">×</button>
+            </div>
+
+            <div class="modal__body">
+                <section class="settings-block">
+                    <form id="session-profile-form" class="stack-form">
+                        <label class="field field--stacked">
+                            <span>Nombre de usuario</span>
+                            <input
+                                id="session-username-input"
+                                type="text"
+                                placeholder="Tu usuario de acceso"
+                                autocomplete="username"
+                            >
+                        </label>
+                        <label class="field field--stacked">
+                            <span>Contraseña actual</span>
+                            <input
+                                id="session-current-password-input"
+                                type="password"
+                                placeholder="Obligatoria para confirmar el cambio"
+                                autocomplete="current-password"
+                            >
+                        </label>
+                        <label class="field field--stacked">
+                            <span>Nueva contraseña</span>
+                            <input
+                                id="session-new-password-input"
+                                type="password"
+                                placeholder="Déjala vacía si no quieres cambiarla"
+                                autocomplete="new-password"
+                            >
+                        </label>
+                        <label class="field field--stacked">
+                            <span>Confirmar nueva contraseña</span>
+                            <input
+                                id="session-confirm-password-input"
+                                type="password"
+                                placeholder="Repite la nueva contraseña"
+                                autocomplete="new-password"
+                            >
+                        </label>
+                        <p class="field__help">
+                            Si cambias la contraseña, el resto de sesiones activas de este usuario se cerrarán por seguridad.
+                        </p>
+                        <div class="settings-block__actions">
+                            <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancelar</button>
+                            <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Guardar cambios</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <div id="project-customize-modal" class="modal" hidden>
         <div class="modal__backdrop" data-close-project-modal="true"></div>
         <div class="modal__panel">
@@ -751,6 +856,51 @@
                     <div id="documents-file-list" class="documents-file-list" aria-live="polite"></div>
                 </section>
             </div>
+        </div>
+    </div>
+
+    <div id="tool-upload-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-tool-upload-modal="true"></div>
+        <div class="modal__panel modal__panel--narrow">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Tools</p>
+                    <h3>Subir tool Python</h3>
+                </div>
+                <button id="close-tool-upload-button" class="icon-button" type="button" aria-label="Cerrar subida de tool">×</button>
+            </div>
+
+            <form id="tool-upload-form" class="modal__body stack-form">
+                <section class="settings-block">
+                    <h4>Archivo</h4>
+                    <label id="tool-upload-dropzone" class="documents-dropzone" for="tools-upload-input">
+                        <input id="tools-upload-input" type="file" accept=".py,text/x-python,text/plain" hidden>
+                        <span class="documents-dropzone__title">Suelta un archivo `.py` aquí</span>
+                        <span class="documents-dropzone__meta">También puedes hacer clic para elegirlo desde tu equipo.</span>
+                    </label>
+                    <div id="tool-upload-file-list" class="documents-file-list" aria-live="polite"></div>
+                </section>
+
+                <label class="field field--stacked">
+                    <span>Nombre de la tool</span>
+                    <input
+                        id="tool-upload-name-input"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="ej. local_search"
+                    >
+                    <p class="field__help">
+                        Se guardará como `nombre.py`. El identificador real de la tool sigue saliendo de `TOOL_NAME` dentro del archivo.
+                    </p>
+                </label>
+
+                <p id="tool-upload-error" class="form-error" hidden></p>
+
+                <div class="confirm-dialog__actions">
+                    <button id="tool-upload-cancel-button" class="ghost-button" type="button">Cancelar</button>
+                    <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Subir tool</button>
+                </div>
+            </form>
         </div>
     </div>
 </body>

@@ -30,6 +30,16 @@ class UsersTable:
         )
         return [{"username": r[0], "role": r[1]} for r in rows]
 
+    def update_credentials(self, current_username, new_username, password_hash):
+        self.db.execute(
+            """
+            UPDATE users
+            SET username = ?, password = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE username = ?
+            """,
+            (new_username, password_hash, current_username)
+        )
+
     def delete(self, username):
         self.db.execute(
             "DELETE FROM users WHERE username = ?",

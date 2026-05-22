@@ -1,9 +1,9 @@
 import os
 import tempfile
-import unittest
 from pathlib import Path
 
 from config_m import ConfigManager
+from data_m import DBManager
 from model_m import ModelOperationError, ProviderUnavailableError, UnsupportedProviderError
 from model_m.provider_manager import ProviderManager
 from model_m.providers.mlx_provider import MLXProvider
@@ -68,7 +68,29 @@ class FakeHttpClient:
             yield line
 
 
-class ProviderManagerTests(unittest.TestCase):
+def create_cloud_provider(
+    db,
+    *,
+    name,
+    endpoint,
+    adapter,
+    api_key="",
+    base_url=None,
+):
+    return db.providers.create(
+        name=name,
+        provider_type="cloud",
+        endpoint=endpoint,
+        api_key=api_key,
+        resolved_adapter=adapter,
+        resolved_metadata={
+            "base_url": base_url or endpoint.rstrip("/"),
+            "detected_from": "test",
+        },
+    )
+
+
+class ProviderManagerTests(IsolatedDatabaseTestCase):
     def tearDown(self):
         for key in [
             "OPENAI_API_KEY",
@@ -79,13 +101,14 @@ class ProviderManagerTests(unittest.TestCase):
             "HUGGINGFACE_HUB_CACHE",
         ]:
             os.environ.pop(key, None)
+        super().tearDown()
 
     def test_registers_expected_providers(self):
         manager = ProviderManager(ConfigManager())
 
         self.assertEqual(
             manager.get_registered_providers(),
-            ["mlx", "ollama", "openai", "anthropic", "google"],
+            ["mlx", "ollama", "cloud"],
         )
 
     def test_raises_for_unsupported_provider(self):
@@ -93,6 +116,27 @@ class ProviderManagerTests(unittest.TestCase):
 
         with self.assertRaises(UnsupportedProviderError):
             manager.get_provider("vertex")
+
+    def test_cloud_provider_detects_known_endpoint_hosts(self):
+        manager = ProviderManager(ConfigManager())
+
+        openai_resolution = manager.resolve_provider_configuration(
+            "cloud",
+            "https://api.openai.com/v1",
+            "sk-test",
+        )
+        google_resolution = manager.resolve_provider_configuration(
+            "cloud",
+            "https://generativelanguage.googleapis.com",
+            "sk-test",
+        )
+
+        self.assertEqual(openai_resolution["resolved_adapter"], "openai_compatible")
+        self.assertEqual(
+            openai_resolution["resolved_metadata"]["base_url"],
+            "https://api.openai.com/v1",
+        )
+        self.assertEqual(google_resolution["resolved_adapter"], "google")
 
     def test_generate_conversation_title_sanitizes_provider_response(self):
         manager = ProviderManager(ConfigManager())
@@ -119,22 +163,43 @@ class ProviderManagerTests(unittest.TestCase):
         self.assertEqual(title, "Algebra lineal aplicada")
 
     def test_openai_provider_requires_api_key(self):
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
 
         with self.assertRaises(ProviderUnavailableError):
-            manager.get_provider("openai").chat([], "gpt-4.1")
+            manager.get_provider("cloud").chat([], "gpt-4.1")
 
     def test_anthropic_provider_requires_api_key(self):
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="Anthropic Cloud",
+            endpoint="https://api.anthropic.com",
+            adapter="anthropic",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
 
         with self.assertRaises(ProviderUnavailableError):
-            manager.get_provider("anthropic").chat([], "claude-sonnet-4")
+            manager.get_provider("cloud").chat([], "claude-sonnet-4")
 
     def test_google_provider_requires_api_key(self):
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="Google Cloud",
+            endpoint="https://generativelanguage.googleapis.com",
+            adapter="google",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
 
         with self.assertRaises(ProviderUnavailableError):
-            manager.get_provider("google").chat([], "gemini-2.5-flash")
+            manager.get_provider("cloud").chat([], "gemini-2.5-flash")
 
     def test_mlx_provider_lists_existing_local_model_paths(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -207,8 +272,15 @@ class ProviderManagerTests(unittest.TestCase):
             self.assertEqual(response["message"]["content"], "Respuesta")
 
     def test_openai_provider_lists_models_via_http(self):
-        os.environ["OPENAI_API_KEY"] = "test-key"
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+            api_key="test-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
         fake_http = FakeHttpClient(
             get_response={
                 "data": [
@@ -216,8 +288,8 @@ class ProviderManagerTests(unittest.TestCase):
                 ]
             }
         )
-        provider = manager.get_provider("openai")
-        provider.http_client = fake_http
+        provider = manager.get_provider("cloud")
+        provider.adapters["openai_compatible"].http_client = fake_http
 
         models = provider.list_models()
 
@@ -226,8 +298,15 @@ class ProviderManagerTests(unittest.TestCase):
         self.assertTrue(fake_http.calls[0]["url"].endswith("/models"))
 
     def test_openai_provider_stream_chat_yields_deltas_and_final_response(self):
-        os.environ["OPENAI_API_KEY"] = "test-key"
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+            api_key="test-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
         fake_http = FakeHttpClient(
             sse_events=[
                 {
@@ -253,8 +332,8 @@ class ProviderManagerTests(unittest.TestCase):
                 },
             ]
         )
-        provider = manager.get_provider("openai")
-        provider.http_client = fake_http
+        provider = manager.get_provider("cloud")
+        provider.adapters["openai_compatible"].http_client = fake_http
 
         events = list(
             provider.stream_chat(
@@ -271,8 +350,15 @@ class ProviderManagerTests(unittest.TestCase):
         self.assertTrue(fake_http.calls[0]["payload"]["stream"])
 
     def test_openai_provider_stream_chat_can_stop_early(self):
-        os.environ["OPENAI_API_KEY"] = "test-key"
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+            api_key="test-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
         fake_http = FakeHttpClient(
             sse_events=[
                 {
@@ -297,8 +383,8 @@ class ProviderManagerTests(unittest.TestCase):
                 },
             ]
         )
-        provider = manager.get_provider("openai")
-        provider.http_client = fake_http
+        provider = manager.get_provider("cloud")
+        provider.adapters["openai_compatible"].http_client = fake_http
 
         stop_checks = iter([False, True])
         events = list(
@@ -429,8 +515,15 @@ class ProviderManagerTests(unittest.TestCase):
         self.assertIn("runner local se cerró", str(error.exception))
 
     def test_anthropic_provider_chat_uses_messages_api_shape(self):
-        os.environ["ANTHROPIC_API_KEY"] = "anthropic-key"
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="Anthropic Cloud",
+            endpoint="https://api.anthropic.com",
+            adapter="anthropic",
+            api_key="anthropic-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
         fake_http = FakeHttpClient(
             post_response={
                 "id": "msg_123",
@@ -440,8 +533,8 @@ class ProviderManagerTests(unittest.TestCase):
                 "usage": {"input_tokens": 12, "output_tokens": 7},
             }
         )
-        provider = manager.get_provider("anthropic")
-        provider.http_client = fake_http
+        provider = manager.get_provider("cloud")
+        provider.adapters["anthropic"].http_client = fake_http
 
         response = provider.chat(
             [
@@ -459,8 +552,15 @@ class ProviderManagerTests(unittest.TestCase):
         self.assertEqual(response["message"]["content"], "Hola desde Claude")
 
     def test_google_provider_lists_generate_content_models(self):
-        os.environ["GOOGLE_API_KEY"] = "google-key"
-        manager = ProviderManager(ConfigManager())
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="Google Cloud",
+            endpoint="https://generativelanguage.googleapis.com",
+            adapter="google",
+            api_key="google-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
         fake_http = FakeHttpClient(
             get_response={
                 "models": [
@@ -479,8 +579,8 @@ class ProviderManagerTests(unittest.TestCase):
                 ]
             }
         )
-        provider = manager.get_provider("google")
-        provider.http_client = fake_http
+        provider = manager.get_provider("cloud")
+        provider.adapters["google"].http_client = fake_http
 
         models = provider.list_models()
 
@@ -593,44 +693,76 @@ class ProviderManagerTests(unittest.TestCase):
 
 class ProviderManagerCacheFallbackTests(IsolatedDatabaseTestCase):
     def test_cloud_providers_can_read_shared_settings_blob(self):
-        from data_m import DBManager
-
         db = DBManager()
+        openai_id = create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+        )
+        anthropic_id = create_cloud_provider(
+            db,
+            name="Anthropic Cloud",
+            endpoint="https://api.anthropic.com",
+            adapter="anthropic",
+        )
+        google_id = create_cloud_provider(
+            db,
+            name="Google Cloud",
+            endpoint="https://generativelanguage.googleapis.com",
+            adapter="google",
+        )
         db.settings.set(
             "openai_api_key",
             '{"openai":"sk-openai","anthropic":"sk-anthropic","google":"sk-google"}',
         )
 
         manager = ProviderManager(ConfigManager(), db_manager=db)
+        provider = manager.get_provider("cloud")
 
-        self.assertEqual(manager.get_provider("openai")._get_api_key(), "sk-openai")
-        self.assertEqual(manager.get_provider("anthropic")._get_api_key(), "sk-anthropic")
-        self.assertEqual(manager.get_provider("google")._get_api_key(), "sk-google")
+        self.assertEqual(
+            provider.adapters["openai_compatible"]._build_headers(db.providers.get(openai_id))["Authorization"],
+            "Bearer sk-openai",
+        )
+        self.assertEqual(
+            provider.adapters["anthropic"]._build_headers(db.providers.get(anthropic_id))["x-api-key"],
+            "sk-anthropic",
+        )
+        self.assertEqual(
+            provider.adapters["google"]._build_headers(db.providers.get(google_id))["x-goog-api-key"],
+            "sk-google",
+        )
 
     def test_returns_cached_models_when_provider_listing_fails(self):
-        from data_m import DBManager
         from model_m.exceptions import ProviderUnavailableError
 
         db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+            api_key="test-key",
+        )
         db.models_cache.upsert(
-            provider="openai",
+            provider="cloud",
             model_id="gpt-4.1",
             display_name="GPT-4.1",
             source="openai",
         )
 
         manager = ProviderManager(ConfigManager(), db_manager=db)
-        provider = manager.get_provider("openai")
+        provider = manager.get_provider("cloud")
 
         def failing_list_models():
             raise ProviderUnavailableError(
-                "OpenAI down",
-                provider="openai",
+                "Cloud down",
+                provider="cloud",
             )
 
         provider.list_models = failing_list_models
 
-        catalog = manager.list_models("openai")
+        catalog = manager.list_models("cloud")
 
         self.assertFalse(catalog["available"])
         self.assertEqual(catalog["models"][0]["id"], "gpt-4.1")

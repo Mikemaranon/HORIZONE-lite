@@ -47,9 +47,10 @@ class ProviderSettingsResolver:
         parsed_keys = self._parse_cloud_api_keys(self.get_setting("openai_api_key"))
 
         if isinstance(parsed_keys, dict):
-            provider_key = parsed_keys.get(provider_name)
-            if provider_key:
-                return provider_key
+            for alias in self._cloud_provider_aliases(provider_name):
+                provider_key = parsed_keys.get(alias)
+                if provider_key:
+                    return provider_key
             return fallback_key
 
         if parsed_keys:
@@ -87,3 +88,22 @@ class ProviderSettingsResolver:
             return normalized
 
         return parsed if isinstance(parsed, dict) else normalized
+
+    def _cloud_provider_aliases(self, provider_name):
+        normalized = str(provider_name or "").strip().lower()
+        aliases = [normalized]
+        if normalized == "openai_compatible":
+            aliases.extend(["openai", "cloud"])
+        elif normalized == "microsoft_foundry":
+            aliases.extend(["microsoft_foundry", "openai_compatible", "openai", "cloud"])
+        elif normalized in {"anthropic", "google"}:
+            aliases.append("cloud")
+
+        seen = set()
+        ordered = []
+        for alias in aliases:
+            if not alias or alias in seen:
+                continue
+            seen.add(alias)
+            ordered.append(alias)
+        return ordered

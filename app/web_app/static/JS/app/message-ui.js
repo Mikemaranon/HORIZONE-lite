@@ -81,11 +81,33 @@ export function appendTypingMessage(message = createPendingAssistantMessage()) {
         "beforeend",
         createMessageFrameMarkup(
             message,
-            `<div class="typing-indicator"><span></span><span></span><span></span></div>`,
+            `
+                <div class="message__content message__content--status" data-pending-message-body="true">
+                    ${createTypingIndicatorMarkup()}
+                </div>
+            `,
             createMessageMetaMarkup(message),
             ` data-typing-message="true"`,
         )
     );
+    keepMessagesPinnedToBottomIfNeeded();
+}
+
+
+export function showToolStatusMessage(toolDisplayName, message = createPendingAssistantMessage()) {
+    const normalizedToolName = String(toolDisplayName || "").trim() || "herramienta";
+    if (!document.querySelector("[data-typing-message='true']")) {
+        appendTypingMessage(message);
+    }
+
+    const pendingBody = document.querySelector(
+        "[data-typing-message='true'] [data-pending-message-body='true']"
+    );
+    if (!pendingBody) {
+        return;
+    }
+
+    pendingBody.innerHTML = createToolStatusMarkup(normalizedToolName);
     keepMessagesPinnedToBottomIfNeeded();
 }
 
@@ -213,4 +235,19 @@ function resolveAssistantProfileName(message) {
 
 function resolveAssistantIconImage(message) {
     return getModelConfigById(message.model_config_id)?.icon_image || "";
+}
+
+
+function createTypingIndicatorMarkup() {
+    return `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+}
+
+
+function createToolStatusMarkup(toolDisplayName) {
+    return `
+        <p class="tool-status" aria-live="polite">
+            <span class="tool-status__dot" aria-hidden="true"></span>
+            <span>Usando herramienta: ${escapeHtml(toolDisplayName)}</span>
+        </p>
+    `;
 }

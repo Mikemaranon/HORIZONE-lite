@@ -71,6 +71,12 @@
     white-space: pre-wrap;
 }
 
+.message__content--status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.75rem;
+}
+
 .message__content--markdown > :first-child {
     margin-top: 0;
 }
@@ -320,4 +326,22 @@
 
 .typing-indicator span:nth-child(3) {
     animation-delay: 0.28s;
+}
+
+.tool-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: rgba(30, 31, 25, 0.54);
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+}
+
+.tool-status__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(30, 31, 25, 0.38);
+    animation: pulse 1.05s infinite ease-in-out;
 }

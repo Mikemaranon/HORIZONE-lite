@@ -104,3 +104,36 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
             last_user_message,
             {"role": "user", "content": "Second\nquestion"},
         )
+
+    def test_history_context_includes_previous_tool_usage(self):
+        built_messages = self.builder.build_input_messages(
+            None,
+            {
+                "name": "Research",
+                "system_prompt": "Be precise.",
+            },
+            [
+                {"role": "user", "content": "Busca el dato."},
+                {
+                    "role": "assistant",
+                    "content": "He encontrado la respuesta.",
+                    "tool_events": [
+                        {
+                            "tool_name": "web_search",
+                            "arguments": {"query": "league followers"},
+                            "ok": True,
+                            "result": {
+                                "results": [
+                                    {"title": "Fuente 1", "url": "https://example.com/1"},
+                                ]
+                            },
+                        }
+                    ],
+                },
+                {"role": "user", "content": "Dame las fuentes consultadas."},
+            ],
+        )
+
+        self.assertIn("[Previous tool usage]", built_messages[0]["content"])
+        self.assertIn("web_search", built_messages[0]["content"])
+        self.assertIn("https://example.com/1", built_messages[0]["content"])

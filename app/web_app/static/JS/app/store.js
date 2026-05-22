@@ -1,12 +1,14 @@
 import {
     loadConversationDetailData,
     loadConversationsData,
+    loadCurrentUserData,
     loadModelsData,
     loadProfilesData,
     loadProvidersData,
     loadProjectDocumentsData,
     loadProjectsData,
     loadSettingsData,
+    loadToolsData,
 } from "./api.js";
 
 
@@ -49,6 +51,16 @@ export async function loadModels() {
 }
 
 
+export async function loadTools() {
+    return loadToolsData();
+}
+
+
 export async function loadSettings() {
     return loadSettingsData();
+}
+
+
+export async function loadCurrentUser() {
+    return loadCurrentUserData();
 }

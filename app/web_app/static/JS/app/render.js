@@ -6,6 +6,8 @@ import {
     renderSettingsProvidersManager,
     renderSettingsModelsManager,
     renderSettingsProfilesManager,
+    renderSettingsSession,
+    renderSettingsToolsManager,
     renderSettingsSpace,
 } from "./render/settings-render.js";
 import { renderConversations, renderProjects } from "./render/sidebar-render.js";
@@ -19,6 +21,8 @@ export function renderAll({ onProjectSelect, onConversationSelect, onConversatio
     renderSettingsProvidersManager();
     renderSettingsModelsManager();
     renderSettingsProfilesManager();
+    renderSettingsSession();
+    renderSettingsToolsManager();
     renderChatPanel();
     renderChatSurface();
     renderDocumentsFileList();
@@ -36,5 +40,7 @@ export {
     renderSettingsProvidersManager,
     renderSettingsModelsManager,
     renderSettingsProfilesManager,
+    renderSettingsSession,
+    renderSettingsToolsManager,
     renderSettingsSpace,
 };

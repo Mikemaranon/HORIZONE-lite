@@ -9,6 +9,7 @@ import {
     closeProfileModal,
     closeProfileSwitchModal,
     closeProjectCustomizeModal,
+    closeToolUploadModal,
 } from "../modal-ui.js";
 import { hideStatus } from "../status-ui.js";
 
@@ -24,12 +25,20 @@ export function handleMessagesWheel(event, { disableMessagesAutoScroll }) {
 
 
 export function syncSidebarVisibility() {
-    if (!isMobileSidebarViewport()) {
+    const isMobile = isMobileSidebarViewport();
+    const isSidebarOpen = isMobile ? Boolean(state.isSidebarOpen) : !Boolean(state.isDesktopSidebarCollapsed);
+
+    if (!isMobile) {
         state.isSidebarOpen = false;
     }
 
-    elements.appShell?.classList.toggle("is-sidebar-open", Boolean(state.isSidebarOpen && isMobileSidebarViewport()));
-    document.body.classList.toggle("is-sidebar-open", Boolean(state.isSidebarOpen && isMobileSidebarViewport()));
+    elements.appShell?.classList.toggle("is-sidebar-open", isSidebarOpen);
+    document.body.classList.toggle("is-sidebar-open", Boolean(isMobile && state.isSidebarOpen));
+
+    if (elements.appSidebar) {
+        elements.appSidebar.setAttribute("aria-hidden", String(!isSidebarOpen));
+    }
+
     syncSidebarToggleAria();
 }
 
@@ -56,29 +65,47 @@ export function bindSidebarViewportChangeListener() {
 
 
 export function openSidebar() {
-    if (!isMobileSidebarViewport()) {
+    if (isMobileSidebarViewport()) {
+        state.isSidebarOpen = true;
+        syncSidebarVisibility();
+        return true;
+    }
+
+    if (!state.isDesktopSidebarCollapsed) {
         return false;
     }
 
-    state.isSidebarOpen = true;
+    state.isDesktopSidebarCollapsed = false;
     syncSidebarVisibility();
     return true;
 }
 
 
 export function closeSidebar() {
-    if (!state.isSidebarOpen) {
+    if (isMobileSidebarViewport()) {
+        if (!state.isSidebarOpen) {
+            return false;
+        }
+
+        state.isSidebarOpen = false;
+        syncSidebarVisibility();
+        return true;
+    }
+
+    if (state.isDesktopSidebarCollapsed) {
         return false;
     }
 
-    state.isSidebarOpen = false;
+    state.isDesktopSidebarCollapsed = true;
     syncSidebarVisibility();
     return true;
 }
 
 
 export function toggleSidebar() {
-    if (state.isSidebarOpen) {
+    const isOpen = isMobileSidebarViewport() ? Boolean(state.isSidebarOpen) : !Boolean(state.isDesktopSidebarCollapsed);
+
+    if (isOpen) {
         closeSidebar();
         return;
     }
@@ -226,6 +253,11 @@ export function handleDocumentKeyDown(event) {
         event.stopPropagation();
         return;
     }
+    if (elements.toolUploadModal && !elements.toolUploadModal.hidden) {
+        closeToolUploadModal();
+        event.stopPropagation();
+        return;
+    }
 
     if (closeChatPanel()) {
         event.stopPropagation();
@@ -314,7 +346,7 @@ function syncChatSidebarSectionHeights() {
 
 
 function syncSidebarToggleAria() {
-    const isOpen = Boolean(state.isSidebarOpen && isMobileSidebarViewport());
+    const isOpen = isMobileSidebarViewport() ? Boolean(state.isSidebarOpen) : !Boolean(state.isDesktopSidebarCollapsed);
 
     if (elements.sidebarToggleButton) {
         elements.sidebarToggleButton.setAttribute("aria-expanded", String(isOpen));
@@ -322,9 +354,14 @@ function syncSidebarToggleAria() {
             "aria-label",
             isOpen ? "Cerrar navegación lateral" : "Abrir navegación lateral"
         );
+        elements.sidebarToggleButton.title = isOpen
+            ? "Ocultar barra lateral"
+            : "Mostrar barra lateral";
     }
 
-    if (elements.appSidebar) {
-        elements.appSidebar.setAttribute("aria-hidden", String(!isOpen && isMobileSidebarViewport()));
+    if (elements.sidebarToggleIcon) {
+        const openSrc = elements.sidebarToggleIcon.dataset.openSrc;
+        const closedSrc = elements.sidebarToggleIcon.dataset.closedSrc;
+        elements.sidebarToggleIcon.src = isOpen ? openSrc : closedSrc;
     }
 }

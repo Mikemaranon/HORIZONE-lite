@@ -12,6 +12,7 @@ from .provider_registry import ProviderRegistry
 from .provider_settings_resolver import ProviderSettingsResolver
 from .providers import (
     AnthropicProvider,
+    CloudProvider,
     GoogleProvider,
     ModelProvider,
     MLXProvider,
@@ -21,6 +22,7 @@ from .providers import (
 
 __all__ = [
     "AnthropicProvider",
+    "CloudProvider",
     "ConversationTitleService",
     "GoogleProvider",
     "ModelCatalogService",

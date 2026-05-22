@@ -22,4 +22,4 @@ class DBConnectorTests(IsolatedDatabaseTestCase):
         self.assertEqual(connector.db_path, default_path)
         self.assertFalse(str(default_path).startswith(str(source_tree_root.resolve())))
         self.assertEqual(default_path.name, "flask.db")
-        self.assertEqual(default_path.parent.name, ".polar-lite")
+        self.assertEqual(default_path.parent.name, ".horizone-lite")

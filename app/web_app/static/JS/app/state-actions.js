@@ -91,6 +91,11 @@ export function setModelModalState({ mode, modelId = null, context = "settings" 
 }
 
 
+export function setToolsShowActiveOnly(isActiveOnly) {
+    state.toolsShowActiveOnly = Boolean(isActiveOnly);
+}
+
+
 export function setProjectDocuments(documents = []) {
     state.projectDocuments = documents;
 }
@@ -99,16 +104,6 @@ export function setProjectDocuments(documents = []) {
 export function setStagedDocuments(documents = []) {
     state.stagedDocuments = documents;
 }
-
-
-export function setChatToolEnabled(toolId, isEnabled) {
-    if (!toolId) {
-        return;
-    }
-
-    state.chatToolStates[toolId] = Boolean(isEnabled);
-}
-
 
 export function setActiveGenerationRequestId(requestId = null) {
     state.activeGenerationRequestId = requestId || null;
@@ -189,6 +184,11 @@ export function applyModelsPayload(data) {
 }
 
 
+export function applyToolsPayload(data) {
+    state.tools = data.tools || [];
+}
+
+
 export function applySettingsPayload(data) {
     const settings = {};
 
@@ -197,6 +197,11 @@ export function applySettingsPayload(data) {
     }
 
     state.settings = settings;
+}
+
+
+export function applyCurrentUserPayload(data) {
+    state.currentUser = data.user || null;
 }
 
 

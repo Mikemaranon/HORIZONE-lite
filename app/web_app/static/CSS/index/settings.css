@@ -95,6 +95,43 @@
     margin-top: 0;
 }
 
+.settings-block__actions--tools {
+    flex-wrap: nowrap;
+    align-items: center;
+    align-self: flex-start;
+}
+
+.settings-filter-toggle[aria-pressed="true"] {
+    border-color: rgba(199, 103, 46, 0.55);
+    box-shadow: 0 0 0 2px rgba(199, 103, 46, 0.12);
+    background: rgba(199, 103, 46, 0.06);
+}
+
+.settings-tools-upload-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    flex: none;
+}
+
+.settings-tools-upload-button__icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-tools-upload-button__icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
 .profiles-manager {
     min-width: 0;
 }
@@ -102,7 +139,7 @@
 .profiles-manager__list {
     display: grid;
     gap: 12px;
-    max-height: 520px;
+    max-height: 300px;
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -359,6 +396,7 @@
 .chat-tools-list {
     flex: 1 1 auto;
     min-height: 0;
+    margin-top: 15px;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
@@ -390,6 +428,19 @@
     display: grid;
     gap: 4px;
     min-width: 0;
+}
+
+.chat-tool-card__heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chat-tool-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
 }
 
 .chat-tool-card__copy p,

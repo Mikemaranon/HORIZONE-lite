@@ -7,6 +7,8 @@ class UserAPI(BaseAPI):
 
     def register(self):
         self.app.add_url_rule("/api/users/register", view_func=self.register_user, methods=["POST"])
+        self.app.add_url_rule("/api/users/me", view_func=self.get_current_user, methods=["GET"])
+        self.app.add_url_rule("/api/users/me", view_func=self.update_current_user, methods=["PATCH"])
         self.app.add_url_rule("/api/users/get", view_func=self.get_user, methods=["POST"])
         self.app.add_url_rule("/api/users/all", view_func=self.get_all_users, methods=["GET"])
         self.app.add_url_rule("/api/users/delete", view_func=self.delete_user, methods=["DELETE"])
@@ -31,6 +33,59 @@ class UserAPI(BaseAPI):
             return self.error("User already exists", 400)
 
         return self.ok({"message": "User created successfully"}, 201)
+
+    def get_current_user(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        token = self.user_manager.get_token_from_cookie(request)
+        if not token:
+            token = self.user_manager.get_request_token(request)
+
+        user = self.user_manager.get_user(token)
+        if not user:
+            return self.error("User not found", 404)
+
+        user.pop("password", None)
+        return self.ok({"user": user})
+
+    def update_current_user(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        token = self.user_manager.get_token_from_cookie(request)
+        if not token:
+            token = self.user_manager.get_request_token(request)
+
+        data = self.get_request_json(request)
+        current_password = data.get("current_password", "")
+        username = data.get("username")
+        password = data.get("password")
+
+        if username is None and password is None:
+            return self.error("Nothing to update", 400)
+
+        try:
+            user, refreshed_token = self.user_manager.update_user_credentials(
+                token=token,
+                current_password=current_password,
+                new_username=username,
+                new_password=password,
+            )
+        except ValueError as error:
+            message = str(error)
+            status_code = 401 if message == "Unauthorized" else 400
+            return self.error(message, status_code)
+
+        return self.ok(
+            {
+                "message": "Perfil de sesión actualizado.",
+                "user": user,
+                "token": refreshed_token,
+            }
+        )
 
     def get_user(self):
 

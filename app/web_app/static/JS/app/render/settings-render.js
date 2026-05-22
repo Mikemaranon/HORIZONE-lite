@@ -13,27 +13,22 @@ import {
 } from "../state-actions.js";
 import { state } from "../state.js";
 
-const CHAT_TOOL_PREVIEW_ITEMS = [
-    {
-        id: "web-search",
-        name: "Buscar en internet",
-        summary: "Consulta fuentes web antes de responder.",
-    },
-    {
-        id: "calculator",
-        name: "Calculadora",
-        summary: "Resuelve operaciones y conversiones rápidas.",
-    },
-    {
-        id: "current-date",
-        name: "Fecha actual",
-        summary: "Devuelve fecha y zona horaria locales.",
-    },
-];
-
 
 export function renderSettingsSpace() {
     elements.settingsSpace.hidden = state.workspaceMode !== "settings";
+}
+
+
+export function renderSettingsSession() {
+    if (!elements.sessionUsernameValue || !elements.sessionRoleValue) {
+        return;
+    }
+
+    const username = state.currentUser?.username || "Sin sesión";
+    const role = state.currentUser?.role || "unknown";
+
+    elements.sessionUsernameValue.textContent = username;
+    elements.sessionRoleValue.textContent = `Rol: ${role}`;
 }
 
 
@@ -234,6 +229,30 @@ export function renderSettingsProfilesManager() {
 }
 
 
+export function renderSettingsToolsManager() {
+    if (!elements.settingsToolsList) {
+        return;
+    }
+
+    const tools = getSortedTools().filter((tool) => (
+        state.toolsShowActiveOnly ? tool.is_active : true
+    ));
+    if (elements.settingsFilterToolsButton) {
+        elements.settingsFilterToolsButton.setAttribute(
+            "aria-pressed",
+            state.toolsShowActiveOnly ? "true" : "false",
+        );
+    }
+    elements.settingsToolsList.innerHTML = tools.length
+        ? tools.map((tool) => createToolCardMarkup(tool, "data-settings-tool-toggle")).join("")
+        : `<div class="profiles-manager__empty">${
+            state.toolsShowActiveOnly
+                ? "No hay tools activas ahora mismo."
+                : "Todavia no hay tools disponibles. Sube un archivo .py para empezar."
+        }</div>`;
+}
+
+
 export function renderChatPanel() {
     renderChatToolsList();
     renderChatModelCard();
@@ -324,20 +343,54 @@ function renderChatToolsList() {
         return;
     }
 
-    elements.chatToolsList.innerHTML = CHAT_TOOL_PREVIEW_ITEMS.map((tool) => {
-        const isEnabled = Boolean(state.chatToolStates?.[tool.id]);
-        const toggleActionLabel = `${isEnabled ? "Desactivar" : "Activar"} ${tool.name}`;
+    const tools = getSortedTools();
+    elements.chatToolsList.innerHTML = tools.length
+        ? tools.map((tool) => createToolCardMarkup(tool, "data-chat-tool-toggle")).join("")
+        : `<div class="chat-profile-card__empty">No hay tools listas todavia. Sube una desde ajustes generales o activa una de las integradas.</div>`;
+}
 
-        return `
+
+function getSortedTools() {
+    return [...(state.tools || [])].sort((left, right) => {
+        if (left.is_builtin !== right.is_builtin) {
+            return left.is_builtin ? -1 : 1;
+        }
+        const leftLabel = String(left.display_name || left.name || "");
+        const rightLabel = String(right.display_name || right.name || "");
+        const displayComparison = leftLabel.localeCompare(rightLabel);
+        if (displayComparison !== 0) {
+            return displayComparison;
+        }
+        return String(left.name || "").localeCompare(String(right.name || ""));
+    });
+}
+
+
+function createToolCardMarkup(tool, toggleAttribute) {
+    const isEnabled = Boolean(tool.is_active);
+    const toolLabel = tool.display_name || tool.name;
+    const toggleActionLabel = `${isEnabled ? "Desactivar" : "Activar"} ${toolLabel}`;
+    const badges = [
+        tool.is_builtin
+            ? `<span class="profile-summary-card__tag">Integrada</span>`
+            : `<span class="profile-summary-card__tag">Custom</span>`,
+        `<span class="profile-summary-card__tag">${escapeHtml(tool.name)}</span>`,
+        `<span class="profile-summary-card__tag">${escapeHtml(tool.filename || "tool.py")}</span>`,
+    ].join("");
+
+    return `
         <article class="chat-tool-card${isEnabled ? " is-enabled" : ""}">
             <div class="chat-tool-card__copy">
-                <strong>${escapeHtml(tool.name)}</strong>
-                <p>${escapeHtml(tool.summary)}</p>
+                <div class="chat-tool-card__heading">
+                    <strong>${escapeHtml(toolLabel)}</strong>
+                </div>
+                <p>${escapeHtml(tool.description || "Sin descripcion.")}</p>
+                <div class="chat-tool-card__meta">${badges}</div>
             </div>
             <button
                 class="chat-tool-card__toggle"
                 type="button"
-                data-chat-tool-toggle="${tool.id}"
+                ${toggleAttribute}="${tool.id}"
                 aria-pressed="${isEnabled ? "true" : "false"}"
                 aria-label="${escapeHtml(toggleActionLabel)}"
                 title="${escapeHtml(toggleActionLabel)}"
@@ -348,7 +401,6 @@ function renderChatToolsList() {
             </button>
         </article>
     `;
-    }).join("");
 }
 
 

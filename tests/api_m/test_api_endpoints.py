@@ -9,6 +9,51 @@ from api_m.domains.chat_api import ChatAPI
 class ApiEndpointTests(ApiTestCase):
     MODEL_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0XcAAAAASUVORK5CYII="
 
+    def test_current_user_endpoint_returns_authenticated_user(self):
+        response = self.client.get("/api/users/me", headers=self.auth_headers)
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["user"]["username"], "admin")
+        self.assertEqual(payload["user"]["role"], "admin")
+        self.assertNotIn("password", payload["user"])
+
+    def test_current_user_can_update_username_and_password(self):
+        response = self.client.patch(
+            "/api/users/me",
+            json={
+                "username": "polar-admin",
+                "current_password": "admin",
+                "password": "new-secret",
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["user"]["username"], "polar-admin")
+        self.assertNotEqual(payload["token"], self.token)
+        self.assertIsNone(self.db.users.get("admin"))
+        self.assertIsNotNone(self.db.users.get("polar-admin"))
+        self.assertFalse(self.user_manager.validate_token(self.token))
+        self.assertTrue(self.user_manager.validate_token(payload["token"]))
+        self.assertTrue(self.user_manager.authenticate("polar-admin", "new-secret"))
+
+    def test_current_user_update_requires_valid_current_password(self):
+        response = self.client.patch(
+            "/api/users/me",
+            json={
+                "username": "polar-admin",
+                "current_password": "wrong-password",
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["error"], "La contraseña actual no es correcta.")
+        self.assertIsNotNone(self.db.users.get("admin"))
+
     def test_models_endpoint_returns_configured_models(self):
         response = self.client.get("/api/models", headers=self.auth_headers)
         payload = response.get_json()
@@ -25,7 +70,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/providers",
             json={
                 "name": "OpenAI Sandbox",
-                "provider_type": "openai",
+                "provider_type": "cloud",
                 "endpoint": "https://api.openai.com/v1",
                 "api_key": "test-key",
             },
@@ -83,7 +128,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(conversation_response.status_code, 201)
         self.assertEqual(conversation["project_id"], project["id"])
         self.assertEqual(conversation["profile_id"], profile["id"])
-        self.assertEqual(conversation["provider"], "openai")
+        self.assertEqual(conversation["provider"], "cloud")
         self.assertEqual(conversation["model_config_id"], model["id"])
         self.assertEqual(model["icon_image"], self.MODEL_ICON_DATA_URL)
         self.assertEqual(model["name"], "gpt-4.1")
@@ -473,7 +518,7 @@ class ApiEndpointTests(ApiTestCase):
         )
         calls = []
 
-        def fake_generate_title(provider, model, first_user_message):
+        def fake_generate_title(provider, model, first_user_message, settings=None):
             calls.append(("title", provider, model, first_user_message))
             return "Computacion cuantica"
 
@@ -525,7 +570,7 @@ class ApiEndpointTests(ApiTestCase):
             model="gemma-3",
         )
 
-        def failing_generate_title(provider, model, first_user_message):
+        def failing_generate_title(provider, model, first_user_message, settings=None):
             raise ProviderUnavailableError("MLX offline", provider="mlx")
 
         def fake_chat(provider, messages, model, settings):
@@ -708,6 +753,63 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(stored_messages[1]["content"], "Hola mundo")
         self.assertEqual(stored_messages[1]["provider_message_id"], "resp-stream-1")
 
+    def test_chat_endpoint_streams_tool_progress_before_final_response(self):
+        conversation_id = self.db.conversations.create(
+            title="Streaming tool progress",
+            provider="ollama",
+            model="qwen3",
+        )
+        tool = self.db.tools.get_by_name("web_search")
+        self.db.tools.set_active(tool["id"], True)
+        self.api_manager.services.tool_registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
+            "query": arguments.get("query", ""),
+            "results": [
+                {
+                    "title": "Ultima hora",
+                    "url": "https://example.com/ultima-hora",
+                    "snippet": "Noticia destacada",
+                }
+            ],
+            "result_count": 1,
+        }
+
+        self.model_manager.chat = lambda provider, messages, model, settings: {
+            "provider": provider,
+            "model": model,
+            "message": {
+                "role": "assistant",
+                "content": "Aquí tienes una noticia reciente: https://example.com/ultima-hora",
+            },
+            "message_id": "resp-stream-tool-1",
+            "usage": {"completion_tokens": 6},
+            "finish_reason": "stop",
+            "raw": {},
+        }
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "busca noticias de ultima hora"}],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+            buffered=True,
+        )
+
+        payload = response.get_data(as_text=True)
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("event: tool_start", payload)
+        self.assertIn('"tool_name": "web_search"', payload)
+        self.assertIn("event: delta", payload)
+        self.assertIn("https://example.com/ultima-hora", payload)
+        self.assertEqual(
+            stored_messages[-1]["content"],
+            "Aquí tienes una noticia reciente: https://example.com/ultima-hora",
+        )
+
     def test_chat_endpoint_streams_error_event_when_provider_fails(self):
         conversation_id = self.db.conversations.create(
             title="Streaming broken",
@@ -790,6 +892,125 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("event: error", payload)
         self.assertIn("Tokenizer template exploded", payload)
+
+    def test_chat_sources_follow_up_reports_no_external_sources_when_previous_answer_had_no_tools(self):
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="No sources",
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="Quien jugó contra KOI el domingo 10?",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Movistar KOI jugó contra G2 Esports.",
+            profile_id=profile["id"],
+            profile_name=profile["name"],
+        )
+
+        self.model_manager.stream_chat = lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("stream_chat should not be called for deterministic source attribution")
+        )
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [
+                    {"role": "user", "content": "Quien jugó contra KOI el domingo 10?"},
+                    {"role": "assistant", "content": "Movistar KOI jugó contra G2 Esports."},
+                    {"role": "user", "content": "que fuentes has consultado?"},
+                ],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+            buffered=True,
+        )
+
+        payload = response.get_data(as_text=True)
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("event: end", payload)
+        self.assertIn("No consulté fuentes externas en la respuesta anterior.", payload)
+        self.assertEqual(stored_messages[-1]["tool_events"], [])
+
+    def test_chat_sources_follow_up_returns_sources_from_previous_tool_events(self):
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Real sources",
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="Busca los partidos del domingo 10.",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="Movistar KOI jugó contra G2 Esports.",
+            profile_id=profile["id"],
+            profile_name=profile["name"],
+            tool_events=[
+                {
+                    "tool_name": "web_search",
+                    "arguments": {"query": "Movistar KOI Sunday May 10 match"},
+                    "ok": True,
+                    "result": {
+                        "results": [
+                            {
+                                "title": "Schedule",
+                                "url": "https://example.com/schedule",
+                            },
+                            {
+                                "title": "Match recap",
+                                "url": "https://example.com/recap",
+                            },
+                        ]
+                    },
+                }
+            ],
+        )
+
+        self.model_manager.stream_chat = lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("stream_chat should not be called for deterministic source attribution")
+        )
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [
+                    {"role": "user", "content": "Busca los partidos del domingo 10."},
+                    {"role": "assistant", "content": "Movistar KOI jugó contra G2 Esports."},
+                    {"role": "user", "content": "dime fuentes consultadas"},
+                ],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+            buffered=True,
+        )
+
+        payload = response.get_data(as_text=True)
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Las fuentes consultadas en la respuesta anterior son:", payload)
+        self.assertIn("Schedule", payload)
+        self.assertIn("example.com", payload)
+        self.assertEqual(
+            stored_messages[-1]["tool_events"][0]["tool_name"],
+            "web_search",
+        )
 
     def test_settings_endpoint_persists_api_key(self):
         write_response = self.client.post(

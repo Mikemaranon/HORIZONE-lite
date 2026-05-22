@@ -8,10 +8,11 @@ from model_m import ProviderError
 
 
 class ChatStreamService:
-    def __init__(self, db_manager, model_manager, persistence_service):
+    def __init__(self, db_manager, model_manager, persistence_service, tool_manager=None):
         self.db = db_manager
         self.model_manager = model_manager
         self.persistence_service = persistence_service
+        self.tool_manager = tool_manager
         self._active_streams = {}
         self._active_streams_lock = threading.Lock()
 
@@ -61,7 +62,8 @@ class ChatStreamService:
                 final_response = None
                 streamed_text_parts = []
 
-                for event in self.model_manager.stream_chat(
+                stream_source = self.tool_manager or self.model_manager
+                for event in stream_source.stream_chat(
                     provider,
                     input_messages,
                     model,
@@ -75,6 +77,28 @@ class ChatStreamService:
                         if delta:
                             streamed_text_parts.append(delta)
                             yield self._format_sse("delta", {"delta": delta})
+                        continue
+
+                    if event_type == "tool_start":
+                        yield self._format_sse(
+                            "tool_start",
+                            {
+                                "tool_name": event.get("tool_name", ""),
+                                "display_name": event.get("display_name", ""),
+                                "arguments": event.get("arguments") or {},
+                            },
+                        )
+                        continue
+
+                    if event_type == "tool_result":
+                        yield self._format_sse(
+                            "tool_result",
+                            {
+                                "tool_name": event.get("tool_name", ""),
+                                "display_name": event.get("display_name", ""),
+                                "ok": bool(event.get("ok")),
+                            },
+                        )
                         continue
 
                     if event_type == "response":
@@ -138,6 +162,59 @@ class ChatStreamService:
                 )
             finally:
                 self._release_stream(request_id)
+
+        return Response(
+            generate(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    def build_static_stream_response(
+        self,
+        conversation_id,
+        provider,
+        model,
+        request_id,
+        assistant_message_meta,
+        response,
+    ):
+        @stream_with_context
+        def generate():
+            yield self._format_sse(
+                "start",
+                {
+                    "conversation_id": conversation_id,
+                    "provider": provider,
+                    "model": model,
+                    "request_id": request_id,
+                    "message_meta": assistant_message_meta,
+                },
+            )
+
+            content = ((response.get("message") or {}).get("content") or "")
+            if content:
+                yield self._format_sse("delta", {"delta": content})
+
+            if conversation_id:
+                self.persistence_service.finalize_response(
+                    conversation_id,
+                    response,
+                    assistant_message_meta,
+                )
+
+            payload = {
+                "response": response,
+                "cancelled": False,
+                "request_id": request_id,
+                "message_meta": assistant_message_meta,
+            }
+            if conversation_id:
+                payload["conversation"] = self.db.conversations.get(conversation_id)
+
+            yield self._format_sse("end", payload)
 
         return Response(
             generate(),

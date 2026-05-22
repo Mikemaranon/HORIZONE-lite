@@ -20,4 +20,8 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("messages", "model_name", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "profile_id", "INTEGER"),
     ColumnMigration("messages", "profile_name", "TEXT DEFAULT ''"),
+    ColumnMigration("messages", "tool_events", "TEXT DEFAULT ''"),
+    ColumnMigration("providers", "resolved_adapter", "TEXT DEFAULT ''"),
+    ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
+    ColumnMigration("tools", "display_name", "TEXT DEFAULT ''"),
 ]

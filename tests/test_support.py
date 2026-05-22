@@ -26,12 +26,15 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "test.db"
+        self.tools_path = Path(self.temp_dir.name) / "tools"
         os.environ["APP_DB_PATH"] = str(self.db_path)
+        os.environ["HORIZONE_LITE_TOOLS_PATH"] = str(self.tools_path)
         reset_singletons()
 
     def tearDown(self):
         reset_singletons()
         os.environ.pop("APP_DB_PATH", None)
+        os.environ.pop("HORIZONE_LITE_TOOLS_PATH", None)
         self.temp_dir.cleanup()
 
 

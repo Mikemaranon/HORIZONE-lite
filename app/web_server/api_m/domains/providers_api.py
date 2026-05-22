@@ -4,7 +4,7 @@ from api_m.domains.base_api import BaseAPI
 
 
 class ProvidersAPI(BaseAPI):
-    SUPPORTED_PROVIDER_TYPES = {"mlx", "ollama", "openai", "anthropic", "google"}
+    SUPPORTED_PROVIDER_TYPES = {"mlx", "ollama", "cloud"}
 
     def register(self):
         self.app.add_url_rule("/api/providers", view_func=self.handle_providers_get, methods=["GET"])
@@ -27,9 +27,9 @@ class ProvidersAPI(BaseAPI):
 
             if not provider:
                 return self.error("Provider not found", 404)
-            return self.ok({"provider": provider})
+            return self.ok({"provider": self._serialize_public_provider(provider)})
 
-        return self.ok({"providers": self.db.providers.all()})
+        return self.ok({"providers": [self._serialize_public_provider(provider) for provider in self.db.providers.all()]})
 
     def handle_providers_post(self):
         auth = self.authenticate_request(request)
@@ -43,7 +43,7 @@ class ProvidersAPI(BaseAPI):
             return self.error(str(error), 400)
 
         provider_id = self.db.providers.create(**provider_data)
-        return self.ok({"provider": self.db.providers.get(provider_id)}, 201)
+        return self.ok({"provider": self._serialize_public_provider(self.db.providers.get(provider_id))}, 201)
 
     def handle_providers_patch(self):
         auth = self.authenticate_request(request)
@@ -68,7 +68,7 @@ class ProvidersAPI(BaseAPI):
 
         self.db.providers.update(provider_id=provider_id, **provider_data)
         self.db.models.sync_provider_snapshot(provider_id)
-        return self.ok({"provider": self.db.providers.get(provider_id)})
+        return self.ok({"provider": self._serialize_public_provider(self.db.providers.get(provider_id))})
 
     def handle_providers_delete(self):
         auth = self.authenticate_request(request)
@@ -109,23 +109,51 @@ class ProvidersAPI(BaseAPI):
             return self.error("Provider not found or not restorable", 404)
 
         self.db.models.sync_provider_snapshot(provider_id)
-        return self.ok({"provider": provider})
+        return self.ok({"provider": self._serialize_public_provider(provider)})
 
     def _parse_provider_payload(self, data):
         self.require_fields(data, "name", "provider_type")
         name = str(data.get("name", "")).strip()
         provider_type = str(data.get("provider_type", "")).strip().lower()
+        endpoint = str(data.get("endpoint", "")).strip()
+        api_key = str(data.get("api_key", "")).strip()
 
         if not name:
             raise ValueError("Missing name")
         if provider_type not in self.SUPPORTED_PROVIDER_TYPES:
-            raise ValueError("Provider type must be one of: mlx, ollama, openai, anthropic, google")
+            raise ValueError("Provider type must be one of: mlx, ollama, cloud")
+        if provider_type in {"ollama", "cloud"} and not endpoint:
+            raise ValueError("Missing endpoint")
+
+        resolved = self.model_manager.resolve_provider_configuration(
+            provider_type,
+            endpoint,
+            api_key,
+        )
 
         return {
             "name": name,
             "provider_type": provider_type,
-            "endpoint": str(data.get("endpoint", "")).strip(),
-            "api_key": str(data.get("api_key", "")).strip(),
+            "endpoint": endpoint,
+            "api_key": api_key,
+            "resolved_adapter": resolved["resolved_adapter"],
+            "resolved_metadata": resolved["resolved_metadata"],
             "is_builtin": bool(data.get("is_builtin", False)),
             "builtin_key": str(data.get("builtin_key", "")).strip().lower() or None,
+        }
+
+    def _serialize_public_provider(self, provider):
+        if not provider:
+            return None
+
+        return {
+            "id": provider["id"],
+            "name": provider["name"],
+            "provider_type": provider["provider_type"],
+            "endpoint": provider["endpoint"],
+            "api_key": provider["api_key"],
+            "is_builtin": provider["is_builtin"],
+            "builtin_key": provider["builtin_key"],
+            "created_at": provider["created_at"],
+            "updated_at": provider["updated_at"],
         }

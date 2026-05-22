@@ -51,6 +51,17 @@ import {
     openCreateProviderModal,
 } from "./controllers/providers-controller.js";
 import {
+    handleDocumentToolClick,
+    handleToolsFilterToggle,
+    handleToolUploadButtonClick,
+    handleToolUploadDragLeave,
+    handleToolUploadDragOver,
+    handleToolUploadDrop,
+    handleToolUploadInputChange,
+    handleToolUploadNameInput,
+    handleToolUploadSubmit,
+} from "./controllers/tools-controller.js";
+import {
     handleBackToProject,
     handleDocumentsDragLeave,
     handleDocumentsDragOver,
@@ -65,7 +76,12 @@ import {
     handleProjectSelect,
     handleWorkspaceSettingsOpen,
 } from "./controllers/projects-controller.js";
-import { ensureAuthenticated, handleLogout } from "./controllers/session-controller.js";
+import {
+    ensureAuthenticated,
+    handleLogout,
+    handleSessionProfileSubmit,
+    openSessionProfileEditor,
+} from "./controllers/session-controller.js";
 import { elements } from "./dom.js";
 import {
     closeDocumentsModal,
@@ -75,18 +91,31 @@ import {
     closeProfileSwitchModal,
     closeProjectCustomizeModal,
     closeProviderModal,
+    closeSessionProfileModal,
+    closeToolUploadModal,
     openProjectCustomizeModal,
 } from "./modal-ui.js";
 import {
     applyConversationsPayload,
+    applyCurrentUserPayload,
     applyModelsPayload,
     applyProfilesPayload,
     applyProjectsPayload,
     applyProvidersPayload,
     applySettingsPayload,
+    applyToolsPayload,
     enterHomeWorkspace,
 } from "./state-actions.js";
-import { loadConversations, loadModels, loadProfiles, loadProjects, loadProviders, loadSettings } from "./store.js";
+import {
+    loadConversations,
+    loadCurrentUser,
+    loadModels,
+    loadProfiles,
+    loadProjects,
+    loadProviders,
+    loadSettings,
+    loadTools,
+} from "./store.js";
 
 const onProjectSelect = (projectId) => handleProjectSelect(projectId, { closeSidebarOnMobile });
 const onConversationSelect = (conversationId) => handleConversationSelect(conversationId, { closeSidebarOnMobile });
@@ -109,13 +138,15 @@ registerChatCallbacks({
 
 
 export async function bootApp() {
-    const [settingsData, providersData, profilesData, projectsData, modelsData, conversationsData] = await Promise.all([
+    const [settingsData, providersData, profilesData, projectsData, modelsData, toolsData, conversationsData, currentUserData] = await Promise.all([
         loadSettings(),
         loadProviders(),
         loadProfiles(),
         loadProjects(),
         loadModels(),
+        loadTools(),
         loadConversations(),
+        loadCurrentUser(),
     ]);
 
     applySettingsPayload(settingsData);
@@ -123,7 +154,9 @@ export async function bootApp() {
     applyProfilesPayload(profilesData);
     applyProjectsPayload(projectsData);
     applyModelsPayload(modelsData);
+    applyToolsPayload(toolsData);
     applyConversationsPayload(conversationsData);
+    applyCurrentUserPayload(currentUserData);
     enterHomeWorkspace();
     syncSidebarVisibility();
     syncChatPanelVisibility();
@@ -162,6 +195,16 @@ export function bindUI() {
     elements.editProfileButton?.addEventListener("click", handleActiveChatProfileEdit);
     elements.settingsNewProviderButton?.addEventListener("click", openCreateProviderModal);
     elements.settingsNewModelButton?.addEventListener("click", () => openCreateModelModal("settings"));
+    elements.settingsNewToolButton?.addEventListener("click", handleToolUploadButtonClick);
+    elements.settingsFilterToolsButton?.addEventListener("click", handleToolsFilterToggle);
+    elements.toolsUploadInput?.addEventListener("change", handleToolUploadInputChange);
+    elements.toolUploadNameInput?.addEventListener("input", handleToolUploadNameInput);
+    elements.toolUploadForm?.addEventListener("submit", handleToolUploadSubmit);
+    elements.closeToolUploadButton?.addEventListener("click", closeToolUploadModal);
+    elements.toolUploadCancelButton?.addEventListener("click", closeToolUploadModal);
+    elements.toolUploadDropzone?.addEventListener("dragover", handleToolUploadDragOver);
+    elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
+    elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
     elements.closeModelSwitchButton?.addEventListener("click", closeModelSwitchModal);
     elements.closeModelButton?.addEventListener("click", closeModelModal);
     elements.closeProviderButton?.addEventListener("click", closeProviderModal);
@@ -177,9 +220,13 @@ export function bindUI() {
     elements.projectCustomizeForm?.addEventListener("submit", handleProjectCustomizeSubmit);
     elements.deleteProjectButton?.addEventListener("click", handleProjectDelete);
     elements.settingsNewProfileButton?.addEventListener("click", () => openCreateProfileModal("settings"));
+    elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);
     elements.modelCancelButton?.addEventListener("click", closeModelModal);
     elements.providerCancelButton?.addEventListener("click", closeProviderModal);
     elements.profileCancelButton?.addEventListener("click", closeProfileModal);
+    elements.closeSessionProfileButton?.addEventListener("click", closeSessionProfileModal);
+    elements.sessionProfileCancelButton?.addEventListener("click", closeSessionProfileModal);
+    elements.sessionProfileForm?.addEventListener("submit", handleSessionProfileSubmit);
     elements.documentsInput?.addEventListener("change", handleDocumentsSelected);
     elements.documentsDropzone?.addEventListener("dragover", handleDocumentsDragOver);
     elements.documentsDropzone?.addEventListener("dragleave", handleDocumentsDragLeave);
@@ -195,8 +242,10 @@ export function bindUI() {
     elements.providerModal?.addEventListener("click", handleProviderModalClick);
     elements.profileSwitchModal?.addEventListener("click", handleProfileSwitchModalClick);
     elements.profileModal?.addEventListener("click", handleProfileModalClick);
+    elements.sessionProfileModal?.addEventListener("click", handleSessionProfileModalClick);
     elements.projectCustomizeModal?.addEventListener("click", handleProjectModalClick);
     elements.documentsModal?.addEventListener("click", handleDocumentsModalClick);
+    elements.toolUploadModal?.addEventListener("click", handleToolUploadModalClick);
     elements.modelSwitchSearchInput?.addEventListener("input", handleModelSearchInput);
     document.addEventListener("keydown", handleDocumentKeyDown);
     document.querySelectorAll("[data-prompt]").forEach((element) => {
@@ -207,6 +256,7 @@ export function bindUI() {
         });
     });
     document.addEventListener("click", (event) => handleDocumentClick(event, { handleProjectDocumentDelete }));
+    document.addEventListener("click", handleDocumentToolClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();
     syncChatSidebarSections();
@@ -260,8 +310,22 @@ function handleProjectModalClick(event) {
 }
 
 
+function handleSessionProfileModalClick(event) {
+    if (event.target.dataset.closeSessionProfileModal === "true") {
+        closeSessionProfileModal();
+    }
+}
+
+
 function handleDocumentsModalClick(event) {
     if (event.target.dataset.closeDocumentsModal === "true") {
         closeDocumentsModal();
+    }
+}
+
+
+function handleToolUploadModalClick(event) {
+    if (event.target.dataset.closeToolUploadModal === "true") {
+        closeToolUploadModal();
     }
 }

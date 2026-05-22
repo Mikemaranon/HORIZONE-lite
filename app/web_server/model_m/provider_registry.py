@@ -4,11 +4,9 @@ from .exceptions import UnsupportedProviderError
 from .http_client import JsonHttpClient
 from .provider_settings_resolver import ProviderSettingsResolver
 from .providers import (
-    AnthropicProvider,
-    GoogleProvider,
+    CloudProvider,
     MLXProvider,
     OllamaProvider,
-    OpenAIProvider,
 )
 
 
@@ -46,19 +44,7 @@ class ProviderRegistry:
                 http_client=self.http_client,
                 settings_resolver=self.settings_resolver,
             ),
-            "openai": OpenAIProvider(
-                provider_config,
-                db_manager=self.db_manager,
-                http_client=self.http_client,
-                settings_resolver=self.settings_resolver,
-            ),
-            "anthropic": AnthropicProvider(
-                provider_config,
-                db_manager=self.db_manager,
-                http_client=self.http_client,
-                settings_resolver=self.settings_resolver,
-            ),
-            "google": GoogleProvider(
+            "cloud": CloudProvider(
                 provider_config,
                 db_manager=self.db_manager,
                 http_client=self.http_client,

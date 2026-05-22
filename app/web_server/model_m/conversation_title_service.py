@@ -5,7 +5,14 @@ class ConversationTitleService:
         "y en el idioma dominante del mensaje."
     )
 
-    def generate_title(self, provider, model, first_user_message):
+    def generate_title(self, provider, model, first_user_message, settings=None):
+        title_settings = {
+            "temperature": 0.2,
+            "max_tokens": 24,
+        }
+        if settings:
+            title_settings.update(settings)
+
         response = provider.chat(
             [
                 {
@@ -18,10 +25,7 @@ class ConversationTitleService:
                 },
             ],
             model,
-            {
-                "temperature": 0.2,
-                "max_tokens": 24,
-            },
+            title_settings,
         )
         raw_title = (response.get("message") or {}).get("content", "")
         return self._sanitize_generated_title(raw_title)

@@ -116,6 +116,10 @@ select:disabled {
     border-radius: var(--radius-pill);
 }
 
+.ghost-button[aria-pressed="true"] {
+    color: var(--text);
+}
+
 .icon-button {
     width: 42px;
     height: 42px;

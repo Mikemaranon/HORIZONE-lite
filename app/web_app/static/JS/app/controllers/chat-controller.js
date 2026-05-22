@@ -12,6 +12,7 @@ import {
     finalizeStreamingAssistantMessage,
     removeStreamingAssistantMessage,
     removeTypingMessage,
+    showToolStatusMessage,
     syncMessagesAutoScrollState,
     updateStreamingAssistantMessage,
 } from "../message-ui.js";
@@ -125,6 +126,12 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
 
                 streamingAssistantMessage.content += delta;
                 updateStreamingAssistantMessage(streamingAssistantMessage.content);
+            },
+            onToolStart(toolPayload) {
+                showToolStatusMessage(
+                    toolPayload?.display_name || toolPayload?.tool_name || "herramienta",
+                    assistantMessageMeta,
+                );
             },
         });
 

@@ -37,3 +37,9 @@ class SessionsTable:
             "DELETE FROM sessions WHERE token = ?",
             (token,)
         )
+
+    def delete_for_username(self, username):
+        self.db.execute(
+            "DELETE FROM sessions WHERE username = ?",
+            (username,)
+        )

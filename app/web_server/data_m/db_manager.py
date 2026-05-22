@@ -14,6 +14,7 @@ from .db_methods import (
     ModelsTable,
     SettingsTable,
     ModelsCacheTable,
+    ToolsTable,
 )
 
 class DBManager:
@@ -44,6 +45,7 @@ class DBManager:
         self.models = ModelsTable(self.db)
         self.settings = SettingsTable(self.db)
         self.models_cache = ModelsCacheTable(self.db)
+        self.tools = ToolsTable(self.db)
 
         self._ensure_defaults()
 

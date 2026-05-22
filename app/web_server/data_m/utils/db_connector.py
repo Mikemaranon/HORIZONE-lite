@@ -5,7 +5,7 @@ from pathlib import Path
 
 DB_FILENAME = "flask.db"
 DB_PATH_ENV = "APP_DB_PATH"
-RUNTIME_DIRNAME = ".polar-lite"
+RUNTIME_DIRNAME = ".horizone-lite"
 
 
 def _default_db_path():

@@ -41,6 +41,7 @@ CHAT_SCHEMA_STATEMENTS = [
         model_name TEXT DEFAULT '',
         profile_id INTEGER,
         profile_name TEXT DEFAULT '',
+        tool_events TEXT DEFAULT '',
         provider_message_id TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,

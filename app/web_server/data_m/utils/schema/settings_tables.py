@@ -6,6 +6,8 @@ SETTINGS_SCHEMA_STATEMENTS = [
         provider_type TEXT NOT NULL,
         endpoint TEXT DEFAULT '',
         api_key TEXT DEFAULT '',
+        resolved_adapter TEXT DEFAULT '',
+        resolved_metadata TEXT DEFAULT '',
         is_builtin INTEGER DEFAULT 0,
         builtin_key TEXT DEFAULT '',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,

@@ -57,12 +57,29 @@ class ProviderManager:
         provider_name: str,
         model: str,
         first_user_message: str,
+        settings: dict | None = None,
     ) -> str:
         return self.conversation_title_service.generate_title(
             self.get_provider(provider_name),
             model,
             first_user_message,
+            settings or {},
         )
 
     def get_registered_providers(self) -> list[str]:
         return self.provider_registry.get_registered_providers()
+
+    def resolve_provider_configuration(
+        self,
+        provider_type: str,
+        endpoint: str = "",
+        api_key: str = "",
+    ) -> dict:
+        if provider_type != "cloud":
+            return {
+                "resolved_adapter": "",
+                "resolved_metadata": {},
+            }
+
+        provider = self.get_provider("cloud")
+        return provider.resolve_configuration(endpoint, api_key)
