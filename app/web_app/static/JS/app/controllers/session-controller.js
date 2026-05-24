@@ -6,9 +6,9 @@ import {
     store_token,
 } from "../../SERVER_CONN/token-handler.js";
 import { updateCurrentUser } from "../api.js";
-import { renderApp } from "../app-runtime.js";
 import { elements } from "../dom.js";
 import { closeSessionProfileModal, openSessionProfileModal } from "../modal-ui.js";
+import { renderSettingsSession } from "../render.js";
 import { applyCurrentUserPayload } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
@@ -87,7 +87,7 @@ export async function handleSessionProfileSubmit(event) {
         }
 
         applyCurrentUserPayload(payload);
-        renderApp();
+        renderSettingsSession();
         closeSessionProfileModal();
         elements.sessionProfileForm?.reset();
         showStatus(payload.message || "Perfil de sesión actualizado.");

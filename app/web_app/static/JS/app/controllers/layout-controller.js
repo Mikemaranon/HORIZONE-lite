@@ -229,7 +229,7 @@ export function handleDocumentKeyDown(event) {
         event.stopPropagation();
         return;
     }
-    if (!elements.profileModal.hidden) {
+    if (elements.profileModal && !elements.profileModal.hidden) {
         closeProfileModal();
         event.stopPropagation();
         return;
@@ -244,12 +244,12 @@ export function handleDocumentKeyDown(event) {
         event.stopPropagation();
         return;
     }
-    if (!elements.projectCustomizeModal.hidden) {
+    if (elements.projectCustomizeModal && !elements.projectCustomizeModal.hidden) {
         closeProjectCustomizeModal();
         event.stopPropagation();
         return;
     }
-    if (!elements.documentsModal.hidden) {
+    if (elements.documentsModal && !elements.documentsModal.hidden) {
         closeDocumentsModal();
         event.stopPropagation();
         return;

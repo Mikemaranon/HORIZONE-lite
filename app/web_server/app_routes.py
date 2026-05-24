@@ -21,6 +21,7 @@ class AppRoutes:
     def _register_routes(self):
         self.app.add_url_rule("/", "home", self.get_home, methods=["GET"])
         self.app.add_url_rule("/index", "index", self.get_index)
+        self.app.add_url_rule("/settings", "settings", self.get_settings)
         self.app.add_url_rule("/login", "login", self.get_login, methods=["GET", "POST"])
         self.app.add_url_rule("/logout", "logout", self.get_logout, methods=["POST"])
 
@@ -35,6 +36,9 @@ class AppRoutes:
     
     def get_index(self):
         return render_template("index.html")
+
+    def get_settings(self):
+        return render_template("settings.html")
     
     def get_home(self):
         user = self.user_manager.check_user(request)
