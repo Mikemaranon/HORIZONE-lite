@@ -8,7 +8,7 @@ export function renderProjects(onProjectSelect) {
     elements.projectCount.textContent = String(state.projects.length);
 
     if (!state.projects.length) {
-        elements.projectsList.innerHTML = createEmptyListItem("Todavía no hay proyectos.");
+        elements.projectsList.innerHTML = createEmptyListItem("There are no projects yet.");
         return;
     }
 
@@ -17,8 +17,8 @@ export function renderProjects(onProjectSelect) {
             const activeClass = project.id === state.activeProjectId ? " is-active" : "";
             const projectChats = getProjectConversations(project.id).length;
             const description = projectChats
-                ? `${projectChats} chat${projectChats === 1 ? "" : "s"} en el proyecto`
-                : (project.description || "Sin chats todavía");
+                ? `${projectChats} chat${projectChats === 1 ? "" : "s"} in the project`
+                : (project.description || "No chats yet");
             return `
                 <button class="list-item${activeClass}" type="button" data-project-id="${project.id}">
                     <div class="list-item__title">${escapeHtml(project.name)}</div>
@@ -43,7 +43,7 @@ export function renderConversations(onConversationSelect, onConversationDelete) 
     elements.conversationCount.textContent = String(standaloneConversations.length);
 
     if (!standaloneConversations.length) {
-        elements.conversationsList.innerHTML = createEmptyListItem("No hay chats puntuales todavía.");
+        elements.conversationsList.innerHTML = createEmptyListItem("There are no standalone chats yet.");
         return;
     }
 
@@ -53,14 +53,14 @@ export function renderConversations(onConversationSelect, onConversationDelete) 
             return `
                 <div class="conversation-row${activeClass}" data-conversation-row="${conversation.id}">
                     <button class="list-item conversation-row__main" type="button" data-conversation-id="${conversation.id}">
-                        <div class="list-item__title">${escapeHtml(conversation.title || "Nueva conversación")}</div>
+                        <div class="list-item__title">${escapeHtml(conversation.title || "New conversation")}</div>
                     </button>
                     <button
                         class="icon-button conversation-row__delete"
                         type="button"
                         data-delete-conversation-id="${conversation.id}"
-                        aria-label="Borrar chat"
-                        title="Borrar chat"
+                        aria-label="Delete chat"
+                        title="Delete chat"
                     >
                         ×
                     </button>

@@ -3,11 +3,11 @@ let projectDialogState = null;
 
 
 export function confirmAction({
-    title = "Confirmar acción",
+    title = "Confirm action",
     message = "",
-    confirmLabel = "Confirmar",
-    cancelLabel = "Cancelar",
-    eyebrow = "Confirmación",
+    confirmLabel = "Confirm",
+    cancelLabel = "Cancel",
+    eyebrow = "Confirmation",
     confirmVariant = "danger",
 } = {}) {
     const state = ensureConfirmDialog();
@@ -51,16 +51,16 @@ function ensureConfirmDialog() {
         <div id="confirm-dialog" class="modal confirm-dialog" hidden>
             <div class="modal__backdrop" data-dialog-cancel="true"></div>
             <div class="modal__panel modal__panel--narrow confirm-dialog__panel" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
-                <button id="confirm-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Cerrar">×</button>
+                <button id="confirm-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Close">×</button>
                 <div class="confirm-dialog__body">
                     <div class="confirm-dialog__header">
-                        <p id="confirm-dialog-eyebrow" class="modal__eyebrow">Confirmación</p>
-                        <h3 id="confirm-dialog-title">Confirmar acción</h3>
+                        <p id="confirm-dialog-eyebrow" class="modal__eyebrow">Confirmation</p>
+                        <h3 id="confirm-dialog-title">Confirm action</h3>
                         <p id="confirm-dialog-message" class="confirm-dialog__message"></p>
                     </div>
                     <div class="confirm-dialog__actions">
-                        <button id="confirm-dialog-cancel" class="ghost-button" type="button">Cancelar</button>
-                        <button id="confirm-dialog-confirm" class="action-button action-button--danger" type="button">Confirmar</button>
+                        <button id="confirm-dialog-cancel" class="ghost-button" type="button">Cancel</button>
+                        <button id="confirm-dialog-confirm" class="action-button action-button--danger" type="button">Confirm</button>
                     </div>
                 </div>
             </div>
@@ -112,26 +112,26 @@ function ensureProjectDialog() {
         <div id="project-create-dialog" class="modal project-create-dialog" hidden>
             <div class="modal__backdrop" data-dialog-cancel="true"></div>
             <div class="modal__panel modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="project-create-dialog-title">
-                <button id="project-create-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Cerrar">×</button>
+                <button id="project-create-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Close">×</button>
                 <div class="modal__header">
                     <div>
-                        <p class="modal__eyebrow">Proyecto</p>
-                        <h3 id="project-create-dialog-title">Nuevo proyecto</h3>
+                        <p class="modal__eyebrow">Project</p>
+                        <h3 id="project-create-dialog-title">New project</h3>
                     </div>
                 </div>
                 <form id="project-create-dialog-form" class="modal__body project-create-dialog__form">
                     <label class="field field--stacked">
-                        <span>Nombre</span>
-                        <input id="project-create-name-input" type="text" autocomplete="off" placeholder="Ej. Investigación local">
+                        <span>Name</span>
+                        <input id="project-create-name-input" type="text" autocomplete="off" placeholder="e.g. Local research">
                     </label>
                     <label class="field field--stacked">
-                        <span>Descripción</span>
-                        <textarea id="project-create-description-input" rows="3" placeholder="Contexto breve del proyecto..."></textarea>
+                        <span>Description</span>
+                        <textarea id="project-create-description-input" rows="3" placeholder="Short project context..."></textarea>
                     </label>
-                    <p id="project-create-error" class="form-error" hidden>El proyecto necesita un nombre.</p>
+                    <p id="project-create-error" class="form-error" hidden>The project needs a name.</p>
                     <div class="confirm-dialog__actions">
-                        <button id="project-create-cancel" class="ghost-button" type="button">Cancelar</button>
-                        <button class="action-button action-button--primary" type="submit">Crear proyecto</button>
+                        <button id="project-create-cancel" class="ghost-button" type="button">Cancel</button>
+                        <button class="action-button action-button--primary" type="submit">Create project</button>
                     </div>
                 </form>
             </div>

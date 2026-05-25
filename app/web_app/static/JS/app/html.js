@@ -32,7 +32,7 @@ export function createModelAvatarMarkup(modelName, iconImage, className = "model
         classes.push(`${className}--image`);
         return `
             <span class="${classes.join(" ")}">
-                <img src="${escapeHtml(normalizedIcon)}" alt="${escapeHtml(modelName || "Modelo")}" loading="lazy">
+                <img src="${escapeHtml(normalizedIcon)}" alt="${escapeHtml(modelName || "Model")}" loading="lazy">
             </span>
         `;
     }

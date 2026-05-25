@@ -22,14 +22,14 @@ export function syncComposerAvailability() {
     if (state.loading) {
         elements.sendButton.classList.remove("action-button--primary");
         elements.sendButton.classList.add("action-button--danger", "composer__send--stop");
-        elements.sendButton.setAttribute("aria-label", state.generationStopRequested ? "Deteniendo" : "Parar");
-        elements.sendButton.setAttribute("title", state.generationStopRequested ? "Deteniendo" : "Parar");
+        elements.sendButton.setAttribute("aria-label", state.generationStopRequested ? "Stopping" : "Stop");
+        elements.sendButton.setAttribute("title", state.generationStopRequested ? "Stopping" : "Stop");
         elements.sendButton.innerHTML = `<span class="composer__stop-icon" aria-hidden="true"></span>`;
     } else {
         elements.sendButton.classList.add("action-button--primary");
         elements.sendButton.classList.remove("action-button--danger", "composer__send--stop");
-        elements.sendButton.setAttribute("aria-label", "Enviar");
-        elements.sendButton.setAttribute("title", "Enviar");
+        elements.sendButton.setAttribute("aria-label", "Send");
+        elements.sendButton.setAttribute("title", "Send");
         elements.sendButton.innerHTML = `
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M3 20v-6l8-2-8-2V4l19 8-19 8z" fill="currentColor"></path>
@@ -38,23 +38,23 @@ export function syncComposerAvailability() {
     }
 
     if (isProjectWorkspace) {
-        elements.composerInput.placeholder = "Abre o crea un chat dentro del proyecto para escribir.";
-        elements.composerHint.textContent = "Los proyectos gestionan contexto; el texto se escribe dentro de un chat del proyecto.";
+        elements.composerInput.placeholder = "Open or create a chat inside the project to type.";
+        elements.composerHint.textContent = "Projects manage context; text is written inside a project chat.";
     } else if (isSettingsWorkspace) {
-        elements.composerInput.placeholder = "Vuelve a un chat para escribir.";
-        elements.composerHint.textContent = "Los ajustes generales se gestionan desde esta vista.";
+        elements.composerInput.placeholder = "Return to a chat to type.";
+        elements.composerHint.textContent = "General settings are managed from this view.";
     } else if (!getSelectedModel()) {
-        elements.composerInput.placeholder = "Selecciona un modelo antes de escribir.";
-        elements.composerHint.textContent = "Cada chat usa su propio modelo sin afectar al resto.";
+        elements.composerInput.placeholder = "Select a model before typing.";
+        elements.composerHint.textContent = "Each chat uses its own model without affecting the others.";
     } else if (state.loading && state.generationStopRequested) {
-        elements.composerInput.placeholder = "Deteniendo la respuesta actual...";
-        elements.composerHint.textContent = "Esperando a que el proveedor cierre la generación en curso.";
+        elements.composerInput.placeholder = "Stopping the current response...";
+        elements.composerHint.textContent = "Waiting for the provider to close the current generation.";
     } else if (state.loading) {
-        elements.composerInput.placeholder = "Pulsa parar si quieres cortar esta respuesta.";
-        elements.composerHint.textContent = "La respuesta se está generando ahora mismo.";
+        elements.composerInput.placeholder = "Press stop if you want to interrupt this response.";
+        elements.composerHint.textContent = "The response is being generated right now.";
     } else {
-        elements.composerInput.placeholder = "Pregunta cualquier cosa...";
-        elements.composerHint.textContent = "`Shift + Enter` para salto de línea";
+        elements.composerInput.placeholder = "Ask anything...";
+        elements.composerHint.textContent = "`Shift + Enter` for a new line";
     }
 }
 

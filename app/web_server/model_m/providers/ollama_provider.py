@@ -191,11 +191,11 @@ class OllamaProvider(ModelProvider):
 
         message = str(raw_error)
         if "llama runner process has terminated" in message:
-            resolved_model = f" para `{model}`" if model else ""
+            resolved_model = f" for `{model}`" if model else ""
             message = (
-                f"Ollama pudo encontrar el modelo{resolved_model}, pero su runner local se cerró "
-                "durante la generación. Reinicia Ollama y prueba también `ollama run <modelo>` "
-                "fuera de la app para confirmar que el modelo funciona."
+                f"Ollama could find the model{resolved_model}, but its local runner stopped "
+                "during generation. Restart Ollama and also try `ollama run <model>` "
+                "outside the app to confirm the model works."
             )
 
         raise ModelOperationError(

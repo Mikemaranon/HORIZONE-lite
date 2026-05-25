@@ -102,7 +102,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         db.messages.create(
             conversation_id=conversation_id,
             role="assistant",
-            content="Respuesta con fuentes",
+            content="Answer with sources",
             tool_events=[
                 {
                     "tool_name": "web_search",
@@ -110,7 +110,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
                     "ok": True,
                     "result": {
                         "results": [
-                            {"title": "Fuente", "url": "https://example.com"}
+                            {"title": "Source", "url": "https://example.com"}
                         ]
                     },
                 }

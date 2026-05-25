@@ -10,29 +10,29 @@ import { state } from "../app/state.js";
 
 const SETTINGS_CATEGORY_MAP = {
     providers: {
-        eyebrow: "Conexiones",
-        title: "Proveedores",
-        description: "Gestiona los backends disponibles para hablar con modelos locales o remotos.",
+        eyebrow: "Connections",
+        title: "Providers",
+        description: "Manage the available backends for talking to local or remote models.",
     },
     models: {
-        eyebrow: "Catálogo",
-        title: "Modelos",
-        description: "Configura qué modelos existen en tu instalación y a qué proveedor apunta cada uno.",
+        eyebrow: "Catalog",
+        title: "Models",
+        description: "Configure which models exist in your installation and which provider each one points to.",
     },
     profiles: {
-        eyebrow: "Comportamiento",
-        title: "Perfiles",
-        description: "Define prompts, temperatura y tono reutilizable para cada conversación.",
+        eyebrow: "Behavior",
+        title: "Profiles",
+        description: "Define reusable prompts, temperature, and tone for each conversation.",
     },
     tools: {
-        eyebrow: "Automatización",
-        title: "Herramientas",
-        description: "Activa tools globales y sube archivos Python para ampliar lo que puede hacer el asistente.",
+        eyebrow: "Automation",
+        title: "Tools",
+        description: "Enable global tools and upload Python files to extend what the assistant can do.",
     },
     session: {
-        eyebrow: "Cuenta local",
-        title: "Sesión",
-        description: "Revisa tu usuario actual y ajusta las credenciales de acceso de este equipo.",
+        eyebrow: "Local account",
+        title: "Session",
+        description: "Review your current user and adjust the sign-in credentials for this machine.",
     },
 };
 
@@ -125,8 +125,8 @@ function renderSettingsSidebarAccount() {
     }
     if (accountMetaNode) {
         accountMetaNode.textContent = role === "admin"
-            ? "Cuenta administradora de esta instalación local"
-            : `Cuenta ${role} de esta instalación local`;
+            ? "Administrator account for this local installation"
+            : `${role} account for this local installation`;
     }
     if (accountAvatarNode) {
         accountAvatarNode.textContent = initial;

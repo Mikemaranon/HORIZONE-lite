@@ -144,7 +144,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
 
         def fake_chat(messages, model, settings=None):
             self.assertEqual(messages[0]["role"], "system")
-            self.assertEqual(messages[1]["content"], "Necesito ayuda con algebra lineal")
+            self.assertEqual(messages[1]["content"], "I need help with linear algebra")
             self.assertEqual(settings["max_tokens"], 24)
             return {
                 "message": {
@@ -157,7 +157,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         title = manager.generate_conversation_title(
             "ollama",
             "qwen3",
-            "Necesito ayuda con algebra lineal",
+            "I need help with linear algebra",
         )
 
         self.assertEqual(title, "Algebra lineal aplicada")
@@ -264,7 +264,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
             provider._import_mlx_runtime = lambda: (fake_load, fake_stream_generate, fake_make_sampler)
 
             response = provider.chat(
-                [{"role": "user", "content": "Hola"}],
+                [{"role": "user", "content": "Hello"}],
                 "gemma-3-4b-it-4bit",
             )
 
@@ -512,7 +512,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
                 "qwen2.5-coder:7b",
             )
 
-        self.assertIn("runner local se cerró", str(error.exception))
+        self.assertIn("local runner stopped", str(error.exception))
 
     def test_anthropic_provider_chat_uses_messages_api_shape(self):
         db = DBManager()
@@ -528,7 +528,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
             post_response={
                 "id": "msg_123",
                 "model": "claude-sonnet-4",
-                "content": [{"type": "text", "text": "Hola desde Claude"}],
+                "content": [{"type": "text", "text": "Hello from Claude"}],
                 "stop_reason": "end_turn",
                 "usage": {"input_tokens": 12, "output_tokens": 7},
             }
@@ -538,18 +538,18 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
 
         response = provider.chat(
             [
-                {"role": "system", "content": "Sé breve"},
-                {"role": "user", "content": "Hola"},
+                {"role": "system", "content": "Be brief"},
+                {"role": "user", "content": "Hello"},
             ],
             "claude-sonnet-4",
             {"temperature": 0.3, "max_tokens": 256},
         )
 
         payload = fake_http.calls[0]["payload"]
-        self.assertEqual(payload["system"], "Sé breve")
+        self.assertEqual(payload["system"], "Be brief")
         self.assertEqual(payload["messages"][0]["role"], "user")
         self.assertEqual(payload["max_tokens"], 256)
-        self.assertEqual(response["message"]["content"], "Hola desde Claude")
+        self.assertEqual(response["message"]["content"], "Hello from Claude")
 
     def test_google_provider_lists_generate_content_models(self):
         db = DBManager()

@@ -1,8 +1,8 @@
 class ConversationTitleService:
     TITLE_GENERATION_PROMPT = (
-        "Genera un titulo corto para una conversacion a partir del primer mensaje del usuario. "
-        "Responde solo con el titulo, sin comillas ni puntuacion final, usando entre 2 y 6 palabras "
-        "y en el idioma dominante del mensaje."
+        "Generate a short title for a conversation based on the user's first message. "
+        "Reply only with the title, without quotes or final punctuation, using between 2 and 6 words "
+        "and in the dominant language of the message."
     )
 
     def generate_title(self, provider, model, first_user_message, settings=None):

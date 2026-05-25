@@ -116,15 +116,15 @@ class UserManager:
             raise ValueError("User not found")
 
         if not current_password or not check_password_hash(user["password"], current_password):
-            raise ValueError("La contraseña actual no es correcta.")
+            raise ValueError("The current password is incorrect.")
 
         normalized_username = (new_username or current_username).strip()
         if not normalized_username:
-            raise ValueError("El nombre de usuario no puede estar vacío.")
+            raise ValueError("The username cannot be empty.")
 
         normalized_password = (new_password or "").strip()
         if normalized_username != current_username and self.db.users.get(normalized_username):
-            raise ValueError("Ese nombre de usuario ya está en uso.")
+            raise ValueError("That username is already in use.")
 
         if normalized_username == current_username and not normalized_password:
             return (

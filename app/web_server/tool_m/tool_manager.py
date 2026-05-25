@@ -548,11 +548,11 @@ Rules:
             "día de hoy",
             "que dia es hoy",
             "qué día es hoy",
+            "hora actual",
             "what date is it",
             "what day is it",
             "today's date",
             "current date",
-            "hora actual",
             "current time",
         ]
         return any(trigger in lowered for trigger in triggers)
@@ -610,8 +610,8 @@ Rules:
         display_name = tool_event.get("tool_display_name") or self._resolve_tool_display_name(tool_name)
 
         if not tool_event.get("ok"):
-            error = str(tool_event.get("error") or "La herramienta no pudo completarse.")
-            return f"No pude completar {display_name}: {error}"
+            error = str(tool_event.get("error") or "The tool could not complete.")
+            return f"I could not complete {display_name}: {error}"
 
         if tool_name == "web_search":
             result = tool_event.get("result") or {}
@@ -619,17 +619,17 @@ Rules:
             results = result.get("results") or []
             if not results:
                 if query:
-                    return f"No he encontrado resultados relevantes en la web para \"{query}\"."
-                return "No he encontrado resultados relevantes en la web."
+                    return f"I could not find relevant results on the web for \"{query}\"."
+                return "I could not find relevant results on the web."
 
             lines = []
             if query:
-                lines.append(f"He buscado en la web sobre \"{query}\". Esto es lo más relevante:")
+                lines.append(f"I searched the web for \"{query}\". Here is the most relevant information:")
             else:
-                lines.append("He buscado en la web. Esto es lo más relevante:")
+                lines.append("I searched the web. Here is the most relevant information:")
 
             for item in results[:5]:
-                title = str(item.get("title") or "Resultado").strip()
+                title = str(item.get("title") or "Result").strip()
                 url = str(item.get("url") or "").strip()
                 snippet = str(item.get("snippet") or "").strip()
                 line = f"- {title}: {url}" if url else f"- {title}"
@@ -646,8 +646,8 @@ Rules:
             timezone = str(result.get("timezone") or "").strip()
             details = [value for value in [date, time, timezone] if value]
             if details:
-                return f"Fecha y hora actuales: {', '.join(details)}."
-            return "He consultado la fecha actual."
+                return f"Current date and time: {', '.join(details)}."
+            return "I checked the current date."
 
         result = tool_event.get("result")
         if isinstance(result, dict):
@@ -657,9 +657,9 @@ Rules:
                     compact_fields.append(f"{key}: {value}")
 
             if compact_fields:
-                return f"He usado {display_name}. Resultado: {'; '.join(compact_fields)}"
+                return f"I used {display_name}. Result: {'; '.join(compact_fields)}"
 
-        return f"He usado {display_name} para preparar la respuesta."
+        return f"I used {display_name} to prepare the response."
 
     def _resolve_tool_display_name(self, tool_name, runtime_tool=None):
         if runtime_tool and runtime_tool.get("display_name"):
@@ -669,7 +669,7 @@ Rules:
         if stored_tool and stored_tool.get("display_name"):
             return str(stored_tool["display_name"]).strip()
 
-        return str(tool_name or "herramienta").replace("_", " ").strip()
+        return str(tool_name or "tool").replace("_", " ").strip()
 
     def _build_cancelled_response(self, provider_name, model, tool_events):
         response = {

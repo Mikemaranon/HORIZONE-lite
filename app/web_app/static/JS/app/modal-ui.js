@@ -2,6 +2,10 @@ import { elements } from "./dom.js";
 
 
 function openModal(modal) {
+    if (!modal) {
+        return;
+    }
+
     modal.hidden = false;
     modal.dataset.state = "closed";
     document.body.classList.add("is-modal-open", "modal-open");
@@ -15,6 +19,10 @@ function openModal(modal) {
 
 
 function closeModal(modal) {
+    if (!modal) {
+        return;
+    }
+
     if (modal.hidden || modal.dataset.state === "closing") {
         return;
     }

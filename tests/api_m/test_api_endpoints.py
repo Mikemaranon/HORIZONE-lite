@@ -51,7 +51,7 @@ class ApiEndpointTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload["error"], "La contraseña actual no es correcta.")
+        self.assertEqual(payload["error"], "The current password is incorrect.")
         self.assertIsNotNone(self.db.users.get("admin"))
 
     def test_models_endpoint_returns_configured_models(self):
@@ -152,7 +152,7 @@ class ApiEndpointTests(ApiTestCase):
         self.db.messages.create(
             conversation_id=conversation_id,
             role="assistant",
-            content="Hola",
+            content="Hello",
             model_config_id=model_id,
             model_name="Qwen 3",
             profile_id=profile["id"],
@@ -253,19 +253,19 @@ class ApiEndpointTests(ApiTestCase):
     def test_chat_endpoint_applies_project_context_and_documents(self):
         project_id = self.db.projects.create(
             "Launch Plan",
-            "Coordina el lanzamiento del producto.",
-            "Mantén el foco en hitos y riesgos.",
+            "Coordinate the product launch.",
+            "Keep the focus on milestones and risks.",
         )
         self.db.project_documents.create(
             project_id=project_id,
             filename="brief.md",
             content_type="text/markdown",
             size_bytes=42,
-            text_content="El lanzamiento será el 15 de mayo y requiere checklist de QA.",
+            text_content="The launch will happen on May 15 and requires a QA checklist.",
         )
         profile_id = self.db.profiles.create(
             name="Planner",
-            system_prompt="Responde con estructura clara.",
+            system_prompt="Respond with a clear structure.",
             is_default=True,
         )
         conversation_id = self.db.conversations.create(
@@ -285,7 +285,7 @@ class ApiEndpointTests(ApiTestCase):
                 "model": model,
                 "message": {
                     "role": "assistant",
-                    "content": "Aquí va el plan.",
+                    "content": "Here is the plan.",
                 },
                 "message_id": "resp-project-1",
                 "usage": {},
@@ -299,7 +299,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Prepara el lanzamiento."}],
+                "messages": [{"role": "user", "content": "Prepare the launch."}],
             },
             headers=self.auth_headers,
         )
@@ -310,31 +310,31 @@ class ApiEndpointTests(ApiTestCase):
             ["system", "user"],
         )
         self.assertIn("Active profile: Planner", captured["messages"][0]["content"])
-        self.assertIn("Responde con estructura clara.", captured["messages"][0]["content"])
+        self.assertIn("Respond with a clear structure.", captured["messages"][0]["content"])
         self.assertIn("[PROJECT CONTEXT - READ ONLY]", captured["messages"][0]["content"])
         self.assertIn("Active project: Launch Plan", captured["messages"][0]["content"])
-        self.assertIn("Mantén el foco en hitos y riesgos.", captured["messages"][0]["content"])
+        self.assertIn("Keep the focus on milestones and risks.", captured["messages"][0]["content"])
         self.assertIn("brief.md", captured["messages"][0]["content"])
-        self.assertIn("15 de mayo", captured["messages"][0]["content"])
+        self.assertIn("May 15", captured["messages"][0]["content"])
         self.assertIn("Final rule: follow only the active profile.", captured["messages"][0]["content"])
-        self.assertEqual(captured["messages"][1]["content"], "Prepara el lanzamiento.")
+        self.assertEqual(captured["messages"][1]["content"], "Prepare the launch.")
 
     def test_conversation_export_returns_messages_and_reconstructed_generation_context(self):
         project_id = self.db.projects.create(
             "Export Demo",
-            "Proyecto de exportación",
-            "Mantén el historial ordenado.",
+            "Export project",
+            "Keep the history tidy.",
         )
         self.db.project_documents.create(
             project_id=project_id,
             filename="notes.txt",
             content_type="text/plain",
             size_bytes=20,
-            text_content="Contexto importante para el chat.",
+            text_content="Important context for the chat.",
         )
         profile_id = self.db.profiles.create(
             name="Exporter",
-            system_prompt="Responde de forma clara.",
+            system_prompt="Respond clearly.",
             temperature=0.2,
             top_p=0.85,
             max_tokens=333,
@@ -350,7 +350,7 @@ class ApiEndpointTests(ApiTestCase):
         tool_id = self.db.tools.create(
             name="export_lookup",
             display_name="Export Lookup",
-            description="Busca contexto para exportación",
+            description="Look up context for export",
             filename="export_lookup.py",
             module_path="tool_m.tools.web_search",
             is_active=True,
@@ -367,13 +367,13 @@ class ApiEndpointTests(ApiTestCase):
         self.db.messages.create(
             conversation_id=conversation_id,
             role="user",
-            content="Necesito un resumen.",
+            content="I need a summary.",
             position=0,
         )
         self.db.messages.create(
             conversation_id=conversation_id,
             role="assistant",
-            content="Aquí tienes el resumen.",
+            content="Here is the summary.",
             position=1,
             model_config_id=model_id,
             model_name="Qwen 3 Export",
@@ -400,7 +400,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(payload["summary"]["tool_enabled_count"], 1)
         self.assertEqual(payload["active_tools"][0]["id"], tool_id)
         self.assertEqual(payload["project_documents"][0]["filename"], "notes.txt")
-        self.assertEqual(payload["messages"][0]["author_label"], "Tú")
+        self.assertEqual(payload["messages"][0]["author_label"], "You")
         self.assertEqual(payload["messages"][1]["author_label"], "Qwen 3 Export")
         self.assertEqual(payload["messages"][1]["tool_events"][0]["tool_name"], "web_search")
         self.assertEqual(payload["messages"][1]["generation"]["settings"]["temperature"], 0.2)
@@ -413,12 +413,12 @@ class ApiEndpointTests(ApiTestCase):
             payload["messages"][1]["generation"]["input_messages"][0]["content"],
         )
         self.assertIn(
-            "Mantén el historial ordenado.",
+            "Keep the history tidy.",
             payload["messages"][1]["generation"]["input_messages"][0]["content"],
         )
         self.assertEqual(
             payload["messages"][1]["generation"]["input_messages"][1]["content"],
-            "Necesito un resumen.",
+            "I need a summary.",
         )
 
     def test_chat_endpoint_converts_prior_turns_into_read_only_history_context(self):
@@ -559,7 +559,7 @@ class ApiEndpointTests(ApiTestCase):
             data={
                 "project_id": str(project_id),
                 "files": [
-                    (io.BytesIO(b"Resumen del proyecto"), "brief.txt"),
+                    (io.BytesIO(b"Project summary"), "brief.txt"),
                     (io.BytesIO(b"{\"ok\": true}"), "metadata.json"),
                 ],
             },
@@ -590,7 +590,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(len(listed_documents), 2)
         self.assertEqual(listed_documents[0]["filename"], "brief.txt")
-        self.assertIn("Resumen del proyecto", stored_document["text_content"])
+        self.assertIn("Project summary", stored_document["text_content"])
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(len(list_after_delete.get_json()["documents"]), 1)
 
@@ -614,7 +614,7 @@ class ApiEndpointTests(ApiTestCase):
 
     def test_chat_endpoint_generates_title_before_first_response(self):
         conversation_id = self.db.conversations.create(
-            title="Nueva conversación",
+            title="New conversation",
             provider="openai",
             model="gpt-4.1",
         )
@@ -622,7 +622,7 @@ class ApiEndpointTests(ApiTestCase):
 
         def fake_generate_title(provider, model, first_user_message, settings=None):
             calls.append(("title", provider, model, first_user_message))
-            return "Computacion cuantica"
+            return "Quantum computing"
 
         def fake_chat(provider, messages, model, settings):
             calls.append(("chat", provider, model, messages[-1]["content"]))
@@ -631,7 +631,7 @@ class ApiEndpointTests(ApiTestCase):
                 "model": model,
                 "message": {
                     "role": "assistant",
-                    "content": "La computacion cuantica usa qubits",
+                    "content": "Quantum computing uses qubits",
                 },
                 "message_id": "resp-title-1",
                 "usage": {},
@@ -649,7 +649,7 @@ class ApiEndpointTests(ApiTestCase):
                 "messages": [
                     {
                         "role": "user",
-                        "content": "Explicame la computacion cuantica",
+                        "content": "Explain quantum computing to me",
                     }
                 ],
             },
@@ -661,13 +661,13 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(calls[0][0], "title")
         self.assertEqual(calls[1][0], "chat")
-        self.assertEqual(calls[0][1:], ("openai", "gpt-4.1", "Explicame la computacion cuantica"))
-        self.assertEqual(conversation["title"], "Computacion cuantica")
-        self.assertEqual(payload["conversation"]["title"], "Computacion cuantica")
+        self.assertEqual(calls[0][1:], ("openai", "gpt-4.1", "Explain quantum computing to me"))
+        self.assertEqual(conversation["title"], "Quantum computing")
+        self.assertEqual(payload["conversation"]["title"], "Quantum computing")
 
     def test_chat_endpoint_keeps_responding_if_title_generation_fails(self):
         conversation_id = self.db.conversations.create(
-            title="Nueva conversación",
+            title="New conversation",
             provider="mlx",
             model="gemma-3",
         )
@@ -681,7 +681,7 @@ class ApiEndpointTests(ApiTestCase):
                 "model": model,
                 "message": {
                     "role": "assistant",
-                    "content": "Seguimos respondiendo",
+                    "content": "We keep responding",
                 },
                 "message_id": None,
                 "usage": {},
@@ -696,7 +696,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Hola"}],
+                "messages": [{"role": "user", "content": "Hello"}],
             },
             headers=self.auth_headers,
         )
@@ -704,8 +704,8 @@ class ApiEndpointTests(ApiTestCase):
         conversation = self.db.conversations.get(conversation_id)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload["response"]["message"]["content"], "Seguimos respondiendo")
-        self.assertEqual(conversation["title"], "Nueva conversación")
+        self.assertEqual(payload["response"]["message"]["content"], "We keep responding")
+        self.assertEqual(conversation["title"], "New conversation")
 
     def test_chat_endpoint_persists_user_message_even_when_provider_fails(self):
         conversation_id = self.db.conversations.create(
@@ -723,7 +723,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Guarda esto"}],
+                "messages": [{"role": "user", "content": "Save this"}],
             },
             headers=self.auth_headers,
         )
@@ -732,7 +732,7 @@ class ApiEndpointTests(ApiTestCase):
         stored_messages = self.db.messages.for_conversation(conversation_id)
         self.assertEqual(len(stored_messages), 1)
         self.assertEqual(stored_messages[0]["role"], "user")
-        self.assertEqual(stored_messages[0]["content"], "Guarda esto")
+        self.assertEqual(stored_messages[0]["content"], "Save this")
 
     def test_chat_endpoint_persists_duplicate_user_messages_in_order(self):
         conversation_id = self.db.conversations.create(
@@ -741,7 +741,7 @@ class ApiEndpointTests(ApiTestCase):
             model="mlx-community/gemma-3-4b-it-4bit",
         )
 
-        replies = iter(["Primera respuesta", "Segunda respuesta"])
+        replies = iter(["First response", "Second response"])
 
         def fake_chat(provider, messages, model, settings):
             return {
@@ -763,7 +763,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Hola"}],
+                "messages": [{"role": "user", "content": "Hello"}],
             },
             headers=self.auth_headers,
         )
@@ -772,9 +772,9 @@ class ApiEndpointTests(ApiTestCase):
             json={
                 "conversation_id": conversation_id,
                 "messages": [
-                    {"role": "user", "content": "Hola"},
-                    {"role": "assistant", "content": "Primera respuesta"},
-                    {"role": "user", "content": "Hola"},
+                    {"role": "user", "content": "Hello"},
+                    {"role": "assistant", "content": "First response"},
+                    {"role": "user", "content": "Hello"},
                 ],
             },
             headers=self.auth_headers,
@@ -787,10 +787,10 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(
             [(message["role"], message["content"]) for message in stored_messages],
             [
-                ("user", "Hola"),
-                ("assistant", "Primera respuesta"),
-                ("user", "Hola"),
-                ("assistant", "Segunda respuesta"),
+                ("user", "Hello"),
+                ("assistant", "First response"),
+                ("user", "Hello"),
+                ("assistant", "Second response"),
             ],
         )
 
@@ -807,8 +807,8 @@ class ApiEndpointTests(ApiTestCase):
             captured["messages"] = messages
             captured["model"] = model
             captured["settings"] = settings
-            yield {"type": "delta", "delta": "Hola"}
-            yield {"type": "delta", "delta": " mundo"}
+            yield {"type": "delta", "delta": "Hello"}
+            yield {"type": "delta", "delta": " world"}
             yield {
                 "type": "response",
                 "response": {
@@ -816,7 +816,7 @@ class ApiEndpointTests(ApiTestCase):
                     "model": model,
                     "message": {
                         "role": "assistant",
-                        "content": "Hola mundo",
+                        "content": "Hello world",
                     },
                     "message_id": "resp-stream-1",
                     "usage": {"completion_tokens": 2},
@@ -831,7 +831,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Saluda"}],
+                "messages": [{"role": "user", "content": "Say hello"}],
                 "stream": True,
             },
             headers=self.auth_headers,
@@ -847,12 +847,12 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(captured["model"], "gpt-4.1")
         self.assertIn("event: start", payload)
         self.assertIn("event: delta", payload)
-        self.assertIn('"delta": "Hola"', payload)
+        self.assertIn('"delta": "Hello"', payload)
         self.assertIn("event: end", payload)
-        self.assertIn('"content": "Hola mundo"', payload)
+        self.assertIn('"content": "Hello world"', payload)
         self.assertIn('"conversation"', payload)
         self.assertEqual(len(stored_messages), 2)
-        self.assertEqual(stored_messages[1]["content"], "Hola mundo")
+        self.assertEqual(stored_messages[1]["content"], "Hello world")
         self.assertEqual(stored_messages[1]["provider_message_id"], "resp-stream-1")
 
     def test_chat_endpoint_streams_tool_progress_before_final_response(self):
@@ -867,9 +867,9 @@ class ApiEndpointTests(ApiTestCase):
             "query": arguments.get("query", ""),
             "results": [
                 {
-                    "title": "Ultima hora",
-                    "url": "https://example.com/ultima-hora",
-                    "snippet": "Noticia destacada",
+                    "title": "Breaking news",
+                    "url": "https://example.com/breaking-news",
+                    "snippet": "Featured news",
                 }
             ],
             "result_count": 1,
@@ -880,7 +880,7 @@ class ApiEndpointTests(ApiTestCase):
             "model": model,
             "message": {
                 "role": "assistant",
-                "content": "Aquí tienes una noticia reciente: https://example.com/ultima-hora",
+                "content": "Here is a recent news item: https://example.com/breaking-news",
             },
             "message_id": "resp-stream-tool-1",
             "usage": {"completion_tokens": 6},
@@ -892,7 +892,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "busca noticias de ultima hora"}],
+                "messages": [{"role": "user", "content": "search for breaking news"}],
                 "stream": True,
             },
             headers=self.auth_headers,
@@ -906,10 +906,10 @@ class ApiEndpointTests(ApiTestCase):
         self.assertIn("event: tool_start", payload)
         self.assertIn('"tool_name": "web_search"', payload)
         self.assertIn("event: delta", payload)
-        self.assertIn("https://example.com/ultima-hora", payload)
+        self.assertIn("https://example.com/breaking-news", payload)
         self.assertEqual(
             stored_messages[-1]["content"],
-            "Aquí tienes una noticia reciente: https://example.com/ultima-hora",
+            "Here is a recent news item: https://example.com/breaking-news",
         )
 
     def test_chat_endpoint_streams_error_event_when_provider_fails(self):
@@ -929,7 +929,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Guarda esto"}],
+                "messages": [{"role": "user", "content": "Save this"}],
                 "stream": True,
             },
             headers=self.auth_headers,
@@ -943,7 +943,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertIn("event: error", payload)
         self.assertIn("MLX offline", payload)
         self.assertEqual(len(stored_messages), 1)
-        self.assertEqual(stored_messages[0]["content"], "Guarda esto")
+        self.assertEqual(stored_messages[0]["content"], "Save this")
 
     def test_chat_cancel_endpoint_marks_active_stream(self):
         cancel_event = threading.Event()
@@ -982,7 +982,7 @@ class ApiEndpointTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "Hola"}],
+                "messages": [{"role": "user", "content": "Hello"}],
                 "stream": True,
             },
             headers=self.auth_headers,
@@ -1006,12 +1006,12 @@ class ApiEndpointTests(ApiTestCase):
         self.db.messages.create(
             conversation_id=conversation_id,
             role="user",
-            content="Quien jugó contra KOI el domingo 10?",
+            content="Who played against KOI on Sunday the 10th?",
         )
         self.db.messages.create(
             conversation_id=conversation_id,
             role="assistant",
-            content="Movistar KOI jugó contra G2 Esports.",
+            content="Movistar KOI played against G2 Esports.",
             profile_id=profile["id"],
             profile_name=profile["name"],
         )
@@ -1025,9 +1025,9 @@ class ApiEndpointTests(ApiTestCase):
             json={
                 "conversation_id": conversation_id,
                 "messages": [
-                    {"role": "user", "content": "Quien jugó contra KOI el domingo 10?"},
-                    {"role": "assistant", "content": "Movistar KOI jugó contra G2 Esports."},
-                    {"role": "user", "content": "que fuentes has consultado?"},
+                    {"role": "user", "content": "Who played against KOI on Sunday the 10th?"},
+                    {"role": "assistant", "content": "Movistar KOI played against G2 Esports."},
+                    {"role": "user", "content": "which sources did you use?"},
                 ],
                 "stream": True,
             },
@@ -1040,7 +1040,7 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("event: end", payload)
-        self.assertIn("No consulté fuentes externas en la respuesta anterior.", payload)
+        self.assertIn("I did not consult external sources in the previous response.", payload)
         self.assertEqual(stored_messages[-1]["tool_events"], [])
 
     def test_chat_sources_follow_up_returns_sources_from_previous_tool_events(self):
@@ -1054,12 +1054,12 @@ class ApiEndpointTests(ApiTestCase):
         self.db.messages.create(
             conversation_id=conversation_id,
             role="user",
-            content="Busca los partidos del domingo 10.",
+            content="Look up the matches from Sunday the 10th.",
         )
         self.db.messages.create(
             conversation_id=conversation_id,
             role="assistant",
-            content="Movistar KOI jugó contra G2 Esports.",
+            content="Movistar KOI played against G2 Esports.",
             profile_id=profile["id"],
             profile_name=profile["name"],
             tool_events=[
@@ -1092,9 +1092,9 @@ class ApiEndpointTests(ApiTestCase):
             json={
                 "conversation_id": conversation_id,
                 "messages": [
-                    {"role": "user", "content": "Busca los partidos del domingo 10."},
-                    {"role": "assistant", "content": "Movistar KOI jugó contra G2 Esports."},
-                    {"role": "user", "content": "dime fuentes consultadas"},
+                    {"role": "user", "content": "Look up the matches from Sunday the 10th."},
+                    {"role": "assistant", "content": "Movistar KOI played against G2 Esports."},
+                    {"role": "user", "content": "tell me the sources consulted"},
                 ],
                 "stream": True,
             },
@@ -1106,7 +1106,7 @@ class ApiEndpointTests(ApiTestCase):
         stored_messages = self.db.messages.for_conversation(conversation_id)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Las fuentes consultadas en la respuesta anterior son:", payload)
+        self.assertIn("The sources consulted in the previous response are:", payload)
         self.assertIn("Schedule", payload)
         self.assertIn("example.com", payload)
         self.assertEqual(
@@ -1143,7 +1143,7 @@ class ApiEndpointTests(ApiTestCase):
             json={
                 "id": profile_id,
                 "name": "Research Pro",
-                "personality": "Claro y técnico",
+                "personality": "Clear and technical",
                 "tags": ["code", "review"],
                 "system_prompt": "Be structured and concise.",
                 "temperature": 0.5,
@@ -1157,7 +1157,7 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["profile"]["name"], "Research Pro")
-        self.assertEqual(response.get_json()["profile"]["personality"], "Claro y técnico")
+        self.assertEqual(response.get_json()["profile"]["personality"], "Clear and technical")
         self.assertEqual(profile["system_prompt"], "Be structured and concise.")
         self.assertEqual(profile["tags"], ["code", "review"])
         self.assertEqual(profile["temperature"], 0.5)
@@ -1210,12 +1210,12 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("máximo de 10", response.get_json()["error"])
+        self.assertIn("maximum of 10", response.get_json()["error"])
 
     def test_profile_can_be_deleted(self):
         profile_id = self.db.profiles.create(
             name="Temporary Profile",
-            personality="Breve",
+            personality="Brief",
             tags=["tmp"],
         )
 
@@ -1237,7 +1237,7 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("último perfil", response.get_json()["error"])
+        self.assertIn("last profile", response.get_json()["error"])
 
     def test_conversation_can_be_deleted(self):
         conversation_id = self.db.conversations.create(
@@ -1248,7 +1248,7 @@ class ApiEndpointTests(ApiTestCase):
         self.db.messages.create(
             conversation_id=conversation_id,
             role="user",
-            content="Borrar esto",
+            content="Delete this",
         )
 
         response = self.client.delete(

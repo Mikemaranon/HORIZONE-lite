@@ -81,7 +81,7 @@ class ProfilesAPI(BaseAPI):
             return self.error("Profile not found", 404)
 
         if self.db.profiles.count() <= 1:
-            return self.error("No se puede borrar el último perfil.", 400)
+            return self.error("The last profile cannot be deleted.", 400)
 
         self.db.profiles.delete(profile_id)
         return self.ok({"deleted": True, "profile_id": profile_id})
@@ -131,6 +131,6 @@ class ProfilesAPI(BaseAPI):
             seen.add(normalized_key)
 
         if len(normalized_tags) > self.MAX_TAGS:
-            raise ValueError(f"tags admite un máximo de {self.MAX_TAGS} elementos")
+            raise ValueError(f"tags supports a maximum of {self.MAX_TAGS} items")
 
         return normalized_tags

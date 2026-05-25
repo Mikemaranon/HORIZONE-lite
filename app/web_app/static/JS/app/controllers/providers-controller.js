@@ -23,11 +23,11 @@ export async function handleProviderSubmit(event) {
 
     const providerPayload = readProviderFormValues();
     if (!providerPayload.name) {
-        showStatus("El proveedor necesita un nombre.", true);
+        showStatus("The provider needs a name.", true);
         return;
     }
     if (!providerPayload.provider_type) {
-        showStatus("El tipo de proveedor es obligatorio.", true);
+        showStatus("The provider type is required.", true);
         return;
     }
 
@@ -49,9 +49,9 @@ export async function handleProviderSubmit(event) {
         renderSettingsModelsManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus(isEditing ? "Proveedor actualizado." : "Proveedor creado.");
+        showStatus(isEditing ? "Provider updated." : "Provider created.");
     } catch (error) {
-        showStatus(error.message || "No se pudo guardar el proveedor.", true);
+        showStatus(error.message || "The provider could not be saved.", true);
     }
 }
 
@@ -74,7 +74,7 @@ export function handleProviderEdit(providerId) {
 
     const provider = getProviderConfigById(providerId);
     if (!provider) {
-        showStatus("No se encontró el proveedor seleccionado.", true);
+        showStatus("The selected provider was not found.", true);
         return;
     }
 
@@ -96,15 +96,15 @@ export async function handleProviderDelete(providerId) {
 
     const provider = getProviderConfigById(providerId);
     if (!provider) {
-        showStatus("No se encontró el proveedor seleccionado.", true);
+        showStatus("The selected provider was not found.", true);
         return;
     }
 
     const confirmed = await confirmAction({
-        eyebrow: "Proveedor",
-        title: "Borrar proveedor",
-        message: `Se borrará "${provider.name}". Primero elimina o mueve sus modelos a otro proveedor.`,
-        confirmLabel: "Borrar proveedor",
+        eyebrow: "Provider",
+        title: "Delete provider",
+        message: `\"${provider.name}\" will be deleted. Remove or move its models to another provider first.`,
+        confirmLabel: "Delete provider",
         confirmVariant: "danger",
     });
 
@@ -119,9 +119,9 @@ export async function handleProviderDelete(providerId) {
         renderSettingsModelsManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus("Proveedor borrado.");
+        showStatus("Provider deleted.");
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el proveedor.", true);
+        showStatus(error.message || "The provider could not be deleted.", true);
     }
 }
 
@@ -138,9 +138,9 @@ export async function handleProviderRestore(providerId) {
         renderSettingsModelsManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus("Proveedor restaurado.");
+        showStatus("Provider restored.");
     } catch (error) {
-        showStatus(error.message || "No se pudo restaurar el proveedor.", true);
+        showStatus(error.message || "The provider could not be restored.", true);
     }
 }
 
@@ -176,9 +176,9 @@ function readProviderFormValues() {
 function populateProviderModal(provider = null) {
     const isEditing = Boolean(provider);
 
-    elements.providerModalEyebrow.textContent = isEditing ? "Editar proveedor" : "Proveedor";
-    elements.providerModalTitle.textContent = isEditing ? provider.name : "Crear proveedor";
-    elements.providerSubmitButton.textContent = isEditing ? "Guardar cambios" : "Crear proveedor";
+    elements.providerModalEyebrow.textContent = isEditing ? "Edit provider" : "Provider";
+    elements.providerModalTitle.textContent = isEditing ? provider.name : "Create provider";
+    elements.providerSubmitButton.textContent = isEditing ? "Save changes" : "Create provider";
     elements.providerIdInput.value = isEditing ? String(provider.id) : "";
     elements.providerBuiltinInput.value = isEditing && provider.is_builtin ? "true" : "false";
     elements.providerBuiltinKeyInput.value = isEditing ? (provider.builtin_key || "") : "";

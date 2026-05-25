@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
     bindSettingsUI();
     bootSettingsPage().catch((error) => {
         console.error(error);
-        showStatus(error.message || "No se pudo cargar la página de ajustes.", true);
+        showStatus(error.message || "The settings page could not be loaded.", true);
     });
 });
 
@@ -275,7 +275,7 @@ function syncSettingsSidebarVisibility() {
         toggleButton.setAttribute("aria-expanded", String(Boolean(isOverlay && isSettingsSidebarOpen)));
         toggleButton.setAttribute(
             "aria-label",
-            isSettingsSidebarOpen ? "Cerrar navegación de ajustes" : "Abrir navegación de ajustes",
+            isSettingsSidebarOpen ? "Close settings navigation" : "Open settings navigation",
         );
     }
 

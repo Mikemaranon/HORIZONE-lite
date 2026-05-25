@@ -8,19 +8,19 @@ export function getDefaultProfileId() {
 
 export function getProfileNameById(profileId) {
     if (!profileId) {
-        return "sin perfil";
+        return "no profile";
     }
 
-    return state.profiles.find((profile) => profile.id === Number(profileId))?.name || "sin perfil";
+    return state.profiles.find((profile) => profile.id === Number(profileId))?.name || "no profile";
 }
 
 
 export function getProviderNameById(providerId) {
     if (!providerId) {
-        return "sin proveedor";
+        return "no provider";
     }
 
-    return state.providers.find((provider) => provider.id === Number(providerId))?.name || "sin proveedor";
+    return state.providers.find((provider) => provider.id === Number(providerId))?.name || "no provider";
 }
 
 
@@ -99,5 +99,5 @@ export function buildConversationTitle() {
         return `${project.name} · chat`;
     }
 
-    return "Nueva conversación";
+    return "New conversation";
 }

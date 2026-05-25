@@ -241,8 +241,8 @@ class ChatService:
                 prepared.provider,
                 prepared.model,
                 message=(
-                    "No he consultado fuentes externas en este hilo todavía. "
-                    "Si quieres, puedo buscarlas ahora y citar resultados concretos."
+                    "I have not consulted external sources in this thread yet. "
+                    "If you want, I can search now and cite specific results."
                 ),
             )
 
@@ -252,8 +252,8 @@ class ChatService:
                 prepared.provider,
                 prepared.model,
                 message=(
-                    "No hay una respuesta asistente previa en este hilo para atribuir fuentes. "
-                    "Si quieres, puedo hacer la búsqueda ahora."
+                    "There is no previous assistant response in this thread to attribute sources to. "
+                    "If you want, I can perform the search now."
                 ),
             )
 
@@ -263,9 +263,9 @@ class ChatService:
                 prepared.provider,
                 prepared.model,
                 message=(
-                    "No consulté fuentes externas en la respuesta anterior. "
-                    "Esa respuesta no quedó respaldada por ninguna tool o búsqueda web en este hilo. "
-                    "Si quieres, puedo buscarlo ahora y darte fuentes reales."
+                    "I did not consult external sources in the previous response. "
+                    "That response was not backed by any tool or web search in this thread. "
+                    "If you want, I can search now and give you real sources."
                 ),
             )
 
@@ -293,10 +293,12 @@ class ChatService:
             "qué fuentes has consultado",
             "dame las fuentes",
             "dime las fuentes",
+            "sources consulted",
             "which sources did you use",
             "what sources did you use",
+            "give me the sources",
+            "tell me the sources",
             "show me the sources",
-            "sources consulted",
         ]
         return any(trigger in normalized for trigger in triggers)
 
@@ -310,7 +312,7 @@ class ChatService:
     def _build_sources_response(self, provider, model, tool_events):
         source_lines = self._extract_tool_source_lines(tool_events)
         if source_lines:
-            content = "Las fuentes consultadas en la respuesta anterior son:\n\n" + "\n".join(
+            content = "The sources consulted in the previous response are:\n\n" + "\n".join(
                 [f"- {line}" for line in source_lines]
             )
         else:
@@ -322,10 +324,10 @@ class ChatService:
                         if tool_event.get("tool_name")
                     }
                 )
-            ) or "tools internas"
+            ) or "internal tools"
             content = (
-                "En la respuesta anterior sí hubo uso de tools, pero no quedaron URLs o fuentes web explícitas "
-                f"para citar. Las tools usadas fueron: {tool_names}."
+                "The previous response did use tools, but there were no explicit URLs or web sources "
+                f"left to cite. The tools used were: {tool_names}."
             )
 
         return {

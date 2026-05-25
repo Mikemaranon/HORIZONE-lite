@@ -90,7 +90,7 @@ class ModelsAPI(BaseAPI):
             return self.error("Model not found", 404)
 
         if self.db.models.count() <= 1:
-            return self.error("No se puede borrar el último modelo.", 400)
+            return self.error("The last model cannot be deleted.", 400)
 
         self.db.models.delete(model_id)
         return self.ok({"deleted": True, "model_id": model_id})
@@ -150,7 +150,7 @@ class ModelsAPI(BaseAPI):
 
         mime_type = prefix[5:].split(";", 1)[0].strip().lower()
         if mime_type not in ALLOWED_MODEL_ICON_MIME_TYPES:
-            raise ValueError("icon_image must be PNG, JPEG, WEBP o GIF")
+            raise ValueError("icon_image must be PNG, JPEG, WEBP, or GIF")
 
         if not payload:
             raise ValueError("icon_image payload is empty")

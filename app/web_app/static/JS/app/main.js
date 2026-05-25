@@ -10,6 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
     bindUI();
     bootApp().catch((error) => {
         console.error(error);
-        showStatus(error.message || "No se pudo inicializar la aplicación.", true);
+        showStatus(error.message || "The application could not be initialized.", true);
     });
 });

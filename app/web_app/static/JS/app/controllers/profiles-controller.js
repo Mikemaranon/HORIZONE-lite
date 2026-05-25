@@ -36,11 +36,11 @@ export async function handleProfileSubmit(event) {
     });
 
     if (!profilePayload.name) {
-        showStatus("El perfil necesita un nombre.", true);
+        showStatus("The profile needs a name.", true);
         return;
     }
     if (profilePayload.tags.length > MAX_PROFILE_TAGS) {
-        showStatus(`Las etiquetas admiten un máximo de ${MAX_PROFILE_TAGS} elementos.`, true);
+        showStatus(`Tags support a maximum of ${MAX_PROFILE_TAGS} items.`, true);
         return;
     }
 
@@ -76,9 +76,9 @@ export async function handleProfileSubmit(event) {
         renderSettingsProfilesManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus(isEditing ? "Perfil actualizado." : "Perfil creado.");
+        showStatus(isEditing ? "Profile updated." : "Profile created.");
     } catch (error) {
-        showStatus(error.message || "No se pudo guardar el perfil.", true);
+        showStatus(error.message || "The profile could not be saved.", true);
     }
 }
 
@@ -104,7 +104,7 @@ export async function handleProfileOptionSelect(profileId) {
         renderChatPanel();
         renderConversationHeader();
     } catch (error) {
-        showStatus(error.message || "No se pudo cambiar el perfil del chat.", true);
+        showStatus(error.message || "The chat profile could not be changed.", true);
     }
 }
 
@@ -129,7 +129,7 @@ export function handleSettingsProfileEdit(profileId, context = "settings") {
 
     const profile = state.profiles.find((item) => item.id === profileId);
     if (!profile) {
-        showStatus("No se encontró el perfil seleccionado.", true);
+        showStatus("The selected profile was not found.", true);
         return;
     }
 
@@ -153,15 +153,15 @@ export async function handleSettingsProfileDelete(profileId) {
 
     const profile = state.profiles.find((item) => item.id === profileId);
     if (!profile) {
-        showStatus("No se encontró el perfil seleccionado.", true);
+        showStatus("The selected profile was not found.", true);
         return;
     }
 
     const confirmed = await confirmAction({
-        eyebrow: "Perfil",
-        title: "Borrar perfil",
-        message: `Se borrará "${profile.name}". Los chats que lo usaban pasarán a quedar sin perfil explícito.`,
-        confirmLabel: "Borrar perfil",
+        eyebrow: "Profile",
+        title: "Delete profile",
+        message: `\"${profile.name}\" will be deleted. Chats using it will end up without an explicit profile.`,
+        confirmLabel: "Delete profile",
         confirmVariant: "danger",
     });
 
@@ -191,9 +191,9 @@ export async function handleSettingsProfileDelete(profileId) {
         renderSettingsProfilesManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus("Perfil borrado.");
+        showStatus("Profile deleted.");
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el perfil.", true);
+        showStatus(error.message || "The profile could not be deleted.", true);
     }
 }
 
@@ -265,7 +265,7 @@ export function handleDocumentClick(event, { handleProjectDocumentDelete }) {
 export function handleActiveChatProfileEdit() {
     const activeProfileId = state.activeConversation?.profile_id || state.pendingProfileId || getDefaultProfileId();
     if (!activeProfileId) {
-        showStatus("No hay un perfil seleccionado para editar.", true);
+        showStatus("There is no selected profile to edit.", true);
         return;
     }
 
@@ -359,9 +359,9 @@ function populateProfileModal(profile = null) {
     const isEditing = Boolean(profile);
     const tags = Array.isArray(profile?.tags) ? profile.tags.slice(0, MAX_PROFILE_TAGS).join(", ") : "";
 
-    elements.profileModalEyebrow.textContent = isEditing ? "Editar perfil" : "Perfil";
-    elements.profileModalTitle.textContent = isEditing ? profile.name : "Crear perfil";
-    elements.profileSubmitButton.textContent = isEditing ? "Guardar cambios" : "Crear perfil";
+    elements.profileModalEyebrow.textContent = isEditing ? "Edit profile" : "Profile";
+    elements.profileModalTitle.textContent = isEditing ? profile.name : "Create profile";
+    elements.profileSubmitButton.textContent = isEditing ? "Save changes" : "Create profile";
     elements.profileIdInput.value = isEditing ? String(profile.id) : "";
     elements.profileNameInput.value = profile?.name || "";
     elements.profilePersonalityInput.value = profile?.personality || "";

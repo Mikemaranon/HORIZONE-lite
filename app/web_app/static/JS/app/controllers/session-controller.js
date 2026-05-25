@@ -58,19 +58,19 @@ export async function handleSessionProfileSubmit(event) {
     const confirmPassword = elements.sessionConfirmPasswordInput?.value || "";
 
     if (!username) {
-        showStatus("El nombre de usuario no puede estar vacío.", true);
+        showStatus("The username cannot be empty.", true);
         elements.sessionUsernameInput?.focus();
         return;
     }
 
     if (!currentPassword) {
-        showStatus("Necesitas la contraseña actual para guardar cambios.", true);
+        showStatus("You need the current password to save changes.", true);
         elements.sessionCurrentPasswordInput?.focus();
         return;
     }
 
     if (newPassword && newPassword !== confirmPassword) {
-        showStatus("La confirmación de la nueva contraseña no coincide.", true);
+        showStatus("The new password confirmation does not match.", true);
         elements.sessionConfirmPasswordInput?.focus();
         return;
     }
@@ -90,8 +90,8 @@ export async function handleSessionProfileSubmit(event) {
         renderSettingsSession();
         closeSessionProfileModal();
         elements.sessionProfileForm?.reset();
-        showStatus(payload.message || "Perfil de sesión actualizado.");
+        showStatus(payload.message || "Session profile updated.");
     } catch (error) {
-        showStatus(error.message || "No se pudo actualizar el perfil de sesión.", true);
+        showStatus(error.message || "The session profile could not be updated.", true);
     }
 }

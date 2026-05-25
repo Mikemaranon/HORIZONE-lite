@@ -9,7 +9,7 @@ const PROVIDER_TYPE_LABELS = {
 
 
 export function getProviderTypeDisplayName(providerType) {
-    return PROVIDER_TYPE_LABELS[String(providerType || "").toLowerCase()] || providerType || "Proveedor";
+    return PROVIDER_TYPE_LABELS[String(providerType || "").toLowerCase()] || providerType || "Provider";
 }
 
 
@@ -71,7 +71,7 @@ export function getActualProvider() {
 
 
 export function getModelNameById(modelConfigId) {
-    return getModelConfigById(modelConfigId)?.name || "sin modelo";
+    return getModelConfigById(modelConfigId)?.name || "no model";
 }
 
 

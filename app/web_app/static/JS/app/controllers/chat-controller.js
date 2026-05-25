@@ -70,7 +70,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         return;
     }
     if (!getSelectedModel()) {
-        showStatus("Selecciona un modelo antes de enviar el mensaje.", true);
+        showStatus("Select a model before sending the message.", true);
         return;
     }
 
@@ -129,7 +129,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
             },
             onToolStart(toolPayload) {
                 showToolStatusMessage(
-                    toolPayload?.display_name || toolPayload?.tool_name || "herramienta",
+                    toolPayload?.display_name || toolPayload?.tool_name || "tool",
                     assistantMessageMeta,
                 );
             },
@@ -171,11 +171,11 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         renderConversationHeader();
 
         if (payload.finish_reason === "cancelled") {
-            showStatus("Respuesta detenida.", false);
+            showStatus("Response stopped.", false);
             return;
         }
         if (["length", "max_tokens"].includes(payload.finish_reason)) {
-            showStatus("La respuesta se detuvo por límite de tokens del proveedor o del modelo.", true);
+            showStatus("The response stopped due to the provider or model token limit.", true);
         }
     } catch (error) {
         removeTypingMessage();
@@ -183,7 +183,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
             const lastMessage = state.activeMessages[state.activeMessages.length - 1];
             if (lastMessage?.role === "assistant" && lastMessage.content) {
                 finalizeStreamingAssistantMessage(lastMessage.content);
-                showStatus("Respuesta detenida.", false);
+                showStatus("Response stopped.", false);
             } else {
                 if (lastMessage?.role === "assistant") {
                     state.activeMessages.pop();
@@ -198,7 +198,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         }
         removeStreamingAssistantMessage();
         renderMessages({ preserveViewport: true });
-        showStatus(error.message || "No se pudo enviar el mensaje.", true);
+        showStatus(error.message || "The message could not be sent.", true);
     } finally {
         setActiveGenerationRequestId(null);
         setGenerationStopRequested(false);
@@ -240,7 +240,7 @@ export async function handleStopGeneration() {
     } catch (error) {
         setGenerationStopRequested(false);
         syncComposerAvailability();
-        showStatus(error.message || "No se pudo detener la respuesta en curso.", true);
+        showStatus(error.message || "The current response could not be stopped.", true);
     }
 }
 
@@ -259,7 +259,7 @@ export async function ensureActiveConversation({ handleConversationSelect, close
     }
 
     if (!getSelectedModel()) {
-        throw new Error("Selecciona un modelo antes de empezar a chatear.");
+        throw new Error("Select a model before starting to chat.");
     }
 
     enterConversationWorkspace();
@@ -276,11 +276,11 @@ export async function ensureActiveConversation({ handleConversationSelect, close
 
 export async function handleConversationDelete(conversationId) {
     const conversation = state.conversations.find((item) => item.id === conversationId);
-    const label = conversation?.title || "este chat";
+    const label = conversation?.title || "this chat";
     const confirmed = await confirmAction({
-        title: `Borrar "${label}"`,
-        message: "Esta acción elimina el chat y sus mensajes. No se puede deshacer.",
-        confirmLabel: "Borrar chat",
+        title: `Delete "${label}"`,
+        message: "This action deletes the chat and its messages. It cannot be undone.",
+        confirmLabel: "Delete chat",
         eyebrow: "Chat",
     });
 
@@ -306,7 +306,7 @@ export async function handleConversationDelete(conversationId) {
         applyConversationsPayload(data);
         renderApp();
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el chat.", true);
+        showStatus(error.message || "The chat could not be deleted.", true);
     }
 }
 

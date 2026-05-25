@@ -15,7 +15,7 @@ const MESSAGES_AUTO_SCROLL_THRESHOLD = 24;
 
 export function createMessageMarkup(message) {
     const isUser = message.role === "user";
-    const roleLabel = isUser ? "Tú" : null;
+    const roleLabel = isUser ? "You" : null;
     const contentClass = isUser ? "message__content--plain" : "message__content--markdown";
     const renderedContent = isUser
         ? escapeHtml(message.content || "")
@@ -95,7 +95,7 @@ export function appendTypingMessage(message = createPendingAssistantMessage()) {
 
 
 export function showToolStatusMessage(toolDisplayName, message = createPendingAssistantMessage()) {
-    const normalizedToolName = String(toolDisplayName || "").trim() || "herramienta";
+    const normalizedToolName = String(toolDisplayName || "").trim() || "tool";
     if (!document.querySelector("[data-typing-message='true']")) {
         appendTypingMessage(message);
     }
@@ -171,7 +171,7 @@ export function createPendingAssistantMessage() {
         role: "assistant",
         content: "",
         model_config_id: selectedModel?.id || state.activeConversation?.model_config_id || null,
-        model_name: selectedModel?.display_name || selectedModel?.name || state.activeConversation?.model || "Asistente",
+        model_name: selectedModel?.display_name || selectedModel?.name || state.activeConversation?.model || "Assistant",
         profile_id: selectedProfileId,
         profile_name: getProfileNameById(selectedProfileId),
     };
@@ -200,7 +200,7 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
 }
 
 
-function createMessageMetaMarkup(message, userLabel = "Tú") {
+function createMessageMetaMarkup(message, userLabel = "You") {
     if (message.role === "user") {
         return escapeHtml(userLabel);
     }
@@ -220,7 +220,7 @@ function resolveAssistantModelName(message) {
 
     return getModelDisplayNameById(message.model_config_id)
         || state.activeConversation?.model
-        || "Asistente";
+        || "Assistant";
 }
 
 
@@ -247,7 +247,7 @@ function createToolStatusMarkup(toolDisplayName) {
     return `
         <p class="tool-status" aria-live="polite">
             <span class="tool-status__dot" aria-hidden="true"></span>
-            <span>Usando herramienta: ${escapeHtml(toolDisplayName)}</span>
+            <span>Using tool: ${escapeHtml(toolDisplayName)}</span>
         </p>
     `;
 }

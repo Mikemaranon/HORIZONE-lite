@@ -51,12 +51,12 @@ class ChatExportService:
                 "system_prompts_versioned_per_turn": False,
                 "notes": [
                     (
-                        "Los system prompts y ajustes por turno se reconstruyen con la "
-                        "configuración actual del proyecto, perfil y documentos asociados."
+                        "System prompts and per-turn settings are reconstructed using the "
+                        "current project, profile, and associated document configuration."
                     ),
                     (
-                        "Los tool events se exportan desde el historial persistido de cada "
-                        "respuesta del asistente."
+                        "Tool events are exported from the persisted history of each "
+                        "assistant response."
                     ),
                 ],
             },
@@ -117,11 +117,11 @@ class ChatExportService:
     def _resolve_author_label(self, message, model):
         role = str(message.get("role") or "").strip().lower()
         if role == "user":
-            return "Tú"
+            return "You"
         if role == "assistant":
             if model and model.get("display_name"):
                 return model["display_name"]
-            return message.get("model_name") or "Asistente"
+            return message.get("model_name") or "Assistant"
         return role or "unknown"
 
     def _get_project_snapshot(self, project_id):

@@ -18,7 +18,7 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
 
     elements.projectSpaceTitle.textContent = activeProject.name;
     elements.projectSpaceDescription.textContent = activeProject.description
-        || "Este proyecto tiene su propio espacio, separado de los chats puntuales.";
+        || "This project has its own space, separate from standalone chats.";
     elements.projectNameInput.value = activeProject.name || "";
     elements.projectDescriptionInput.value = activeProject.description || "";
     elements.projectSystemPromptInput.value = activeProject.system_prompt || "";
@@ -26,11 +26,11 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
     const projectConversations = getProjectConversations(activeProject.id);
     const totalChats = projectConversations.length;
     const totalDocuments = state.projectDocuments.length;
-    elements.projectChatCount.textContent = `${totalChats} chat${totalChats === 1 ? "" : "s"} · ${totalDocuments} documento${totalDocuments === 1 ? "" : "s"}`;
+    elements.projectChatCount.textContent = `${totalChats} chat${totalChats === 1 ? "" : "s"} · ${totalDocuments} document${totalDocuments === 1 ? "" : "s"}`;
 
     if (!projectConversations.length) {
         elements.projectConversationsList.innerHTML = createEmptyListItem(
-            "Este proyecto todavía no tiene chats. Usa el botón + para crear el primero."
+            "This project does not have chats yet. Use the + button to create the first one."
         );
         return;
     }
@@ -41,14 +41,14 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
             return `
                 <div class="project-chat-card${activeClass}" data-conversation-row="${conversation.id}">
                     <button class="project-chat-card__main" type="button" data-conversation-id="${conversation.id}">
-                        <span class="project-chat-card__title">${escapeHtml(conversation.title || "Nuevo chat")}</span>
+                        <span class="project-chat-card__title">${escapeHtml(conversation.title || "New chat")}</span>
                     </button>
                     <button
                         class="icon-button conversation-row__delete"
                         type="button"
                         data-delete-conversation-id="${conversation.id}"
-                        aria-label="Borrar chat"
-                        title="Borrar chat"
+                        aria-label="Delete chat"
+                        title="Delete chat"
                     >
                         ×
                     </button>
@@ -80,7 +80,7 @@ export function renderDocumentsFileList() {
 
     const uploadedDocuments = state.projectDocuments || [];
     if (!uploadedDocuments.length && !state.stagedDocuments.length) {
-        elements.documentsFileList.innerHTML = `<p class="documents-file-list__empty">No hay documentos seleccionados.</p>`;
+        elements.documentsFileList.innerHTML = `<p class="documents-file-list__empty">No documents selected.</p>`;
         return;
     }
 
@@ -95,7 +95,7 @@ export function renderDocumentsFileList() {
                 type="button"
                 data-delete-project-document-id="${file.id}"
             >
-                Borrar
+                Delete
             </button>
         </div>
     `).join("");
@@ -104,7 +104,7 @@ export function renderDocumentsFileList() {
         <div class="documents-file documents-file--pending">
             <div class="documents-file__copy">
                 <span class="documents-file__name">${escapeHtml(file.name)}</span>
-                <span class="documents-file__meta">${escapeHtml(`${file.sizeLabel} · subiendo…`)}</span>
+                <span class="documents-file__meta">${escapeHtml(`${file.sizeLabel} · uploading…`)}</span>
             </div>
         </div>
     `).join("");

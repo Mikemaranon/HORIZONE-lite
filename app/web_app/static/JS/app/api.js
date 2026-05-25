@@ -210,7 +210,7 @@ export async function sendChatStream(data, handlers = {}, options = {}) {
     }
 
     if (!response.body) {
-        throw new Error("El navegador no soporta respuestas en streaming en este entorno.");
+        throw new Error("The browser does not support streaming responses in this environment.");
     }
 
     const reader = response.body.getReader();
@@ -247,7 +247,7 @@ export async function sendChatStream(data, handlers = {}, options = {}) {
     }
 
     if (!finalResponse) {
-        throw new Error("La respuesta en streaming terminó sin un evento final.");
+        throw new Error("The streaming response ended without a final event.");
     }
 
     return finalResponse;
@@ -291,7 +291,7 @@ function ensureSuccessfulResponse(response, payload) {
         if (response.status === 401) {
             delete_token();
             window.location.href = "/login";
-            throw new Error("Tu sesión ha expirado.");
+            throw new Error("Your session has expired.");
         }
 
         throw new Error(errorMessage);
@@ -304,7 +304,7 @@ async function apiRequestFormData(method, endpoint, body) {
     if (!token) {
         delete_token();
         window.location.href = "/login";
-        throw new Error("Tu sesión ha expirado.");
+        throw new Error("Your session has expired.");
     }
 
     const response = await fetch(endpoint, {
@@ -346,7 +346,7 @@ function parseSseEvent(rawEvent) {
         try {
             payload = JSON.parse(dataLines.join("\n"));
         } catch {
-            throw new Error("La respuesta del servidor llegó con un formato de streaming inválido.");
+            throw new Error("The server response arrived with an invalid streaming format.");
         }
     }
 
@@ -387,7 +387,7 @@ function handleStreamEvent(event, handlers) {
         handlers.onError?.(event.payload.error, event.payload);
         throw new Error(
             event.payload.error?.message
-            || "La generación en streaming falló."
+            || "Streaming generation failed."
         );
     }
 

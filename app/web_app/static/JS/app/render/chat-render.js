@@ -41,15 +41,15 @@ export function renderConversationHeader() {
         const selectedModelConfig = getSelectedModelConfig();
         const provider = selectedModelConfig?.provider_name
             || getProviderDisplayName(state.activeConversation?.provider || getActualProvider());
-        const model = state.activeConversation?.model || getSelectedModel() || "modelo pendiente";
+        const model = state.activeConversation?.model || getSelectedModel() || "pending model";
         const profileName = getProfileNameById(state.activeConversation?.profile_id || getSelectedProfileId());
 
-        elements.workspaceEyebrow.textContent = activeProject ? "Chat del proyecto" : "Chat";
-        elements.conversationTitle.textContent = state.activeConversation.title || "Nueva conversación";
+        elements.workspaceEyebrow.textContent = activeProject ? "Project chat" : "Chat";
+        elements.conversationTitle.textContent = state.activeConversation.title || "New conversation";
         elements.conversationMeta.innerHTML = createMetaChipsMarkup([
-            { group: "provider", label: "Proveedor", value: provider },
-            { group: "model", label: "Modelo", value: model },
-            { group: "profile", label: "Perfil", value: profileName },
+            { group: "provider", label: "Provider", value: provider },
+            { group: "model", label: "Model", value: model },
+            { group: "profile", label: "Profile", value: profileName },
         ]);
         elements.conversationMeta.hidden = false;
         elements.conversationSubtitle.hidden = true;
@@ -59,9 +59,9 @@ export function renderConversationHeader() {
     }
 
     if (state.workspaceMode === "project" && activeProject) {
-        elements.workspaceEyebrow.textContent = "Proyecto";
+        elements.workspaceEyebrow.textContent = "Project";
         elements.conversationTitle.textContent = activeProject.name;
-        elements.conversationSubtitle.textContent = "Gestiona aquí el prompt del proyecto y sus chats, sin mezclarlo con los chats puntuales.";
+        elements.conversationSubtitle.textContent = "Manage the project prompt and its chats here, without mixing them with standalone chats.";
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
         elements.conversationSubtitle.hidden = false;
@@ -71,9 +71,9 @@ export function renderConversationHeader() {
     }
 
     if (state.workspaceMode === "settings") {
-        elements.workspaceEyebrow.textContent = "Configuración";
-        elements.conversationTitle.textContent = "Ajustes generales";
-        elements.conversationSubtitle.textContent = "Gestiona aquí proveedores, modelos, perfiles y la sesión de HORIZONE lite.";
+        elements.workspaceEyebrow.textContent = "Configuration";
+        elements.conversationTitle.textContent = "General settings";
+        elements.conversationSubtitle.textContent = "Manage HORIZONE lite providers, models, profiles, and session here.";
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
         elements.conversationSubtitle.hidden = false;
@@ -84,8 +84,8 @@ export function renderConversationHeader() {
 
     if (state.workspaceMode === "home") {
         elements.workspaceEyebrow.textContent = "Chat";
-        elements.conversationTitle.textContent = "Nueva conversación";
-        elements.conversationSubtitle.textContent = "Configura el modelo por defecto en ajustes generales y cambia modelo o perfil por chat desde el panel lateral.";
+        elements.conversationTitle.textContent = "New conversation";
+        elements.conversationSubtitle.textContent = "Set the default model in general settings and change the model or profile per chat from the side panel.";
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
         elements.conversationSubtitle.hidden = false;

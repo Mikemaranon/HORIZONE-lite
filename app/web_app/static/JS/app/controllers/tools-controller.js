@@ -23,9 +23,9 @@ export async function handleToolToggle(toolId, isActive) {
         await refreshToolsState();
         renderSettingsToolsManager();
         renderChatPanel();
-        showStatus(isActive ? "Tool activada." : "Tool desactivada.");
+        showStatus(isActive ? "Tool enabled." : "Tool disabled.");
     } catch (error) {
-        showStatus(error.message || "No se pudo actualizar la tool.", true);
+        showStatus(error.message || "The tool could not be updated.", true);
     }
 }
 
@@ -89,14 +89,14 @@ export async function handleToolUploadSubmit(event) {
     event.preventDefault();
 
     if (!stagedToolFile) {
-        setToolUploadError("Selecciona un archivo .py antes de subir la tool.");
+        setToolUploadError("Select a .py file before uploading the tool.");
         return;
     }
 
     const rawName = elements.toolUploadNameInput?.value.trim() || "";
     const filename = buildToolFilename(rawName);
     if (!filename) {
-        setToolUploadError("Indica un nombre válido para guardar la tool.");
+        setToolUploadError("Provide a valid name to save the tool.");
         return;
     }
 
@@ -115,9 +115,9 @@ export async function handleToolUploadSubmit(event) {
         }
         renderToolUploadDraft();
         closeToolUploadModal();
-        showStatus(`Tool subida: ${filename}`);
+        showStatus(`Tool uploaded: ${filename}`);
     } catch (error) {
-        const message = error.message || "No se pudo subir la tool.";
+        const message = error.message || "The tool could not be uploaded.";
         setToolUploadError(message);
         showStatus(message, true);
     }
@@ -158,7 +158,7 @@ async function refreshToolsState() {
 function stageToolFile(file) {
     if (!isPythonFile(file)) {
         stagedToolFile = null;
-        setToolUploadError("Solo se admiten archivos Python con extensión .py.");
+        setToolUploadError("Only Python files with the .py extension are supported.");
         renderToolUploadDraft();
         return;
     }
@@ -176,14 +176,14 @@ function renderToolUploadDraft() {
     if (elements.toolUploadFileList) {
         if (!stagedToolFile) {
             elements.toolUploadFileList.innerHTML = `
-                <p class="documents-file-list__empty">Todavía no has seleccionado ningún archivo.</p>
+                <p class="documents-file-list__empty">You have not selected any file yet.</p>
             `;
         } else {
             const name = elements.toolUploadNameInput?.value.trim() || "";
             const filename = buildToolFilename(name);
             const metaParts = [formatFileSize(stagedToolFile.size)];
             if (filename) {
-                metaParts.unshift(`Se guardará como ${filename}`);
+                metaParts.unshift(`Will be saved as ${filename}`);
             }
             elements.toolUploadFileList.innerHTML = `
                 <div class="documents-file documents-file--pending">

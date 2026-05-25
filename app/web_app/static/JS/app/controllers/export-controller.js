@@ -18,7 +18,7 @@ let exportInFlight = false;
 
 export function openChatExportDialog() {
     if (!hasExportableConversation()) {
-        showStatus("Necesitas una conversación con mensajes para poder exportarla.", true);
+        showStatus("You need a conversation with messages to export it.", true);
         return;
     }
 
@@ -36,19 +36,19 @@ export function syncChatExportState() {
     if (elements.chatExportButton) {
         elements.chatExportButton.disabled = !canExport;
         elements.chatExportButton.title = canExport
-            ? "Exportar chat"
-            : "Necesitas una conversación con mensajes para exportar";
+            ? "Export chat"
+            : "You need a conversation with messages to export";
     }
 
     if (elements.chatExportSummary) {
         if (canExport) {
-            const conversationTitle = state.activeConversation?.title || "Conversación";
-            const messageLabel = messageCount === 1 ? "mensaje" : "mensajes";
+            const conversationTitle = state.activeConversation?.title || "Conversation";
+            const messageLabel = messageCount === 1 ? "message" : "messages";
             elements.chatExportSummary.textContent = `${conversationTitle} · ${messageCount} ${messageLabel} listos para descargar.`;
         } else if (hasConversation) {
-            elements.chatExportSummary.textContent = "Este chat todavía no tiene mensajes guardados para exportar.";
+            elements.chatExportSummary.textContent = "This chat does not have saved messages to export yet.";
         } else {
-            elements.chatExportSummary.textContent = "Abre una conversación o envía el primer mensaje para habilitar la exportación.";
+            elements.chatExportSummary.textContent = "Open a conversation or send the first message to enable export.";
         }
     }
 
@@ -63,7 +63,7 @@ export async function handleChatExportDownload(format) {
 
     exportInFlight = true;
     syncChatExportState();
-    setExportStatus("Preparando archivo...");
+    setExportStatus("Preparing file...");
 
     try {
         const payload = await loadConversationExportData(state.activeConversationId);
@@ -90,13 +90,13 @@ export async function handleChatExportDownload(format) {
                 buildConversationMarkdownExport(exportData),
             );
         } else {
-            throw new Error("Formato de exportación no soportado.");
+            throw new Error("Unsupported export format.");
         }
 
         closeChatExportModal();
-        showStatus("Conversación exportada correctamente.", false);
+        showStatus("Conversation exported successfully.", false);
     } catch (error) {
-        const message = error.message || "No se pudo exportar la conversación.";
+        const message = error.message || "The conversation could not be exported.";
         setExportStatus(message);
         showStatus(message, true);
     } finally {
@@ -178,19 +178,19 @@ async function buildConversationHtmlExport(exportData) {
 
     return [
         "<!DOCTYPE html>",
-        '<html lang="es">',
+        '<html lang="en">',
         "<head>",
         '    <meta charset="UTF-8">',
         '    <meta name="viewport" content="width=device-width, initial-scale=1.0">',
-        `    <title>${escapeHtml(conversation.title || "Conversación exportada")}</title>`,
+        `    <title>${escapeHtml(conversation.title || "Exported conversation")}</title>`,
         `    <style>${inlineCss}</style>`,
         "</head>",
         "<body>",
         '    <main class="chat-export-page">',
         '        <section class="chat-export-shell">',
         '            <header class="chat-export-header">',
-        `                <p class="chat-export-header__eyebrow">${escapeHtml(project ? "Chat del proyecto" : "Chat exportado")}</p>`,
-        `                <h1 class="chat-export-header__title">${escapeHtml(conversation.title || "Conversación")}</h1>`,
+        `                <p class="chat-export-header__eyebrow">${escapeHtml(project ? "Project chat" : "Exported chat")}</p>`,
+        `                <h1 class="chat-export-header__title">${escapeHtml(conversation.title || "Conversation")}</h1>`,
         "            </header>",
         '            <section class="messages-container chat-export-messages">',
         messagesMarkup,
@@ -218,7 +218,7 @@ function createExportMessageMarkup(message) {
         ? `<div class="message__content message__content--plain">${escapeHtml(message.content || "")}</div>`
         : `<div class="message__content message__content--markdown">${renderMarkdown(message.content || "")}</div>`;
     const metaMarkup = isUser
-        ? "Tú"
+        ? "You"
         : `
             <span class="message__meta-model">${escapeHtml(assistantLabel)}</span>
             <span class="message__meta-separator" aria-hidden="true">|</span>
@@ -242,7 +242,7 @@ function resolveAssistantModelLabel(message) {
         message.model?.display_name
         || message.model_name
         || message.author_label
-        || "Asistente"
+        || "Assistant"
     );
 }
 
@@ -251,7 +251,7 @@ function resolveAssistantProfileLabel(message) {
     return (
         message.profile?.name
         || message.profile_name
-        || "Perfil"
+        || "Profile"
     );
 }
 
@@ -259,14 +259,14 @@ function resolveAssistantProfileLabel(message) {
 function buildConversationMarkdownExport(exportData) {
     const conversation = exportData.conversation || {};
     const blocks = [
-        `# ${conversation.title || "Conversación"}`,
+        `# ${conversation.title || "Conversation"}`,
         "",
     ];
 
     for (const message of exportData.messages || []) {
         blocks.push(`## ${resolveMarkdownParticipant(message)}`);
         blocks.push("");
-        blocks.push(String(message.content || "").trim() || "_Sin contenido_");
+        blocks.push(String(message.content || "").trim() || "_No content_");
         blocks.push("");
     }
 
@@ -276,7 +276,7 @@ function buildConversationMarkdownExport(exportData) {
 
 function resolveMarkdownParticipant(message) {
     if (message.role === "user") {
-        return "Tú";
+        return "You";
     }
 
     const assistantLabel = resolveAssistantModelLabel(message);
@@ -292,7 +292,7 @@ async function loadExportStyles() {
             EXPORT_STYLESHEET_PATHS.map(async (path) => {
                 const response = await fetch(path);
                 if (!response.ok) {
-                    throw new Error("No se pudieron cargar los estilos para exportar el HTML.");
+                    throw new Error("The styles for exporting HTML could not be loaded.");
                 }
                 return response.text();
             }),

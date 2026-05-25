@@ -136,7 +136,7 @@ export function syncChatPanelVisibility() {
         elements.chatSettingsButton.setAttribute("aria-expanded", String(isOpen));
         elements.chatSettingsButton.setAttribute(
             "aria-label",
-            isOpen ? "Cerrar panel del chat" : "Abrir panel del chat"
+            isOpen ? "Close chat panel" : "Open chat panel"
         );
     }
 
@@ -358,10 +358,10 @@ function syncSidebarToggleAria() {
         elements.sidebarToggleButton.setAttribute("aria-expanded", String(isOpen));
         elements.sidebarToggleButton.setAttribute(
             "aria-label",
-            isOpen ? "Cerrar navegación lateral" : "Abrir navegación lateral"
+            isOpen ? "Close side navigation" : "Open side navigation"
         );
         elements.sidebarToggleButton.title = isOpen
-            ? "Ocultar barra lateral"
-            : "Mostrar barra lateral";
+            ? "Hide sidebar"
+            : "Show sidebar";
     }
 }

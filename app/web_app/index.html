@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +13,7 @@
             id="sidebar-backdrop"
             class="sidebar-backdrop"
             type="button"
-            aria-label="Cerrar navegación lateral"
+            aria-label="Close side navigation"
             tabindex="-1"
         ></button>
 
@@ -23,7 +23,7 @@
                     <div class="brand">
                         <img class="brand__logo-full" src="/static/assets/logos/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE lite">
                     </div>
-                    <nav class="sidebar-links" aria-label="Accesos rápidos">
+                    <nav class="sidebar-links" aria-label="Quick links">
                         <a
                             class="sidebar-link"
                             href="https://github.com/Mikemaranon/HORIZONE-lite"
@@ -35,7 +35,7 @@
                                         <path d="M12 21.35 10.55 20.03C5.4 15.36 2 12.27 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.77-3.4 6.86-8.55 11.54L12 21.35Z"></path>
                                     </svg>
                                 </span>
-                                <strong>apoyar</strong>
+                                <strong>support</strong>
                             </span>
                         </a>
                         <a
@@ -49,7 +49,7 @@
                                         <path d="M10.5 3a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Zm10.2 13.79-3.67-3.67a1 1 0 0 0-1.41 1.41l3.67 3.67a1 1 0 0 0 1.41-1.41Z"></path>
                                     </svg>
                                 </span>
-                                <strong>explorar</strong>
+                                <strong>explore</strong>
                             </span>
                         </a>
                     </nav>
@@ -59,15 +59,15 @@
                     <section class="sidebar-group">
                         <div class="sidebar-group__header">
                             <div class="sidebar-group__label">
-                                <h2>Proyectos</h2>
+                                <h2>Projects</h2>
                                 <span id="project-count" class="sidebar-group__meta">0</span>
                             </div>
                             <button
                                 class="list-add-button"
                                 id="new-project-button"
                                 type="button"
-                                aria-label="Crear nuevo proyecto"
-                                title="Nuevo proyecto"
+                                aria-label="Create new project"
+                                title="New project"
                             >
                                 +
                             </button>
@@ -85,8 +85,8 @@
                                 class="list-add-button"
                                 id="new-chat-button"
                                 type="button"
-                                aria-label="Crear nueva conversación"
-                                title="Nueva conversación"
+                                aria-label="Create new conversation"
+                                title="New conversation"
                             >
                                 +
                             </button>
@@ -102,7 +102,7 @@
                                 <path d="M10.825 22q-.275 0-.5-.175t-.275-.45l-.6-2.025q-.325-.125-.638-.312t-.587-.438l-1.975.4q-.275.05-.537-.037T5.287 18l-1.85-3.2q-.15-.25-.113-.538t.238-.487l1.4-1.65q-.05-.325-.05-.625t.05-.625l-1.4-1.65q-.2-.2-.238-.488t.113-.537l1.85-3.2q.15-.25.413-.338t.537-.037l1.975.4q.275-.25.588-.438t.637-.312l.6-2.025q.05-.275.275-.45t.5-.175h3.7q.275 0 .5.175t.275.45l.6 2.025q.325.125.638.313t.587.437l1.975-.4q.275-.05.538.038t.412.337l1.85 3.2q.15.25.113.538t-.238.487l-1.4 1.65q.05.325.05.625t-.05.625l1.4 1.65q.2.2.238.488t-.113.537l-1.85 3.2q-.15.25-.412.338t-.538.037l-1.975-.4q-.275.25-.587.438t-.638.312l-.6 2.025q-.05.275-.275.45t-.5.175Zm1.175-6.5q1.45 0 2.475-1.025Q15.5 13.45 15.5 12q0-1.45-1.025-2.475Q13.45 8.5 12 8.5q-1.45 0-2.475 1.025Q8.5 10.55 8.5 12q0 1.45 1.025 2.475Q10.55 15.5 12 15.5Z"></path>
                             </svg>
                         </span>
-                        <span class="sidebar-settings-button__label">Ajustes</span>
+                        <span class="sidebar-settings-button__label">Settings</span>
                     </button>
                     <p class="sidebar__credit">
                         <a href="https://www.flaticon.com/free-icons/ui" title="ui icons" rel="noreferrer" target="_blank">
@@ -119,7 +119,7 @@
                     id="chat-panel-backdrop"
                     class="chat-panel-backdrop"
                     type="button"
-                    aria-label="Cerrar panel del chat"
+                    aria-label="Close chat panel"
                     tabindex="-1"
                 ></button>
 
@@ -131,7 +131,7 @@
                                     id="sidebar-toggle-button"
                                     class="icon-button sidebar-toggle"
                                     type="button"
-                                    aria-label="Abrir navegación lateral"
+                                    aria-label="Open side navigation"
                                     aria-controls="app-sidebar"
                                     aria-expanded="false"
                                     title="Mostrar u ocultar barra lateral"
@@ -147,22 +147,22 @@
 
                                 <div class="workspace__identity">
                                     <p id="workspace-eyebrow" class="workspace__eyebrow">Chat</p>
-                                    <h2 id="conversation-title" class="workspace__title">Nueva conversación</h2>
+                                    <h2 id="conversation-title" class="workspace__title">New conversation</h2>
                                 </div>
                             </div>
 
                             <div class="workspace__header-actions">
                                 <button id="back-to-project-button" class="ghost-button workspace__back-button" type="button" hidden>
-                                    Volver al proyecto
+                                    Back to project
                                 </button>
                                 <button
                                     id="chat-settings-button"
                                     class="ghost-button workspace__settings-button"
                                     type="button"
-                                    aria-label="Ajustes del chat"
+                                    aria-label="Chat settings"
                                     aria-controls="chat-side-panel"
                                     aria-expanded="false"
-                                    title="Ajustes del chat"
+                                    title="Chat settings"
                                 >
                                     <span class="workspace__settings-button-icon" aria-hidden="true">
                                         <img src="/static/assets/icons/sidebar-right.png" alt="">
@@ -173,7 +173,7 @@
 
                         <div id="conversation-meta" class="workspace__meta" hidden></div>
                         <p id="conversation-subtitle" class="workspace__subtitle">
-                            Abre ajustes para elegir proveedor, modelo y perfil antes de empezar.
+                            Open settings to choose a provider, model, and profile before you start.
                         </p>
                     </header>
 
@@ -191,8 +191,8 @@
                                 id="status-banner-close"
                                 class="status-banner__close"
                                 type="button"
-                                aria-label="Cerrar notificación"
-                                title="Cerrar"
+                                aria-label="Close notification"
+                                title="Close"
                             >
                                 ×
                             </button>
@@ -202,34 +202,34 @@
                     <section class="chat-surface">
                         <div id="empty-state" class="empty-state">
                             <p class="empty-state__eyebrow">HORIZONE lite</p>
-                            <h3>Tu espacio local para conversar con modelos.</h3>
+                            <h3>Your local space for talking to models.</h3>
                             <p>
-                                Crea un chat, abre ajustes generales para el modelo y usa el panel del chat para elegir perfil y preparar herramientas sin salir de esta vista.
+                                Create a chat, open general settings for the model, and use the chat panel to choose a profile and prepare tools without leaving this view.
                             </p>
                             <div class="prompt-grid">
-                                <button class="prompt-card" type="button" data-prompt="recomiedame una serie, libro o película">
-                                    <span class="prompt-card__kicker">Recomendaciones</span>
-                                    <strong>Serie, libro o película</strong>
+                                <button class="prompt-card" type="button" data-prompt="recommend a series, book, or movie">
+                                    <span class="prompt-card__kicker">Recommendations</span>
+                                    <strong>Series, book, or movie</strong>
                                 </button>
-                                <button class="prompt-card" type="button" data-prompt="dame un plan divertido por mi ciudad">
-                                    <span class="prompt-card__kicker">Ciudad</span>
-                                    <strong>Plan divertido cerca</strong>
+                                <button class="prompt-card" type="button" data-prompt="give me a fun plan for my city">
+                                    <span class="prompt-card__kicker">City</span>
+                                    <strong>Fun plan nearby</strong>
                                 </button>
-                                <button class="prompt-card" type="button" data-prompt="ayudame a estudiar sobre el siguiente tema:">
-                                    <span class="prompt-card__kicker">Estudio</span>
-                                    <strong>Ayuda para estudiar</strong>
+                                <button class="prompt-card" type="button" data-prompt="help me study the following topic:">
+                                    <span class="prompt-card__kicker">Study</span>
+                                    <strong>Study help</strong>
                                 </button>
-                                <button class="prompt-card" type="button" data-prompt="descubre música nueva para mí">
-                                    <span class="prompt-card__kicker">Música</span>
-                                    <strong>Descubrir música</strong>
+                                <button class="prompt-card" type="button" data-prompt="discover new music for me">
+                                    <span class="prompt-card__kicker">Music</span>
+                                    <strong>Discover music</strong>
                                 </button>
-                                <button class="prompt-card" type="button" data-prompt="dame ideas para pasar el rato ahora mismo">
-                                    <span class="prompt-card__kicker">Ahora</span>
-                                    <strong>Ideas para este rato</strong>
+                                <button class="prompt-card" type="button" data-prompt="give me ideas for what to do right now">
+                                    <span class="prompt-card__kicker">Now</span>
+                                    <strong>Ideas for right now</strong>
                                 </button>
-                                <button class="prompt-card" type="button" data-prompt="recomiéndame algo interesante para aprender">
-                                    <span class="prompt-card__kicker">Aprender</span>
-                                    <strong>Aprender algo</strong>
+                                <button class="prompt-card" type="button" data-prompt="recommend something interesting to learn">
+                                    <span class="prompt-card__kicker">Learn</span>
+                                    <strong>Learn something new</strong>
                                 </button>
                             </div>
                         </div>
@@ -237,10 +237,10 @@
                         <div id="project-space" class="project-space" hidden>
                             <section class="project-space__hero">
                                 <div>
-                                    <p class="project-space__eyebrow">Proyecto activo</p>
-                                    <h3 id="project-space-title" class="project-space__title">Proyecto</h3>
+                                    <p class="project-space__eyebrow">Active project</p>
+                                    <h3 id="project-space-title" class="project-space__title">Project</h3>
                                     <p id="project-space-description" class="project-space__description">
-                                        Este proyecto agrupa sus propios chats y contexto.
+                                        This project groups its own chats and context.
                                     </p>
                                 </div>
                                 <div class="project-space__actions">
@@ -249,21 +249,21 @@
                                         class="ghost-button"
                                         type="button"
                                     >
-                                        Agregar documentos
+                                        Add documents
                                     </button>
                                     <button
                                         id="customize-project-button"
                                         class="ghost-button"
                                         type="button"
                                     >
-                                        Personalizar
+                                        Customize
                                     </button>
                                     <button
                                         id="new-project-chat-button"
                                         class="list-add-button list-add-button--large"
                                         type="button"
-                                        aria-label="Crear chat en este proyecto"
-                                        title="Nuevo chat del proyecto"
+                                        aria-label="Create chat in this project"
+                                        title="New project chat"
                                     >
                                         +
                                     </button>
@@ -272,7 +272,7 @@
 
                             <section class="project-panel project-panel--chat-list">
                                 <div class="project-panel__header">
-                                    <h4>Chats del proyecto</h4>
+                                    <h4>Project chats</h4>
                                     <span id="project-chat-count" class="project-panel__meta">0 chats</span>
                                 </div>
                                 <div id="project-conversations-list" class="project-conversations-list"></div>
@@ -284,12 +284,12 @@
                                 <section class="settings-block settings-block--providers">
                                     <div class="settings-block__header-row">
                                         <div>
-                                            <h4>Proveedores</h4>
+                                            <h4>Providers</h4>
                                             <p class="settings-block__copy">
-                                                Configura aquí los proveedores disponibles. MLX y Ollama vienen integrados y se pueden restaurar si hace falta.
+                                                Configure the available providers here. MLX and Ollama come built in and can be restored if needed.
                                             </p>
                                         </div>
-                                        <button id="settings-new-provider-button" class="action-button" type="button">Crear</button>
+                                        <button id="settings-new-provider-button" class="action-button" type="button">Create</button>
                                     </div>
 
                                     <div class="profiles-manager">
@@ -300,12 +300,12 @@
                                 <section class="settings-block settings-block--models">
                                     <div class="settings-block__header-row">
                                         <div>
-                                            <h4>Modelos</h4>
+                                            <h4>Models</h4>
                                             <p class="settings-block__copy">
-                                                Cada modelo apunta a uno de los proveedores configurados. Marca el default desde el formulario de crear o editar.
+                                                Each model points to one of the configured providers. Mark the default from the create or edit form.
                                             </p>
                                         </div>
-                                        <button id="settings-new-model-button" class="action-button" type="button">Crear</button>
+                                        <button id="settings-new-model-button" class="action-button" type="button">Create</button>
                                     </div>
 
                                     <div class="profiles-manager">
@@ -316,12 +316,12 @@
                                 <section class="settings-block settings-block--profiles">
                                     <div class="settings-block__header-row">
                                         <div>
-                                            <h4>Perfiles</h4>
+                                            <h4>Profiles</h4>
                                             <p class="settings-block__copy">
-                                                Visualiza los perfiles actuales y edítalos sin salir de los ajustes generales.
+                                                Review the current profiles and edit them without leaving general settings.
                                             </p>
                                         </div>
-                                        <button id="settings-new-profile-button" class="action-button" type="button">Crear</button>
+                                        <button id="settings-new-profile-button" class="action-button" type="button">Create</button>
                                     </div>
 
                                     <div class="profiles-manager">
@@ -334,12 +334,12 @@
                                         <div>
                                             <h4>Tools</h4>
                                             <p class="settings-block__copy">
-                                                Activa o desactiva herramientas globales y sube archivos Python con el contrato de HORIZONE lite.
+                                                Enable or disable global tools and upload Python files that follow the HORIZONE lite contract.
                                             </p>
                                         </div>
                                         <div class="settings-block__actions settings-block__actions--tools">
-                                            <button id="settings-filter-tools-button" class="ghost-button settings-filter-toggle" type="button" aria-pressed="false">Activas</button>
-                                            <button id="settings-new-tool-button" class="action-button settings-tools-upload-button" type="button" aria-label="Subir .py" title="Subir .py">
+                                            <button id="settings-filter-tools-button" class="ghost-button settings-filter-toggle" type="button" aria-pressed="false">Active</button>
+                                            <button id="settings-new-tool-button" class="action-button settings-tools-upload-button" type="button" aria-label="Upload .py" title="Upload .py">
                                                 <span class="settings-tools-upload-button__icon" aria-hidden="true">
                                                     <svg viewBox="0 0 24 24" fill="none" focusable="false" role="img">
                                                         <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"/>
@@ -358,13 +358,13 @@
                                 </section>
 
                                 <section class="settings-block settings-block--session settings-space__session">
-                                    <h4>Sesión</h4>
+                                    <h4>Session</h4>
                                     <p class="settings-block__copy">
-                                        Cierra la sesión actual cuando hayas terminado de trabajar en este equipo.
+                                        Sign out of the current session when you are done working on this machine.
                                     </p>
                                     <div class="settings-block__actions settings-block__actions--flush">
-                                        <button class="ghost-button" id="edit-session-profile-button" type="button">Modificar perfil</button>
-                                        <button class="ghost-button" id="logout-button" type="button">Cerrar sesión</button>
+                                        <button class="ghost-button" id="edit-session-profile-button" type="button">Edit profile</button>
+                                        <button class="ghost-button" id="logout-button" type="button">Sign out</button>
                                     </div>
                                 </section>
                             </div>
@@ -379,11 +379,11 @@
                                 <textarea
                                     id="composer-input"
                                     rows="1"
-                                    placeholder="Pregunta cualquier cosa..."
+                                    placeholder="Ask anything..."
                                 ></textarea>
                                 <div class="composer__actions">
                                     <div id="composer-hint" class="composer__hint">
-                                        `Shift + Enter` para salto de línea
+                                        `Shift + Enter` for a new line
                                     </div>
                                     <button
                                         id="send-button"
@@ -399,27 +399,27 @@
                                 </div>
                             </div>
                             <p class="composer__footer-note">
-                                HORIZONE lite puede responder usando MLX, Ollama u OpenAI según tu configuración activa.
+                                HORIZONE lite can respond using MLX, Ollama, or OpenAI based on your active configuration.
                             </p>
                         </form>
                     </footer>
                 </div>
 
-                <aside id="chat-side-panel" class="chat-side-panel" aria-label="Panel lateral del chat" aria-hidden="true">
+                <aside id="chat-side-panel" class="chat-side-panel" aria-label="Chat side panel" aria-hidden="true">
                     <div class="chat-side-panel__header">
                         <div class="chat-side-panel__header-row">
                             <div>
-                                <h3>Ajustes del chat</h3>
+                                <h3>Chat settings</h3>
                                 <p class="chat-side-panel__subtitle">
-                                    Todo lo que afecta al chat actual, agrupado por secciones.
+                                    Everything that affects the current chat, grouped into sections.
                                 </p>
                             </div>
                             <button
                                 id="chat-export-button"
                                 class="icon-button chat-side-panel__download-button"
                                 type="button"
-                                aria-label="Exportar chat"
-                                title="Exportar chat"
+                                aria-label="Export chat"
+                                title="Export chat"
                                 disabled
                             >
                                 <img src="/static/assets/icons/download-chat.png" alt="">
@@ -433,15 +433,15 @@
                             data-chat-sidebar-section="model"
                         >
                             <summary class="chat-sidebar-section__summary">
-                                <span class="chat-sidebar-section__label">Modelo</span>
-                                <span class="chat-sidebar-section__meta">Proveedor y modelo para este chat</span>
+                                <span class="chat-sidebar-section__label">Model</span>
+                                <span class="chat-sidebar-section__meta">Provider and model for this chat</span>
                             </summary>
                             <div class="chat-sidebar-section__content">
                                 <div class="chat-sidebar-section__content-inner">
                                     <div id="chat-model-card" class="chat-profile-card" aria-live="polite"></div>
                                     <div class="settings-block__actions chat-sidebar-section__actions">
-                                        <button id="change-model-button" class="ghost-button" type="button">Cambiar</button>
-                                        <button id="edit-model-button" class="ghost-button" type="button">Editar</button>
+                                        <button id="change-model-button" class="ghost-button" type="button">Change</button>
+                                        <button id="edit-model-button" class="ghost-button" type="button">Edit</button>
                                     </div>
                                 </div>
                             </div>
@@ -452,15 +452,15 @@
                             data-chat-sidebar-section="profile"
                         >
                             <summary class="chat-sidebar-section__summary">
-                                <span class="chat-sidebar-section__label">Perfil</span>
-                                <span class="chat-sidebar-section__meta">Prompt y comportamiento</span>
+                                <span class="chat-sidebar-section__label">Profile</span>
+                                <span class="chat-sidebar-section__meta">Prompt and behavior</span>
                             </summary>
                             <div class="chat-sidebar-section__content">
                                 <div class="chat-sidebar-section__content-inner">
                                     <div id="chat-profile-card" class="chat-profile-card" aria-live="polite"></div>
                                     <div class="settings-block__actions chat-sidebar-section__actions">
-                                        <button id="change-profile-button" class="ghost-button" type="button">Cambiar</button>
-                                        <button id="edit-profile-button" class="ghost-button" type="button">Editar</button>
+                                        <button id="change-profile-button" class="ghost-button" type="button">Change</button>
+                                        <button id="edit-profile-button" class="ghost-button" type="button">Edit</button>
                                     </div>
                                 </div>
                             </div>
@@ -472,7 +472,7 @@
                         >
                             <summary class="chat-sidebar-section__summary">
                                 <span class="chat-sidebar-section__label">Tools</span>
-                                <span class="chat-sidebar-section__meta">Catalogo global activo para este espacio</span>
+                                <span class="chat-sidebar-section__meta">Active global catalog for this space</span>
                             </summary>
                             <div class="chat-sidebar-section__content">
                                 <div class="chat-sidebar-section__content-inner">
@@ -491,30 +491,30 @@
         <div class="modal__panel modal__panel--narrow modal__panel--profile-switch">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Modelo</p>
-                    <h3>Cambiar modelo</h3>
+                    <p class="modal__eyebrow">Model</p>
+                    <h3>Change model</h3>
                 </div>
-                <button id="close-model-switch-button" class="icon-button" type="button" aria-label="Cerrar selector de modelos">×</button>
+                <button id="close-model-switch-button" class="icon-button" type="button" aria-label="Close model picker">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
-                    <h4>Buscar modelo</h4>
+                    <h4>Search model</h4>
                     <p class="settings-block__copy">
-                        Elige el modelo que se aplicará a este chat o el que quieres usar como valor por defecto.
+                        Choose the model that will be applied to this chat or the one you want to use as the default.
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
-                        <span>Barra de búsqueda</span>
+                        <span>Search bar</span>
                         <input
                             id="model-switch-search"
                             type="search"
-                            placeholder="Busca por nombre o proveedor..."
+                            placeholder="Search by name or provider..."
                             autocomplete="off"
                         >
                     </label>
                     <div id="model-switch-results" class="profile-switch__results" aria-live="polite"></div>
                     <div id="model-switch-no-results" class="profile-switch__empty" hidden>
-                        No hay modelos que coincidan con la búsqueda actual.
+                        No models match the current search.
                     </div>
                 </section>
             </div>
@@ -526,17 +526,17 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Exportar</p>
-                    <h3>Descargar conversación</h3>
+                    <p class="modal__eyebrow">Export</p>
+                    <h3>Download conversation</h3>
                 </div>
-                <button id="close-chat-export-button" class="icon-button" type="button" aria-label="Cerrar exportación">×</button>
+                <button id="close-chat-export-button" class="icon-button" type="button" aria-label="Close export">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block chat-export">
                     <h4>Formatos disponibles</h4>
                     <p id="chat-export-summary" class="chat-export__summary">
-                        Elige cómo quieres descargar el historial del chat actual.
+                        Choose how you want to download the current chat history.
                     </p>
                     <div class="chat-export__grid">
                         <button id="chat-export-json-button" class="chat-export__option" type="button">
@@ -545,7 +545,7 @@
                                 <span>.json</span>
                             </span>
                             <span class="chat-export__option-copy">
-                                Incluye mensajes, autores, modelo, perfil, prompts reconstruidos, tools y metadata.
+                                Includes messages, authors, model, profile, reconstructed prompts, tools, and metadata.
                             </span>
                         </button>
                         <button id="chat-export-html-button" class="chat-export__option" type="button">
@@ -554,7 +554,7 @@
                                 <span>.html</span>
                             </span>
                             <span class="chat-export__option-copy">
-                                Exporta el chat con estilos inline inspirados directamente en la interfaz actual.
+                                Exports the chat with inline styles inspired directly by the current interface.
                             </span>
                         </button>
                         <button id="chat-export-markdown-button" class="chat-export__option" type="button">
@@ -563,7 +563,7 @@
                                 <span>.md</span>
                             </span>
                             <span class="chat-export__option-copy">
-                                Guarda solo las interacciones, con participante y mensaje en un formato ligero.
+                                Saves only the interactions, with participant and message in a lightweight format.
                             </span>
                         </button>
                     </div>
@@ -578,10 +578,10 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p id="model-modal-eyebrow" class="modal__eyebrow">Modelo</p>
-                    <h3 id="model-modal-title">Crear modelo</h3>
+                    <p id="model-modal-eyebrow" class="modal__eyebrow">Model</p>
+                    <h3 id="model-modal-title">Create model</h3>
                 </div>
-                <button id="close-model-button" class="icon-button" type="button" aria-label="Cerrar modelo">×</button>
+                <button id="close-model-button" class="icon-button" type="button" aria-label="Close model">×</button>
             </div>
 
             <div class="modal__body">
@@ -591,22 +591,22 @@
                         <input id="model-builtin-input" type="hidden" value="false">
                         <input id="model-icon-data-input" type="hidden" value="">
                         <label class="field field--stacked">
-                            <span>Nombre visible</span>
-                            <input id="model-display-name-input" type="text" placeholder="Ej. gemma-3, GPT-4.1 Main o Llama razonador">
+                            <span>Display name</span>
+                            <input id="model-display-name-input" type="text" placeholder="e.g. gemma-3, GPT-4.1 Main, or Reasoning Llama">
                         </label>
                         <label class="field field--stacked">
-                            <span>Nombre técnico</span>
-                            <input id="model-name-input" type="text" placeholder="Ej. mlx-community/gemma-3-4b-it-4bit o gpt-4.1">
+                            <span>Technical name</span>
+                            <input id="model-name-input" type="text" placeholder="e.g. mlx-community/gemma-3-4b-it-4bit or gpt-4.1">
                             <p class="field__help">
-                                Este identificador se usa en las llamadas reales al proveedor.
+                                This identifier is used in the actual provider requests.
                             </p>
                         </label>
                         <label class="field field--stacked">
-                            <span>Proveedor</span>
+                            <span>Provider</span>
                             <select id="model-provider-select"></select>
                         </label>
                         <div class="field field--stacked">
-                            <span>Icono del modelo</span>
+                            <span>Model icon</span>
                             <div class="model-icon-field">
                                 <div id="model-icon-preview" class="model-icon-preview is-empty" aria-hidden="true">
                                     <span>AI</span>
@@ -618,21 +618,21 @@
                                         accept="image/png,image/jpeg,image/webp,image/gif"
                                     >
                                     <p class="field__help">
-                                        Sube un logo ligero para identificar este modelo en las respuestas del chat.
+                                        Upload a lightweight logo to identify this model in chat responses.
                                     </p>
                                     <button id="model-icon-clear-button" class="ghost-button ghost-button--compact" type="button" hidden>
-                                        Quitar icono
+                                        Remove icon
                                     </button>
                                 </div>
                             </div>
                         </div>
                         <label class="checkbox-field">
                             <input id="model-default-input" type="checkbox">
-                            <span>Usar este modelo por defecto</span>
+                            <span>Use this model by default</span>
                         </label>
                         <div class="settings-block__actions">
-                            <button id="model-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="model-submit-button" class="action-button action-button--primary" type="submit">Crear modelo</button>
+                            <button id="model-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="model-submit-button" class="action-button action-button--primary" type="submit">Create model</button>
                         </div>
                     </form>
                 </section>
@@ -645,10 +645,10 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p id="provider-modal-eyebrow" class="modal__eyebrow">Proveedor</p>
-                    <h3 id="provider-modal-title">Crear proveedor</h3>
+                    <p id="provider-modal-eyebrow" class="modal__eyebrow">Provider</p>
+                    <h3 id="provider-modal-title">Create provider</h3>
                 </div>
-                <button id="close-provider-button" class="icon-button" type="button" aria-label="Cerrar proveedor">×</button>
+                <button id="close-provider-button" class="icon-button" type="button" aria-label="Close provider">×</button>
             </div>
 
             <div class="modal__body">
@@ -658,11 +658,11 @@
                         <input id="provider-builtin-input" type="hidden" value="false">
                         <input id="provider-builtin-key-input" type="hidden" value="">
                         <label class="field field--stacked">
-                            <span>Nombre</span>
-                            <input id="provider-name-input" type="text" placeholder="Ej. Cloud principal, Ollama local o MLX del Mac">
+                            <span>Name</span>
+                            <input id="provider-name-input" type="text" placeholder="e.g. Primary cloud, local Ollama, or Mac MLX">
                         </label>
                         <label class="field field--stacked">
-                            <span>Tipo de proveedor</span>
+                            <span>Provider type</span>
                             <select id="provider-type-select"></select>
                         </label>
                         <label class="field field--stacked">
@@ -671,11 +671,11 @@
                         </label>
                         <label class="field field--stacked">
                             <span>API key</span>
-                            <input id="provider-api-key-input" type="password" placeholder="Clave opcional o requerida según el proveedor">
+                            <input id="provider-api-key-input" type="password" placeholder="Optional or required key depending on the provider">
                         </label>
                         <div class="settings-block__actions">
-                            <button id="provider-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="provider-submit-button" class="action-button action-button--primary" type="submit">Crear proveedor</button>
+                            <button id="provider-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="provider-submit-button" class="action-button action-button--primary" type="submit">Create provider</button>
                         </div>
                     </form>
                 </section>
@@ -688,30 +688,30 @@
         <div class="modal__panel modal__panel--narrow modal__panel--profile-switch">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Perfil</p>
-                    <h3>Cambiar perfil</h3>
+                    <p class="modal__eyebrow">Profile</p>
+                    <h3>Change profile</h3>
                 </div>
-                <button id="close-profile-switch-button" class="icon-button" type="button" aria-label="Cerrar selector de perfiles">×</button>
+                <button id="close-profile-switch-button" class="icon-button" type="button" aria-label="Close profile picker">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
-                    <h4>Buscar perfil</h4>
+                    <h4>Search profile</h4>
                     <p class="settings-block__copy">
-                        Elige el perfil que se aplicará a este chat o al próximo que abras.
+                        Choose the profile that will be applied to this chat or the next one you open.
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
-                        <span>Barra de búsqueda</span>
+                        <span>Search bar</span>
                         <input
                             id="profile-switch-search"
                             type="search"
-                            placeholder="Busca por nombre, personalidad o prompt..."
+                            placeholder="Search by name, personality, or prompt..."
                             autocomplete="off"
                         >
                     </label>
                     <div id="profile-switch-results" class="profile-switch__results" aria-live="polite"></div>
                     <div id="profile-switch-no-results" class="profile-switch__empty" hidden>
-                        No hay perfiles que coincidan con la búsqueda actual.
+                        No profiles match the current search.
                     </div>
                 </section>
             </div>
@@ -723,10 +723,10 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p id="profile-modal-eyebrow" class="modal__eyebrow">Perfil</p>
-                    <h3 id="profile-modal-title">Crear perfil</h3>
+                    <p id="profile-modal-eyebrow" class="modal__eyebrow">Profile</p>
+                    <h3 id="profile-modal-title">Create profile</h3>
                 </div>
-                <button id="close-profile-button" class="icon-button" type="button" aria-label="Cerrar perfil">×</button>
+                <button id="close-profile-button" class="icon-button" type="button" aria-label="Close profile">×</button>
             </div>
 
             <div class="modal__body">
@@ -734,20 +734,20 @@
                     <form id="profile-form" class="stack-form">
                         <input id="profile-id-input" type="hidden">
                         <label class="field field--stacked">
-                            <span>Nombre</span>
-                            <input id="profile-name-input" type="text" placeholder="Ej. Coding, Research, Creative">
+                            <span>Name</span>
+                            <input id="profile-name-input" type="text" placeholder="e.g. Coding, Research, Creative">
                         </label>
                         <label class="field field--stacked">
-                            <span>Personalidad</span>
-                            <input id="profile-personality-input" type="text" placeholder="Ej. Clara, rigurosa y cercana">
+                            <span>Personality</span>
+                            <input id="profile-personality-input" type="text" placeholder="e.g. Clear, rigorous, and approachable">
                         </label>
                         <label class="field field--stacked">
-                            <span>Etiquetas</span>
-                            <input id="profile-tags-input" type="text" placeholder="Máximo 10, separadas por comas">
+                            <span>Tags</span>
+                            <input id="profile-tags-input" type="text" placeholder="Maximum 10, separated by commas">
                         </label>
                         <label class="field field--stacked">
                             <span>System prompt</span>
-                            <textarea id="profile-system-prompt-input" rows="5" placeholder="Describe el comportamiento del asistente..."></textarea>
+                            <textarea id="profile-system-prompt-input" rows="5" placeholder="Describe how the assistant should behave..."></textarea>
                         </label>
                         <div class="grid-fields">
                             <label class="field field--stacked">
@@ -765,11 +765,11 @@
                         </div>
                         <label class="checkbox-field">
                             <input id="profile-default-input" type="checkbox">
-                            <span>Usar como perfil por defecto</span>
+                            <span>Use as the default profile</span>
                         </label>
                         <div class="settings-block__actions">
-                            <button id="profile-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="profile-submit-button" class="action-button action-button--primary" type="submit">Crear perfil</button>
+                            <button id="profile-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="profile-submit-button" class="action-button action-button--primary" type="submit">Create profile</button>
                         </div>
                     </form>
                 </section>
@@ -782,57 +782,57 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Sesión</p>
-                    <h3>Modificar perfil</h3>
+                    <p class="modal__eyebrow">Session</p>
+                    <h3>Edit profile</h3>
                 </div>
-                <button id="close-session-profile-button" class="icon-button" type="button" aria-label="Cerrar edición de sesión">×</button>
+                <button id="close-session-profile-button" class="icon-button" type="button" aria-label="Close session editing">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
                     <form id="session-profile-form" class="stack-form">
                         <label class="field field--stacked">
-                            <span>Nombre de usuario</span>
+                            <span>Username</span>
                             <input
                                 id="session-username-input"
                                 type="text"
-                                placeholder="Tu usuario de acceso"
+                                placeholder="Your sign-in username"
                                 autocomplete="username"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Contraseña actual</span>
+                            <span>Current password</span>
                             <input
                                 id="session-current-password-input"
                                 type="password"
-                                placeholder="Obligatoria para confirmar el cambio"
+                                placeholder="Required to confirm the change"
                                 autocomplete="current-password"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Nueva contraseña</span>
+                            <span>New password</span>
                             <input
                                 id="session-new-password-input"
                                 type="password"
-                                placeholder="Déjala vacía si no quieres cambiarla"
+                                placeholder="Leave blank if you do not want to change it"
                                 autocomplete="new-password"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Confirmar nueva contraseña</span>
+                            <span>Confirm new password</span>
                             <input
                                 id="session-confirm-password-input"
                                 type="password"
-                                placeholder="Repite la nueva contraseña"
+                                placeholder="Repeat the new password"
                                 autocomplete="new-password"
                             >
                         </label>
                         <p class="field__help">
-                            Si cambias la contraseña, el resto de sesiones activas de este usuario se cerrarán por seguridad.
+                            If you change the password, the rest of this user's active sessions will be signed out for security.
                         </p>
                         <div class="settings-block__actions">
-                            <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Guardar cambios</button>
+                            <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Save changes</button>
                         </div>
                     </form>
                 </section>
@@ -845,42 +845,42 @@
         <div class="modal__panel">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Proyecto</p>
-                    <h3>Personalizar proyecto</h3>
+                    <p class="modal__eyebrow">Project</p>
+                    <h3>Customize project</h3>
                 </div>
-                <button id="close-project-customize-button" class="icon-button" type="button" aria-label="Cerrar personalización">×</button>
+                <button id="close-project-customize-button" class="icon-button" type="button" aria-label="Close customization">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
-                    <h4>Dirección del modelo</h4>
+                    <h4>Model direction</h4>
                     <form id="project-customize-form" class="stack-form">
                         <label class="field field--stacked">
-                            <span>Nombre</span>
-                            <input id="project-name-input" type="text" placeholder="Nombre del proyecto">
+                            <span>Name</span>
+                            <input id="project-name-input" type="text" placeholder="Project name">
                         </label>
                         <label class="field field--stacked">
-                            <span>Descripción</span>
-                            <textarea id="project-description-input" rows="3" placeholder="Contexto breve para reconocer este proyecto..."></textarea>
+                            <span>Description</span>
+                            <textarea id="project-description-input" rows="3" placeholder="Short context to recognize this project..."></textarea>
                         </label>
                         <label class="field field--stacked">
-                            <span>Prompt del sistema del proyecto</span>
+                            <span>Project system prompt</span>
                             <textarea
                                 id="project-system-prompt-input"
                                 rows="8"
-                                placeholder="Define tono, restricciones y contexto que deben guiar los chats de este proyecto..."
+                                placeholder="Define tone, constraints, and context that should guide this project's chats..."
                             ></textarea>
                         </label>
-                        <button class="action-button action-button--primary" type="submit">Guardar personalización</button>
+                        <button class="action-button action-button--primary" type="submit">Save customization</button>
                     </form>
                 </section>
 
                 <section class="settings-block settings-block--danger">
-                    <h4>Borrar proyecto</h4>
+                    <h4>Delete project</h4>
                     <p class="settings-block__copy">
-                        El proyecto se elimina de la lista. Sus chats se conservan como chats puntuales.
+                        The project is removed from the list. Its chats are kept as standalone chats.
                     </p>
-                    <button id="delete-project-button" class="action-button action-button--danger" type="button">Borrar proyecto</button>
+                    <button id="delete-project-button" class="action-button action-button--danger" type="button">Delete project</button>
                 </section>
             </div>
         </div>
@@ -891,19 +891,19 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Documentos</p>
-                    <h3>Agregar documentos</h3>
+                    <p class="modal__eyebrow">Documents</p>
+                    <h3>Add documents</h3>
                 </div>
-                <button id="close-documents-button" class="icon-button" type="button" aria-label="Cerrar documentos">×</button>
+                <button id="close-documents-button" class="icon-button" type="button" aria-label="Close documents">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
-                    <h4>Archivos del proyecto</h4>
+                    <h4>Project files</h4>
                     <label id="documents-dropzone" class="documents-dropzone" for="documents-input">
                         <input id="documents-input" type="file" multiple hidden>
-                        <span class="documents-dropzone__title">Suelta documentos aquí</span>
-                        <span class="documents-dropzone__meta">También puedes hacer clic para elegir varios archivos.</span>
+                        <span class="documents-dropzone__title">Drop documents here</span>
+                        <span class="documents-dropzone__meta">You can also click to choose multiple files.</span>
                     </label>
                     <div id="documents-file-list" class="documents-file-list" aria-live="polite"></div>
                 </section>
@@ -917,40 +917,40 @@
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Tools</p>
-                    <h3>Subir tool Python</h3>
+                    <h3>Upload Python tool</h3>
                 </div>
-                <button id="close-tool-upload-button" class="icon-button" type="button" aria-label="Cerrar subida de tool">×</button>
+                <button id="close-tool-upload-button" class="icon-button" type="button" aria-label="Close tool upload">×</button>
             </div>
 
             <form id="tool-upload-form" class="modal__body stack-form">
                 <section class="settings-block">
-                    <h4>Archivo</h4>
+                    <h4>File</h4>
                     <label id="tool-upload-dropzone" class="documents-dropzone" for="tools-upload-input">
                         <input id="tools-upload-input" type="file" accept=".py,text/x-python,text/plain" hidden>
-                        <span class="documents-dropzone__title">Suelta un archivo `.py` aquí</span>
-                        <span class="documents-dropzone__meta">También puedes hacer clic para elegirlo desde tu equipo.</span>
+                        <span class="documents-dropzone__title">Drop a `.py` file here</span>
+                        <span class="documents-dropzone__meta">You can also click to choose it from your computer.</span>
                     </label>
                     <div id="tool-upload-file-list" class="documents-file-list" aria-live="polite"></div>
                 </section>
 
                 <label class="field field--stacked">
-                    <span>Nombre de la tool</span>
+                    <span>Tool name</span>
                     <input
                         id="tool-upload-name-input"
                         type="text"
                         autocomplete="off"
-                        placeholder="ej. local_search"
+                        placeholder="e.g. local_search"
                     >
                     <p class="field__help">
-                        Se guardará como `nombre.py`. El identificador real de la tool sigue saliendo de `TOOL_NAME` dentro del archivo.
+                        It will be saved as `name.py`. The real tool identifier still comes from `TOOL_NAME` inside the file.
                     </p>
                 </label>
 
                 <p id="tool-upload-error" class="form-error" hidden></p>
 
                 <div class="confirm-dialog__actions">
-                    <button id="tool-upload-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                    <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Subir tool</button>
+                    <button id="tool-upload-cancel-button" class="ghost-button" type="button">Cancel</button>
+                    <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Upload tool</button>
                 </div>
             </form>
         </div>

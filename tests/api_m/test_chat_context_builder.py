@@ -113,10 +113,10 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
                 "system_prompt": "Be precise.",
             },
             [
-                {"role": "user", "content": "Busca el dato."},
+                {"role": "user", "content": "Look up the data."},
                 {
                     "role": "assistant",
-                    "content": "He encontrado la respuesta.",
+                    "content": "I found the answer.",
                     "tool_events": [
                         {
                             "tool_name": "web_search",
@@ -124,13 +124,13 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
                             "ok": True,
                             "result": {
                                 "results": [
-                                    {"title": "Fuente 1", "url": "https://example.com/1"},
+                                    {"title": "Source 1", "url": "https://example.com/1"},
                                 ]
                             },
                         }
                     ],
                 },
-                {"role": "user", "content": "Dame las fuentes consultadas."},
+                {"role": "user", "content": "Give me the consulted sources."},
             ],
         )
 

@@ -176,7 +176,7 @@ def run(arguments):
                 "model": model,
                 "message": {
                     "role": "assistant",
-                    "content": "He encontrado el perfil https://github.com/Mikemaranon.",
+                    "content": "I found the profile https://github.com/Mikemaranon.",
                 },
                 "usage": {},
                 "finish_reason": "stop",
@@ -188,7 +188,7 @@ def run(arguments):
 
         response = self.manager.chat(
             "ollama",
-            [{"role": "user", "content": "busca el perfil de Mikemaranon en github."}],
+            [{"role": "user", "content": "search for Mikemaranon's GitHub profile."}],
             "qwen3",
             {},
         )
@@ -197,11 +197,11 @@ def run(arguments):
             [message["role"] for message in captured["messages"]],
             ["system", "user", "assistant", "user"],
         )
-        self.assertIn("Mikemaranon en github", captured["messages"][-1]["content"])
+        self.assertIn("Mikemaranon's GitHub profile", captured["messages"][-1]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
         self.assertEqual(
             response["raw"]["tool_events"][0]["arguments"]["query"],
-            "el perfil de Mikemaranon en github",
+            "for Mikemaranon's GitHub profile",
         )
 
     def test_extract_tool_call_accepts_json_with_prefix_text(self):
@@ -231,7 +231,7 @@ def run(arguments):
                 {
                     "title": "Breaking News",
                     "url": "https://example.com/breaking-news",
-                    "snippet": "Resumen breve",
+                    "snippet": "Brief summary",
                 }
             ],
             "result_count": 1,
@@ -242,7 +242,7 @@ def run(arguments):
             "model": model,
             "message": {
                 "role": "assistant",
-                "content": '{"tool_call":{"name":"web_search","arguments":{"query":"noticias ultima hora"}}}',
+                "content": '{"tool_call":{"name":"web_search","arguments":{"query":"breaking news"}}}',
             },
             "usage": {},
             "finish_reason": None,
@@ -252,11 +252,11 @@ def run(arguments):
 
         response = self.manager.chat(
             "ollama",
-            [{"role": "user", "content": "busca noticias ultima hora"}],
+            [{"role": "user", "content": "search for breaking news"}],
             "qwen3",
             {},
         )
 
-        self.assertIn("He buscado en la web", response["message"]["content"])
+        self.assertIn("I searched the web", response["message"]["content"])
         self.assertIn("https://example.com/breaking-news", response["message"]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")

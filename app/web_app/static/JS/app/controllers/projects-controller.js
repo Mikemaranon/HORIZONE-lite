@@ -37,7 +37,7 @@ export async function handleProjectSelect(projectId, { closeSidebarOnMobile }) {
         applyProjectDocumentsPayload(data);
     } catch (error) {
         setProjectDocuments([]);
-        showStatus(error.message || "No se pudieron cargar los documentos del proyecto.", true);
+        showStatus(error.message || "The project documents could not be loaded.", true);
     }
 
     renderApp();
@@ -60,7 +60,7 @@ export async function handleNewProject({ closeSidebarOnMobile }) {
         renderApp();
         closeSidebarOnMobile();
     } catch (error) {
-        showStatus(error.message || "No se pudo crear el proyecto.", true);
+        showStatus(error.message || "The project could not be created.", true);
     }
 }
 
@@ -68,11 +68,11 @@ export async function handleNewProject({ closeSidebarOnMobile }) {
 export async function handleNewProjectChat({ handleConversationSelect, closeSidebarOnMobile }) {
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("Selecciona primero un proyecto.", true);
+        showStatus("Select a project first.", true);
         return;
     }
     if (!getSelectedModel()) {
-        showStatus("Selecciona un modelo disponible antes de crear el chat del proyecto.", true);
+        showStatus("Select an available model before creating the project chat.", true);
         return;
     }
 
@@ -91,7 +91,7 @@ export async function handleNewProjectChat({ handleConversationSelect, closeSide
         await handleConversationSelect(payload.conversation.id, { closeSidebarOnMobile });
         closeSidebarOnMobile();
     } catch (error) {
-        showStatus(error.message || "No se pudo crear el chat del proyecto.", true);
+        showStatus(error.message || "The project chat could not be created.", true);
     }
 }
 
@@ -117,13 +117,13 @@ export async function handleProjectCustomizeSubmit(event) {
 
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("No hay un proyecto activo para personalizar.", true);
+        showStatus("There is no active project to customize.", true);
         return;
     }
 
     const name = elements.projectNameInput.value.trim();
     if (!name) {
-        showStatus("El proyecto necesita un nombre.", true);
+        showStatus("The project needs a name.", true);
         return;
     }
 
@@ -140,7 +140,7 @@ export async function handleProjectCustomizeSubmit(event) {
         renderApp();
         closeProjectCustomizeModal();
     } catch (error) {
-        showStatus(error.message || "No se pudo guardar la personalización.", true);
+        showStatus(error.message || "The customization could not be saved.", true);
     }
 }
 
@@ -148,15 +148,15 @@ export async function handleProjectCustomizeSubmit(event) {
 export async function handleProjectDelete() {
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("No hay un proyecto activo para borrar.", true);
+        showStatus("There is no active project to delete.", true);
         return;
     }
 
     const confirmed = await confirmAction({
-        title: `Borrar "${activeProject.name}"`,
-        message: "El proyecto se elimina de la lista. Sus chats se conservarán como chats puntuales.",
-        confirmLabel: "Borrar proyecto",
-        eyebrow: "Proyecto",
+        title: `Delete "${activeProject.name}"`,
+        message: "The project will be removed from the list. Its chats will remain as standalone chats.",
+        confirmLabel: "Delete project",
+        eyebrow: "Project",
     });
 
     if (!confirmed) {
@@ -173,7 +173,7 @@ export async function handleProjectDelete() {
         renderApp();
         closeProjectCustomizeModal();
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el proyecto.", true);
+        showStatus(error.message || "The project could not be deleted.", true);
     }
 }
 
@@ -181,7 +181,7 @@ export async function handleProjectDelete() {
 export async function handleDocumentsOpen() {
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("Selecciona primero un proyecto.", true);
+        showStatus("Select a project first.", true);
         return;
     }
 
@@ -192,7 +192,7 @@ export async function handleDocumentsOpen() {
         renderDocumentsFileList();
         openDocumentsModal();
     } catch (error) {
-        showStatus(error.message || "No se pudieron cargar los documentos del proyecto.", true);
+        showStatus(error.message || "The project documents could not be loaded.", true);
     }
 }
 
@@ -229,7 +229,7 @@ export async function handleProjectDocumentDelete(documentId) {
 
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("Selecciona primero un proyecto.", true);
+        showStatus("Select a project first.", true);
         return;
     }
 
@@ -239,9 +239,9 @@ export async function handleProjectDocumentDelete(documentId) {
         const data = await loadProjectDocuments(activeProject.id);
         applyProjectDocumentsPayload(data);
         renderApp();
-        showStatus("Documento eliminado del proyecto.");
+        showStatus("Document removed from the project.");
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el documento.", true);
+        showStatus(error.message || "The document could not be deleted.", true);
     } finally {
         setLoading(false);
     }
@@ -251,7 +251,7 @@ export async function handleProjectDocumentDelete(documentId) {
 async function uploadDocuments(files) {
     const activeProject = getActiveProject();
     if (!activeProject) {
-        showStatus("Selecciona primero un proyecto.", true);
+        showStatus("Select a project first.", true);
         return;
     }
 
@@ -270,11 +270,11 @@ async function uploadDocuments(files) {
         renderApp();
         showStatus(
             files.length === 1
-                ? "Documento agregado al proyecto."
-                : `${files.length} documentos agregados al proyecto.`
+                ? "Document added to the project."
+                : `${files.length} documents added to the project.`
         );
     } catch (error) {
-        showStatus(error.message || "No se pudieron subir los documentos.", true);
+        showStatus(error.message || "The documents could not be uploaded.", true);
     } finally {
         setLoading(false);
     }

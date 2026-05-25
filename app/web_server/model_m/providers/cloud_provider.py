@@ -150,8 +150,8 @@ class CloudAdapterDetector:
             return probed
 
         raise ValueError(
-            "No se pudo detectar automaticamente el adaptador cloud. "
-            "Usa un endpoint conocido o una URL que exponga rutas compatibles."
+            "The cloud adapter could not be detected automatically. "
+            "Use a known endpoint or a URL that exposes compatible routes."
         )
 
     def _resolve_by_host(self, hostname, endpoint, path):

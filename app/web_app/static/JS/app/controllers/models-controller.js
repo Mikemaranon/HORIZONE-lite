@@ -45,11 +45,11 @@ export async function handleModelSubmit(event) {
     try {
         const modelPayload = await readModelFormValues();
         if (!modelPayload.name) {
-            showStatus("El modelo necesita un nombre técnico.", true);
+            showStatus("The model needs a technical name.", true);
             return;
         }
         if (!modelPayload.provider_id) {
-            showStatus("Selecciona un proveedor para este modelo.", true);
+            showStatus("Select a provider for this model.", true);
             return;
         }
 
@@ -79,9 +79,9 @@ export async function handleModelSubmit(event) {
         renderSettingsModelsManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus(isEditing ? "Modelo actualizado." : "Modelo creado.");
+        showStatus(isEditing ? "Model updated." : "Model created.");
     } catch (error) {
-        showStatus(error.message || "No se pudo guardar el modelo.", true);
+        showStatus(error.message || "The model could not be saved.", true);
     }
 }
 
@@ -97,14 +97,14 @@ export async function handleModelOptionSelect(modelConfigId) {
         renderChatPanel();
         renderConversationHeader();
     } catch (error) {
-        showStatus(error.message || "No se pudo cambiar el modelo.", true);
+        showStatus(error.message || "The model could not be changed.", true);
     }
 }
 
 
 export function openCreateModelModal(context = "settings") {
     if (!(state.providers || []).length) {
-        showStatus("Crea al menos un proveedor antes de crear modelos.", true);
+        showStatus("Create at least one provider before creating models.", true);
         return;
     }
 
@@ -127,7 +127,7 @@ export function handleModelEdit(modelConfigId, context = "settings") {
 
     const model = getModelConfigById(modelConfigId);
     if (!model) {
-        showStatus("No se encontró el modelo seleccionado.", true);
+        showStatus("The selected model was not found.", true);
         return;
     }
 
@@ -151,15 +151,15 @@ export async function handleModelDelete(modelConfigId) {
 
     const model = getModelConfigById(modelConfigId);
     if (!model) {
-        showStatus("No se encontró el modelo seleccionado.", true);
+        showStatus("The selected model was not found.", true);
         return;
     }
 
     const confirmed = await confirmAction({
-        eyebrow: "Modelo",
-        title: "Borrar modelo",
-        message: `Se borrará "${model.display_name || model.name}". Los chats que lo usaban pasarán al modelo de respaldo que determine la aplicación.`,
-        confirmLabel: "Borrar modelo",
+        eyebrow: "Model",
+        title: "Delete model",
+        message: `\"${model.display_name || model.name}\" will be deleted. Chats using it will move to whatever fallback model the application determines.`,
+        confirmLabel: "Delete model",
         confirmVariant: "danger",
     });
 
@@ -174,9 +174,9 @@ export async function handleModelDelete(modelConfigId) {
         renderSettingsModelsManager();
         renderChatPanel();
         renderConversationHeader();
-        showStatus("Modelo borrado.");
+        showStatus("Model deleted.");
     } catch (error) {
-        showStatus(error.message || "No se pudo borrar el modelo.", true);
+        showStatus(error.message || "The model could not be deleted.", true);
     }
 }
 
@@ -184,7 +184,7 @@ export async function handleModelDelete(modelConfigId) {
 export function handleActiveChatModelEdit() {
     const activeModelId = getSelectedModelConfigId();
     if (!activeModelId) {
-        showStatus("No hay un modelo seleccionado para editar.", true);
+        showStatus("There is no selected model to edit.", true);
         return;
     }
 
@@ -233,7 +233,7 @@ export async function handleModelIconInputChange() {
         setModelIconValue(iconImage);
     } catch (error) {
         resetModelIconInputs();
-        showStatus(error.message || "No se pudo cargar el icono del modelo.", true);
+        showStatus(error.message || "The model icon could not be loaded.", true);
     }
 }
 
@@ -277,7 +277,7 @@ function filterModelSwitchOptions(query) {
 async function assignModelToCurrentChat(modelConfigId) {
     const model = getModelConfigById(modelConfigId);
     if (!model) {
-        throw new Error("No se encontró el modelo seleccionado.");
+        throw new Error("The selected model was not found.");
     }
 
     if (state.activeConversationId && state.activeConversation) {
@@ -319,9 +319,9 @@ function populateModelModal(model = null) {
     const isEditing = Boolean(model);
     const modelLabel = model?.display_name || model?.name || "";
 
-    elements.modelModalEyebrow.textContent = isEditing ? "Editar modelo" : "Modelo";
-    elements.modelModalTitle.textContent = isEditing ? modelLabel : "Crear modelo";
-    elements.modelSubmitButton.textContent = isEditing ? "Guardar cambios" : "Crear modelo";
+    elements.modelModalEyebrow.textContent = isEditing ? "Edit model" : "Model";
+    elements.modelModalTitle.textContent = isEditing ? modelLabel : "Create model";
+    elements.modelSubmitButton.textContent = isEditing ? "Save changes" : "Create model";
     elements.modelIdInput.value = isEditing ? String(model.id) : "";
     elements.modelBuiltinInput.value = isEditing && model.is_builtin ? "true" : "false";
     elements.modelDisplayNameInput.value = model?.display_name || model?.name || "";
@@ -343,17 +343,17 @@ async function readModelIconFromInput() {
     }
 
     if (!ALLOWED_MODEL_ICON_TYPES.has(file.type)) {
-        throw new Error("El icono debe ser PNG, JPEG, WEBP o GIF.");
+        throw new Error("The icon must be PNG, JPEG, WEBP, or GIF.");
     }
 
     if (file.size > MAX_MODEL_ICON_SIZE_BYTES) {
-        throw new Error("El icono supera el límite de 512 KB.");
+        throw new Error("The icon exceeds the 512 KB limit.");
     }
 
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("No se pudo leer el icono seleccionado."));
+        reader.onerror = () => reject(new Error("The selected icon could not be read."));
         reader.readAsDataURL(file);
     });
 }
@@ -382,7 +382,7 @@ function syncModelIconPreview(iconImage) {
 
     const hasIcon = Boolean(iconImage);
     elements.modelIconPreview.innerHTML = hasIcon
-        ? `<img src="${iconImage}" alt="Vista previa del icono del modelo">`
+        ? `<img src="${iconImage}" alt="Model icon preview">`
         : `<span>AI</span>`;
 
     elements.modelIconPreview.classList.toggle("is-empty", !hasIcon);

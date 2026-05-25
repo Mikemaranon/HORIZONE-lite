@@ -4,26 +4,26 @@ const markdownModuleUrl = new URL("../../app/web_app/static/JS/app/markdown.js",
 const { renderMarkdown } = await import(markdownModuleUrl);
 
 assert.equal(
-    renderMarkdown("hola `x`"),
-    "<p>hola <code>x</code></p>",
+    renderMarkdown("hello `x`"),
+    "<p>hello <code>x</code></p>",
     "single inline code span should render normally"
 );
 
 assert.equal(
-    renderMarkdown("hola `x"),
-    "<p>hola `x</p>",
+    renderMarkdown("hello `x"),
+    "<p>hello `x</p>",
     "unmatched opening backtick should stay as literal text"
 );
 
 assert.equal(
-    renderMarkdown("``const `value` = 1`` y `otra`"),
-    "<p><code>const `value` = 1</code> y <code>otra</code></p>",
+    renderMarkdown("``const `value` = 1`` and `another`"),
+    "<p><code>const `value` = 1</code> and <code>another</code></p>",
     "multi-backtick fences should only close with the same fence length"
 );
 
 assert.equal(
-    renderMarkdown("En el ejemplo, pasamos `y` (que apunta a `x`) a incrementa, y dentro de la función, `*p` se usa."),
-    "<p>En el ejemplo, pasamos <code>y</code> (que apunta a <code>x</code>) a incrementa, y dentro de la función, <code>*p</code> se usa.</p>",
+    renderMarkdown("In the example, we pass `y` (which points to `x`) to increment, and inside the function, `*p` is used."),
+    "<p>In the example, we pass <code>y</code> (which points to <code>x</code>) to increment, and inside the function, <code>*p</code> is used.</p>",
     "isolated inline code spans should not merge into a longer broken span"
 );
 

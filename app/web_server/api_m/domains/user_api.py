@@ -81,7 +81,7 @@ class UserAPI(BaseAPI):
 
         return self.ok(
             {
-                "message": "Perfil de sesión actualizado.",
+                "message": "Session profile updated.",
                 "user": user,
                 "token": refreshed_token,
             }

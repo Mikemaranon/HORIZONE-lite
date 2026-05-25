@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HORIZONE lite · Ajustes</title>
+    <title>HORIZONE lite · Settings</title>
     <link rel="stylesheet" href="/static/CSS/index.css">
     <script type="module" src="/static/JS/settings/main.js"></script>
 </head>
@@ -12,51 +12,51 @@
         id="settings-sidebar-backdrop"
         class="settings-page__backdrop"
         type="button"
-        aria-label="Cerrar navegación de ajustes"
+        aria-label="Close settings navigation"
         tabindex="-1"
         hidden
     ></button>
     <div class="settings-page">
-        <aside id="settings-sidebar" class="settings-page__sidebar" aria-label="Navegación de ajustes">
+        <aside id="settings-sidebar" class="settings-page__sidebar" aria-label="Settings navigation">
             <div class="settings-page__account">
                 <div id="settings-account-avatar" class="settings-page__account-avatar" aria-hidden="true">H</div>
                 <div class="settings-page__account-copy">
                     <strong id="settings-account-name" class="settings-page__account-name">HORIZONE lite</strong>
                     <p id="settings-account-meta" class="settings-page__account-meta">
-                        Configuración local del workspace
+                        Local workspace configuration
                     </p>
                 </div>
             </div>
 
             <div class="settings-page__nav-groups">
                 <section class="settings-page__nav-group" aria-labelledby="settings-group-models">
-                    <p id="settings-group-models" class="settings-page__nav-group-title">Modelos y contexto</p>
-                    <nav class="settings-page__nav" aria-label="Configuración de modelos y contexto">
+                    <p id="settings-group-models" class="settings-page__nav-group-title">Models and context</p>
+                    <nav class="settings-page__nav" aria-label="Model and context settings">
                         <button class="settings-page__nav-button" type="button" data-settings-category="providers">
-                            <span class="settings-page__nav-label">Proveedores</span>
-                            <span class="settings-page__nav-meta">MLX, Ollama y cloud</span>
+                            <span class="settings-page__nav-label">Providers</span>
+                            <span class="settings-page__nav-meta">MLX, Ollama, and cloud</span>
                         </button>
                         <button class="settings-page__nav-button" type="button" data-settings-category="models">
-                            <span class="settings-page__nav-label">Modelos</span>
-                            <span class="settings-page__nav-meta">Catálogo, defaults e iconos</span>
+                            <span class="settings-page__nav-label">Models</span>
+                            <span class="settings-page__nav-meta">Catalog, defaults, and icons</span>
                         </button>
                         <button class="settings-page__nav-button" type="button" data-settings-category="profiles">
-                            <span class="settings-page__nav-label">Perfiles</span>
-                            <span class="settings-page__nav-meta">Prompts y parámetros</span>
+                            <span class="settings-page__nav-label">Profiles</span>
+                            <span class="settings-page__nav-meta">Prompts and parameters</span>
                         </button>
                     </nav>
                 </section>
 
                 <section class="settings-page__nav-group" aria-labelledby="settings-group-system">
-                    <p id="settings-group-system" class="settings-page__nav-group-title">Sistema</p>
-                    <nav class="settings-page__nav" aria-label="Configuración del sistema">
+                    <p id="settings-group-system" class="settings-page__nav-group-title">System</p>
+                    <nav class="settings-page__nav" aria-label="System settings">
                         <button class="settings-page__nav-button" type="button" data-settings-category="tools">
-                            <span class="settings-page__nav-label">Herramientas</span>
-                            <span class="settings-page__nav-meta">Activación global y `.py`</span>
+                            <span class="settings-page__nav-label">Tools</span>
+                            <span class="settings-page__nav-meta">Global activation and `.py` uploads</span>
                         </button>
                         <button class="settings-page__nav-button" type="button" data-settings-category="session">
-                            <span class="settings-page__nav-label">Sesión</span>
-                            <span class="settings-page__nav-meta">Usuario local y contraseña</span>
+                            <span class="settings-page__nav-label">Session</span>
+                            <span class="settings-page__nav-meta">Local user and password</span>
                         </button>
                     </nav>
                 </section>
@@ -64,7 +64,7 @@
 
             <div class="settings-page__sidebar-footer">
                 <p class="settings-page__sidebar-note">
-                    Los cambios se aplican sobre la misma base de datos local que usa el chat principal.
+                    Changes are applied to the same local database used by the main chat.
                 </p>
             </div>
         </aside>
@@ -78,7 +78,7 @@
                                 id="settings-sidebar-toggle"
                                 class="ghost-button settings-page__sidebar-toggle"
                                 type="button"
-                                aria-label="Abrir navegación de ajustes"
+                                aria-label="Open settings navigation"
                                 aria-controls="settings-sidebar"
                                 aria-expanded="false"
                                 hidden
@@ -86,9 +86,9 @@
                                 <span class="settings-page__sidebar-toggle-icon" aria-hidden="true">☰</span>
                             </button>
                             <p id="workspace-eyebrow" class="workspace__eyebrow" hidden></p>
-                            <h2 id="conversation-title" class="workspace__title">Ajustes generales</h2>
+                            <h2 id="conversation-title" class="workspace__title">General settings</h2>
                             <p id="conversation-subtitle" class="workspace__subtitle settings-page__header-subtitle">
-                                Configura aquí los componentes globales de HORIZONE lite sin mezclarlo con la experiencia del chat.
+                                Configure HORIZONE lite's global components here without mixing them into the chat experience.
                             </p>
                         </div>
                     </div>
@@ -96,10 +96,10 @@
                     <div class="workspace__header-actions settings-page__header-actions">
                         <a class="ghost-button settings-page__back-link" href="/index">
                             <span class="settings-page__back-link-icon" aria-hidden="true">←</span>
-                            <span>Volver al home</span>
+                            <span>Back to home</span>
                         </a>
                         <button id="back-to-project-button" class="ghost-button workspace__back-button" type="button" hidden>
-                            Volver al proyecto
+                            Back to project
                         </button>
                         <button
                             id="chat-settings-button"
@@ -131,8 +131,8 @@
                         id="status-banner-close"
                         class="status-banner__close"
                         type="button"
-                        aria-label="Cerrar notificación"
-                        title="Cerrar"
+                        aria-label="Close notification"
+                        title="Close"
                     >
                         ×
                     </button>
@@ -144,27 +144,27 @@
                     <section class="settings-page__hero">
                         <div class="settings-page__hero-header">
                             <div class="settings-page__hero-main">
-                                <p id="settings-panel-eyebrow" class="workspace__eyebrow">Conexiones</p>
-                                <h3 id="settings-panel-title">Proveedores</h3>
+                                <p id="settings-panel-eyebrow" class="workspace__eyebrow">Connections</p>
+                                <h3 id="settings-panel-title">Providers</h3>
                                 <p id="settings-panel-description" class="settings-page__hero-copy">
-                                    Gestiona los backends disponibles para hablar con modelos locales o remotos.
+                                    Manage the available backends for talking to local or remote models.
                                 </p>
                             </div>
 
                             <div class="settings-page__hero-actions">
                                 <div class="settings-page__category-actions" data-settings-category-actions="providers">
-                                    <button id="settings-new-provider-button" class="action-button" type="button">Crear</button>
+                                    <button id="settings-new-provider-button" class="action-button" type="button">Create</button>
                                 </div>
                                 <div class="settings-page__category-actions" data-settings-category-actions="models" hidden>
-                                    <button id="settings-new-model-button" class="action-button" type="button">Crear</button>
+                                    <button id="settings-new-model-button" class="action-button" type="button">Create</button>
                                 </div>
                                 <div class="settings-page__category-actions" data-settings-category-actions="profiles" hidden>
-                                    <button id="settings-new-profile-button" class="action-button" type="button">Crear</button>
+                                    <button id="settings-new-profile-button" class="action-button" type="button">Create</button>
                                 </div>
                                 <div class="settings-page__category-actions settings-page__category-actions--tools" data-settings-category-actions="tools" hidden>
-                                    <button id="settings-filter-tools-button" class="ghost-button settings-filter-toggle" type="button" aria-pressed="false">Activas</button>
-                                    <button id="settings-new-tool-button" class="action-button" type="button" aria-label="Subir .py" title="Subir .py">
-                                        <span>Subir .py</span>
+                                    <button id="settings-filter-tools-button" class="ghost-button settings-filter-toggle" type="button" aria-pressed="false">Active</button>
+                                    <button id="settings-new-tool-button" class="action-button" type="button" aria-label="Upload .py" title="Upload .py">
+                                        <span>Upload .py</span>
                                     </button>
                                 </div>
                                 <div class="settings-page__category-actions" data-settings-category-actions="session" hidden></div>
@@ -208,14 +208,14 @@
                         <section class="settings-block">
                             <div class="settings-page__session-summary">
                                 <div class="settings-page__session-card">
-                                    <span class="settings-page__session-label">Usuario actual</span>
-                                    <strong id="session-username-value" class="settings-page__session-value">Sin sesión</strong>
-                                    <span id="session-role-value" class="settings-page__session-role">Rol: unknown</span>
+                                    <span class="settings-page__session-label">Current user</span>
+                                    <strong id="session-username-value" class="settings-page__session-value">No session</strong>
+                                    <span id="session-role-value" class="settings-page__session-role">Role: unknown</span>
                                 </div>
 
                                 <div class="settings-page__session-actions">
-                                    <button class="ghost-button" id="edit-session-profile-button" type="button">Modificar perfil</button>
-                                    <button class="ghost-button" id="logout-button" type="button">Cerrar sesión</button>
+                                    <button class="ghost-button" id="edit-session-profile-button" type="button">Edit profile</button>
+                                    <button class="ghost-button" id="logout-button" type="button">Sign out</button>
                                 </div>
                             </div>
                         </section>
@@ -231,9 +231,9 @@
             <div class="modal__header">
                 <div>
                     <p id="model-modal-eyebrow" class="modal__eyebrow">Modelo</p>
-                    <h3 id="model-modal-title">Crear modelo</h3>
+                    <h3 id="model-modal-title">Create model</h3>
                 </div>
-                <button id="close-model-button" class="icon-button" type="button" aria-label="Cerrar modelo">×</button>
+                <button id="close-model-button" class="icon-button" type="button" aria-label="Close model">×</button>
             </div>
 
             <div class="modal__body">
@@ -243,22 +243,22 @@
                         <input id="model-builtin-input" type="hidden" value="false">
                         <input id="model-icon-data-input" type="hidden" value="">
                         <label class="field field--stacked">
-                            <span>Nombre visible</span>
-                            <input id="model-display-name-input" type="text" placeholder="Ej. gemma-3, GPT-4.1 Main o Llama razonador">
+                            <span>Display name</span>
+                            <input id="model-display-name-input" type="text" placeholder="e.g. gemma-3, GPT-4.1 Main, or Reasoning Llama">
                         </label>
                         <label class="field field--stacked">
-                            <span>Nombre técnico</span>
-                            <input id="model-name-input" type="text" placeholder="Ej. mlx-community/gemma-3-4b-it-4bit o gpt-4.1">
+                            <span>Technical name</span>
+                            <input id="model-name-input" type="text" placeholder="e.g. mlx-community/gemma-3-4b-it-4bit or gpt-4.1">
                             <p class="field__help">
-                                Este identificador se usa en las llamadas reales al proveedor.
+                                This identifier is used in the actual provider requests.
                             </p>
                         </label>
                         <label class="field field--stacked">
-                            <span>Proveedor</span>
+                            <span>Provider</span>
                             <select id="model-provider-select"></select>
                         </label>
                         <div class="field field--stacked">
-                            <span>Icono del modelo</span>
+                            <span>Model icon</span>
                             <div class="model-icon-field">
                                 <div id="model-icon-preview" class="model-icon-preview is-empty" aria-hidden="true">
                                     <span>AI</span>
@@ -270,21 +270,21 @@
                                         accept="image/png,image/jpeg,image/webp,image/gif"
                                     >
                                     <p class="field__help">
-                                        Sube un logo ligero para identificar este modelo en las respuestas del chat.
+                                        Upload a lightweight logo to identify this model in chat responses.
                                     </p>
                                     <button id="model-icon-clear-button" class="ghost-button ghost-button--compact" type="button" hidden>
-                                        Quitar icono
+                                        Remove icon
                                     </button>
                                 </div>
                             </div>
                         </div>
                         <label class="checkbox-field">
                             <input id="model-default-input" type="checkbox">
-                            <span>Usar este modelo por defecto</span>
+                            <span>Use this model by default</span>
                         </label>
                         <div class="settings-block__actions">
-                            <button id="model-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="model-submit-button" class="action-button action-button--primary" type="submit">Crear modelo</button>
+                            <button id="model-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="model-submit-button" class="action-button action-button--primary" type="submit">Create model</button>
                         </div>
                     </form>
                 </section>
@@ -297,10 +297,10 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p id="provider-modal-eyebrow" class="modal__eyebrow">Proveedor</p>
-                    <h3 id="provider-modal-title">Crear proveedor</h3>
+                    <p id="provider-modal-eyebrow" class="modal__eyebrow">Provider</p>
+                    <h3 id="provider-modal-title">Create provider</h3>
                 </div>
-                <button id="close-provider-button" class="icon-button" type="button" aria-label="Cerrar proveedor">×</button>
+                <button id="close-provider-button" class="icon-button" type="button" aria-label="Close provider">×</button>
             </div>
 
             <div class="modal__body">
@@ -310,11 +310,11 @@
                         <input id="provider-builtin-input" type="hidden" value="false">
                         <input id="provider-builtin-key-input" type="hidden" value="">
                         <label class="field field--stacked">
-                            <span>Nombre</span>
-                            <input id="provider-name-input" type="text" placeholder="Ej. Cloud principal, Ollama local o MLX del Mac">
+                            <span>Name</span>
+                            <input id="provider-name-input" type="text" placeholder="e.g. Primary cloud, local Ollama, or Mac MLX">
                         </label>
                         <label class="field field--stacked">
-                            <span>Tipo de proveedor</span>
+                            <span>Provider type</span>
                             <select id="provider-type-select"></select>
                         </label>
                         <label class="field field--stacked">
@@ -323,11 +323,11 @@
                         </label>
                         <label class="field field--stacked">
                             <span>API key</span>
-                            <input id="provider-api-key-input" type="password" placeholder="Clave opcional o requerida según el proveedor">
+                            <input id="provider-api-key-input" type="password" placeholder="Optional or required key depending on the provider">
                         </label>
                         <div class="settings-block__actions">
-                            <button id="provider-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="provider-submit-button" class="action-button action-button--primary" type="submit">Crear proveedor</button>
+                            <button id="provider-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="provider-submit-button" class="action-button action-button--primary" type="submit">Create provider</button>
                         </div>
                     </form>
                 </section>
@@ -340,10 +340,10 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p id="profile-modal-eyebrow" class="modal__eyebrow">Perfil</p>
-                    <h3 id="profile-modal-title">Crear perfil</h3>
+                    <p id="profile-modal-eyebrow" class="modal__eyebrow">Profile</p>
+                    <h3 id="profile-modal-title">Create profile</h3>
                 </div>
-                <button id="close-profile-button" class="icon-button" type="button" aria-label="Cerrar perfil">×</button>
+                <button id="close-profile-button" class="icon-button" type="button" aria-label="Close profile">×</button>
             </div>
 
             <div class="modal__body">
@@ -351,20 +351,20 @@
                     <form id="profile-form" class="stack-form">
                         <input id="profile-id-input" type="hidden">
                         <label class="field field--stacked">
-                            <span>Nombre</span>
-                            <input id="profile-name-input" type="text" placeholder="Ej. Coding, Research, Creative">
+                            <span>Name</span>
+                            <input id="profile-name-input" type="text" placeholder="e.g. Coding, Research, Creative">
                         </label>
                         <label class="field field--stacked">
-                            <span>Personalidad</span>
-                            <input id="profile-personality-input" type="text" placeholder="Ej. Clara, rigurosa y cercana">
+                            <span>Personality</span>
+                            <input id="profile-personality-input" type="text" placeholder="e.g. Clear, rigorous, and approachable">
                         </label>
                         <label class="field field--stacked">
-                            <span>Etiquetas</span>
-                            <input id="profile-tags-input" type="text" placeholder="Máximo 10, separadas por comas">
+                            <span>Tags</span>
+                            <input id="profile-tags-input" type="text" placeholder="Maximum 10, separated by commas">
                         </label>
                         <label class="field field--stacked">
                             <span>System prompt</span>
-                            <textarea id="profile-system-prompt-input" rows="5" placeholder="Describe el comportamiento del asistente..."></textarea>
+                            <textarea id="profile-system-prompt-input" rows="5" placeholder="Describe how the assistant should behave..."></textarea>
                         </label>
                         <div class="grid-fields">
                             <label class="field field--stacked">
@@ -382,11 +382,11 @@
                         </div>
                         <label class="checkbox-field">
                             <input id="profile-default-input" type="checkbox">
-                            <span>Usar como perfil por defecto</span>
+                            <span>Use as the default profile</span>
                         </label>
                         <div class="settings-block__actions">
-                            <button id="profile-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="profile-submit-button" class="action-button action-button--primary" type="submit">Crear perfil</button>
+                            <button id="profile-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="profile-submit-button" class="action-button action-button--primary" type="submit">Create profile</button>
                         </div>
                     </form>
                 </section>
@@ -399,57 +399,57 @@
         <div class="modal__panel modal__panel--narrow">
             <div class="modal__header">
                 <div>
-                    <p class="modal__eyebrow">Sesión</p>
-                    <h3>Modificar perfil</h3>
+                    <p class="modal__eyebrow">Session</p>
+                    <h3>Edit profile</h3>
                 </div>
-                <button id="close-session-profile-button" class="icon-button" type="button" aria-label="Cerrar edición de sesión">×</button>
+                <button id="close-session-profile-button" class="icon-button" type="button" aria-label="Close session editing">×</button>
             </div>
 
             <div class="modal__body">
                 <section class="settings-block">
                     <form id="session-profile-form" class="stack-form">
                         <label class="field field--stacked">
-                            <span>Nombre de usuario</span>
+                            <span>Username</span>
                             <input
                                 id="session-username-input"
                                 type="text"
-                                placeholder="Tu usuario de acceso"
+                                placeholder="Your sign-in username"
                                 autocomplete="username"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Contraseña actual</span>
+                            <span>Current password</span>
                             <input
                                 id="session-current-password-input"
                                 type="password"
-                                placeholder="Obligatoria para confirmar el cambio"
+                                placeholder="Required to confirm the change"
                                 autocomplete="current-password"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Nueva contraseña</span>
+                            <span>New password</span>
                             <input
                                 id="session-new-password-input"
                                 type="password"
-                                placeholder="Déjala vacía si no quieres cambiarla"
+                                placeholder="Leave blank if you do not want to change it"
                                 autocomplete="new-password"
                             >
                         </label>
                         <label class="field field--stacked">
-                            <span>Confirmar nueva contraseña</span>
+                            <span>Confirm new password</span>
                             <input
                                 id="session-confirm-password-input"
                                 type="password"
-                                placeholder="Repite la nueva contraseña"
+                                placeholder="Repeat the new password"
                                 autocomplete="new-password"
                             >
                         </label>
                         <p class="field__help">
-                            Si cambias la contraseña, el resto de sesiones activas de este usuario se cerrarán por seguridad.
+                            If you change the password, the rest of this user's active sessions will be signed out for security.
                         </p>
                         <div class="settings-block__actions">
-                            <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                            <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Guardar cambios</button>
+                            <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancel</button>
+                            <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Save changes</button>
                         </div>
                     </form>
                 </section>
@@ -463,9 +463,9 @@
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Tools</p>
-                    <h3>Subir tool Python</h3>
+                    <h3>Upload Python tool</h3>
                 </div>
-                <button id="close-tool-upload-button" class="icon-button" type="button" aria-label="Cerrar subida de tool">×</button>
+                <button id="close-tool-upload-button" class="icon-button" type="button" aria-label="Close tool upload">×</button>
             </div>
 
             <form id="tool-upload-form" class="modal__body stack-form">
@@ -473,30 +473,30 @@
                     <h4>Archivo</h4>
                     <label id="tool-upload-dropzone" class="documents-dropzone" for="tools-upload-input">
                         <input id="tools-upload-input" type="file" accept=".py,text/x-python,text/plain" hidden>
-                        <span class="documents-dropzone__title">Suelta un archivo `.py` aquí</span>
-                        <span class="documents-dropzone__meta">También puedes hacer clic para elegirlo desde tu equipo.</span>
+                        <span class="documents-dropzone__title">Drop a `.py` file here</span>
+                        <span class="documents-dropzone__meta">You can also click to choose it from your computer.</span>
                     </label>
                     <div id="tool-upload-file-list" class="documents-file-list" aria-live="polite"></div>
                 </section>
 
                 <label class="field field--stacked">
-                    <span>Nombre de la tool</span>
+                    <span>Tool name</span>
                     <input
                         id="tool-upload-name-input"
                         type="text"
                         autocomplete="off"
-                        placeholder="ej. local_search"
+                        placeholder="e.g. local_search"
                     >
                     <p class="field__help">
-                        Se guardará como `nombre.py`. El identificador real de la tool sigue saliendo de `TOOL_NAME` dentro del archivo.
+                        It will be saved as `name.py`. The real tool identifier still comes from `TOOL_NAME` inside the file.
                     </p>
                 </label>
 
                 <p id="tool-upload-error" class="form-error" hidden></p>
 
                 <div class="confirm-dialog__actions">
-                    <button id="tool-upload-cancel-button" class="ghost-button" type="button">Cancelar</button>
-                    <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Subir tool</button>
+                    <button id="tool-upload-cancel-button" class="ghost-button" type="button">Cancel</button>
+                    <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Upload tool</button>
                 </div>
             </form>
         </div>

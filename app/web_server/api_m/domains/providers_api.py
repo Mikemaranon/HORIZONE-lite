@@ -85,9 +85,9 @@ class ProvidersAPI(BaseAPI):
         if not provider:
             return self.error("Provider not found", 404)
         if provider.get("is_builtin"):
-            return self.error("Los proveedores integrados no se pueden borrar.", 400)
+            return self.error("Built-in providers cannot be deleted.", 400)
         if self.db.providers.models_count(provider_id) > 0:
-            return self.error("No se puede borrar un proveedor que todavía tiene modelos asignados.", 400)
+            return self.error("A provider with assigned models cannot be deleted.", 400)
 
         self.db.providers.delete(provider_id)
         return self.ok({"deleted": True, "provider_id": provider_id})

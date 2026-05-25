@@ -25,11 +25,11 @@ export function renderSettingsSession() {
         return;
     }
 
-    const username = state.currentUser?.username || "Sin sesión";
+    const username = state.currentUser?.username || "No session";
     const role = state.currentUser?.role || "unknown";
 
     elements.sessionUsernameValue.textContent = username;
-    elements.sessionRoleValue.textContent = `Rol: ${role}`;
+    elements.sessionRoleValue.textContent = `Role: ${role}`;
 }
 
 
@@ -50,9 +50,9 @@ export function renderSettingsProvidersManager() {
         ? providers.map((provider) => {
             const typeBadge = `<span class="profile-summary-card__tag">${escapeHtml(getProviderTypeDisplayName(provider.provider_type))}</span>`;
             const builtinBadge = provider.is_builtin
-                ? `<span class="profile-summary-card__badge">Integrado</span>`
+                ? `<span class="profile-summary-card__badge">Built in</span>`
                 : "";
-            const endpoint = provider.endpoint || "Sin endpoint configurado";
+            const endpoint = provider.endpoint || "No endpoint configured";
             const actions = provider.is_builtin
                 ? `
                     <button
@@ -60,7 +60,7 @@ export function renderSettingsProvidersManager() {
                         type="button"
                         data-edit-provider-id="${provider.id}"
                     >
-                        Editar
+                        Edit
                     </button>
                     <button
                         class="ghost-button ghost-button--compact"
@@ -76,14 +76,14 @@ export function renderSettingsProvidersManager() {
                         type="button"
                         data-edit-provider-id="${provider.id}"
                     >
-                        Editar
+                        Edit
                     </button>
                     <button
                         class="action-button action-button--danger action-button--compact"
                         type="button"
                         data-delete-provider-id="${provider.id}"
                     >
-                        Borrar
+                        Delete
                     </button>
                 `;
 
@@ -107,7 +107,7 @@ export function renderSettingsProvidersManager() {
                 </article>
             `;
         }).join("")
-        : `<div class="profiles-manager__empty">Todavía no hay proveedores guardados.</div>`;
+        : `<div class="profiles-manager__empty">There are no saved providers yet.</div>`;
 }
 
 
@@ -148,21 +148,21 @@ export function renderSettingsModelsManager() {
                                 type="button"
                                 data-edit-model-id="${model.id}"
                             >
-                                Editar
+                                Edit
                             </button>
                             <button
                                 class="action-button action-button--danger action-button--compact"
                                 type="button"
                                 data-delete-model-id="${model.id}"
                             >
-                                Borrar
+                                Delete
                             </button>
                         </div>
                     </div>
                 </article>
             `;
         }).join("")
-        : `<div class="profiles-manager__empty">Todavía no hay modelos guardados.</div>`;
+        : `<div class="profiles-manager__empty">There are no saved models yet.</div>`;
 }
 
 
@@ -185,13 +185,13 @@ export function renderSettingsProfilesManager() {
             const defaultBadge = profile.is_default
                 ? `<span class="profile-summary-card__badge">Default</span>`
                 : "";
-            const personality = profile.personality || "Sin personalidad definida";
+            const personality = profile.personality || "No personality defined";
             const tags = Array.isArray(profile.tags) ? profile.tags.slice(0, PROFILE_SETTINGS_PREVIEW_TAGS) : [];
             const tagsMarkup = tags.length
                 ? tags.map((tag) => `
                     <span class="profile-summary-card__tag">${escapeHtml(tag)}</span>
                 `).join("")
-                : `<span class="profile-summary-card__tag profile-summary-card__tag--muted">Sin etiquetas</span>`;
+                : `<span class="profile-summary-card__tag profile-summary-card__tag--muted">No tags</span>`;
 
             return `
                 <article class="profile-summary-card${isSelected ? " is-selected" : ""}" data-settings-profile-card="${profile.id}">
@@ -212,21 +212,21 @@ export function renderSettingsProfilesManager() {
                                 type="button"
                                 data-edit-profile-id="${profile.id}"
                             >
-                                Editar
+                                Edit
                             </button>
                             <button
                                 class="action-button action-button--danger action-button--compact"
                                 type="button"
                                 data-delete-profile-id="${profile.id}"
                             >
-                                Borrar
+                                Delete
                             </button>
                         </div>
                     </div>
                 </article>
             `;
         }).join("")
-        : `<div class="profiles-manager__empty">Todavía no hay perfiles guardados.</div>`;
+        : `<div class="profiles-manager__empty">There are no saved profiles yet.</div>`;
 }
 
 
@@ -248,8 +248,8 @@ export function renderSettingsToolsManager() {
         ? tools.map((tool) => createToolCardMarkup(tool, "data-settings-tool-toggle")).join("")
         : `<div class="profiles-manager__empty">${
             state.toolsShowActiveOnly
-                ? "No hay tools activas ahora mismo."
-                : "Todavia no hay tools disponibles. Sube un archivo .py para empezar."
+                ? "There are no active tools right now."
+                : "There are no tools available yet. Upload a .py file to get started."
         }</div>`;
 }
 
@@ -294,7 +294,7 @@ export function renderModelSwitchModal() {
                 </button>
             `;
         }).join("")
-        : `<div class="profile-switch__empty">Todavía no hay modelos. Crea el primero desde ajustes generales.</div>`;
+        : `<div class="profile-switch__empty">There are no models yet. Create the first one from general settings.</div>`;
 
     applySwitchQueryState({
         resultsElement: elements.modelSwitchResults,
@@ -325,11 +325,11 @@ export function renderProfileSwitchModal() {
                     data-profile-switch-option="${profile.id}"
                 >
                     <span class="profile-switch__option-name">${escapeHtml(profile.name)}</span>
-                    <span class="profile-switch__option-meta">${escapeHtml((profile.system_prompt || "Sin system prompt") + suffix)}</span>
+                    <span class="profile-switch__option-meta">${escapeHtml((profile.system_prompt || "No system prompt") + suffix)}</span>
                 </button>
             `;
         }).join("")
-        : `<div class="profile-switch__empty">Todavía no hay perfiles. Crea el primero desde ajustes generales.</div>`;
+        : `<div class="profile-switch__empty">There are no profiles yet. Create the first one from general settings.</div>`;
 
     applySwitchQueryState({
         resultsElement: elements.profileSwitchResults,
@@ -348,7 +348,7 @@ function renderChatToolsList() {
     const tools = getSortedTools();
     elements.chatToolsList.innerHTML = tools.length
         ? tools.map((tool) => createToolCardMarkup(tool, "data-chat-tool-toggle")).join("")
-        : `<div class="chat-profile-card__empty">No hay tools listas todavia. Sube una desde ajustes generales o activa una de las integradas.</div>`;
+        : `<div class="chat-profile-card__empty">There are no tools ready yet. Upload one from general settings or enable one of the built-in tools.</div>`;
 }
 
 
@@ -371,10 +371,10 @@ function getSortedTools() {
 function createToolCardMarkup(tool, toggleAttribute) {
     const isEnabled = Boolean(tool.is_active);
     const toolLabel = tool.display_name || tool.name;
-    const toggleActionLabel = `${isEnabled ? "Desactivar" : "Activar"} ${toolLabel}`;
+    const toggleActionLabel = `${isEnabled ? "Disable" : "Enable"} ${toolLabel}`;
     const badges = [
         tool.is_builtin
-            ? `<span class="profile-summary-card__tag">Integrada</span>`
+            ? `<span class="profile-summary-card__tag">Built in</span>`
             : `<span class="profile-summary-card__tag">Custom</span>`,
         `<span class="profile-summary-card__tag">${escapeHtml(tool.name)}</span>`,
         `<span class="profile-summary-card__tag">${escapeHtml(tool.filename || "tool.py")}</span>`,
@@ -386,7 +386,7 @@ function createToolCardMarkup(tool, toggleAttribute) {
                 <div class="chat-tool-card__heading">
                     <strong>${escapeHtml(toolLabel)}</strong>
                 </div>
-                <p>${escapeHtml(tool.description || "Sin descripcion.")}</p>
+                <p>${escapeHtml(tool.description || "No description.")}</p>
                 <div class="chat-tool-card__meta">${badges}</div>
             </div>
             <button
@@ -422,7 +422,7 @@ function renderChatModelCard() {
         }
         elements.chatModelCard.innerHTML = `
             <div class="chat-profile-card__empty">
-                No hay modelos configurados todavía. Crea uno desde ajustes generales para poder chatear.
+                No models are configured yet. Create one from general settings to start chatting.
             </div>
         `;
         return;
@@ -453,7 +453,7 @@ function renderChatProfileCard() {
         }
         elements.chatProfileCard.innerHTML = `
             <div class="chat-profile-card__empty">
-                No hay perfiles disponibles todavía. Crea uno para definir el comportamiento del chat.
+                No profiles are available yet. Create one to define the chat behavior.
             </div>
         `;
         return;
@@ -462,7 +462,7 @@ function renderChatProfileCard() {
     const tags = Array.isArray(profile.tags) ? profile.tags.slice(0, PROFILE_SETTINGS_PREVIEW_TAGS) : [];
     const tagsMarkup = tags.length
         ? tags.map((tag) => `<span class="chat-profile-card__tag">${escapeHtml(tag)}</span>`).join("")
-        : `<span class="chat-profile-card__tag chat-profile-card__tag--muted">Sin etiquetas</span>`;
+        : `<span class="chat-profile-card__tag chat-profile-card__tag--muted">No tags</span>`;
     const defaultBadge = profile.is_default
         ? `<span class="chat-profile-card__badge">Default</span>`
         : "";
@@ -472,7 +472,7 @@ function renderChatProfileCard() {
             <div class="chat-profile-card__top">
                 <div class="chat-profile-card__heading">
                     <strong>${escapeHtml(profile.name)}</strong>
-                    <span>${escapeHtml(profile.personality || "Sin personalidad definida")}</span>
+                    <span>${escapeHtml(profile.personality || "No personality defined")}</span>
                 </div>
                 ${defaultBadge}
             </div>
