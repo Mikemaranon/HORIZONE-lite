@@ -15,6 +15,7 @@ class ChatExportService:
         messages = self.db.messages.for_conversation(conversation_id)
         active_tools = self.db.tools.active()
         project_documents = self.db.project_documents.for_project(project["id"]) if project else []
+        folder_paths = self.context_builder._build_folder_paths(project["id"]) if project else {}
 
         return {
             "conversation": conversation,
@@ -26,7 +27,9 @@ class ChatExportService:
             "project_documents": [
                 {
                     "id": document["id"],
+                    "folder_id": document.get("folder_id"),
                     "filename": document["filename"],
+                    "path": self._build_document_path(document, folder_paths),
                     "content_type": document["content_type"],
                     "size_bytes": document["size_bytes"],
                     "created_at": document["created_at"],
@@ -185,3 +188,9 @@ class ChatExportService:
             if message.get("role") == "user":
                 return message
         return None
+
+    def _build_document_path(self, document, folder_paths):
+        folder_path = folder_paths.get(document.get("folder_id"))
+        if not folder_path:
+            return document["filename"]
+        return f"{folder_path}/{document['filename']}"

@@ -1,14 +1,19 @@
 class ChatPersistenceService:
+    PLACEHOLDER_TITLES = {
+        "new chat",
+        "new conversation",
+        "nueva conversación",
+        "nueva conversacion",
+    }
+
     def __init__(self, db_manager, model_manager):
         self.db = db_manager
         self.model_manager = model_manager
 
     def prepare_conversation(self, conversation, provider, model, request_messages):
         conversation_id = conversation["id"]
-        self._ensure_generated_conversation_title(
+        self._ensure_conversation_title(
             conversation,
-            provider,
-            model,
             request_messages,
         )
         self.persist_request_messages(conversation_id, request_messages)
@@ -37,6 +42,11 @@ class ChatPersistenceService:
 
     def persist_assistant_message(self, conversation_id, response):
         assistant_message = response.get("message", {})
+        normalized_tool_events = self._normalize_tool_events(
+            (response.get("raw") or {}).get("tool_events", [])
+        )
+        if response.get("raw") is not None:
+            response["raw"]["tool_events"] = normalized_tool_events
         self.db.messages.create(
             conversation_id=conversation_id,
             role=assistant_message.get("role", "assistant"),
@@ -45,7 +55,7 @@ class ChatPersistenceService:
             model_name=assistant_message.get("model_name", ""),
             profile_id=assistant_message.get("profile_id"),
             profile_name=assistant_message.get("profile_name", ""),
-            tool_events=(response.get("raw") or {}).get("tool_events", []),
+            tool_events=normalized_tool_events,
             provider_message_id=response.get("message_id"),
         )
 
@@ -59,37 +69,23 @@ class ChatPersistenceService:
         assistant_message["profile_id"] = assistant_message_meta.get("profile_id")
         assistant_message["profile_name"] = assistant_message_meta.get("profile_name", "")
 
-    def _ensure_generated_conversation_title(
-        self,
-        conversation,
-        provider,
-        model,
-        request_messages,
-    ):
+    def _ensure_conversation_title(self, conversation, request_messages):
         stored_messages = self.db.messages.for_conversation(conversation["id"])
         if stored_messages:
+            return
+
+        if not self._should_replace_conversation_title(conversation):
             return
 
         first_user_message = self._get_first_user_message_content(request_messages)
         if not first_user_message:
             return
 
-        try:
-            generated_title = self.model_manager.generate_conversation_title(
-                provider,
-                model,
-                first_user_message,
-                {
-                    "_model_config_id": conversation.get("model_config_id"),
-                },
-            )
-        except Exception:
+        provisional_title = self._build_provisional_title(first_user_message)
+        if not provisional_title:
             return
 
-        if not generated_title:
-            return
-
-        self.db.conversations.rename(conversation["id"], generated_title)
+        self.db.conversations.rename(conversation["id"], provisional_title)
 
     def _get_first_user_message_content(self, messages):
         for message in messages:
@@ -120,3 +116,107 @@ class ChatPersistenceService:
                     return normalized
 
         return ""
+
+    def _should_replace_conversation_title(self, conversation):
+        current_title = str((conversation or {}).get("title") or "").strip().lower()
+        return current_title in self.PLACEHOLDER_TITLES
+
+    def _build_provisional_title(self, first_user_message):
+        normalized = " ".join(str(first_user_message or "").split()).strip(" -–—:;,.!?")
+        if not normalized:
+            return ""
+
+        first_line = normalized.split("\n", 1)[0].strip()
+        if not first_line:
+            return ""
+
+        words = first_line.split()
+        if len(words) > 6:
+            first_line = " ".join(words[:6])
+
+        if len(first_line) > 60:
+            first_line = first_line[:60].rstrip()
+
+        if first_line and first_line[0].islower():
+            first_line = first_line[0].upper() + first_line[1:]
+
+        return first_line.strip(" -–—:;,.!?")
+
+    def _normalize_tool_events(self, tool_events):
+        normalized_events = []
+
+        for tool_event in tool_events if isinstance(tool_events, list) else []:
+            if not isinstance(tool_event, dict):
+                continue
+
+            normalized_event = dict(tool_event)
+            normalized_event["tool_summary"] = self._build_tool_summary(normalized_event)
+            normalized_event["source_urls"] = self._extract_source_urls(normalized_event)
+            normalized_event["source_titles"] = self._extract_source_titles(normalized_event)
+            normalized_events.append(normalized_event)
+
+        return normalized_events
+
+    def _build_tool_summary(self, tool_event):
+        tool_name = str(tool_event.get("tool_name") or "tool").strip()
+        arguments = tool_event.get("arguments") or {}
+
+        if not tool_event.get("ok"):
+            error = str(tool_event.get("error") or "The tool could not complete.").strip()
+            return f"{tool_name} failed: {error}"
+
+        result = tool_event.get("result") or {}
+        if tool_name == "web_search":
+            query = str(arguments.get("query") or result.get("query") or "").strip()
+            results = result.get("results") or []
+            count = len(results) if isinstance(results, list) else 0
+            if query:
+                return f'{tool_name} searched for "{query}" and returned {count} result(s).'
+            return f"{tool_name} returned {count} result(s)."
+
+        if tool_name == "current_date":
+            date = str(result.get("date") or "").strip()
+            time = str(result.get("time") or "").strip()
+            timezone = str(result.get("timezone") or "").strip()
+            details = [value for value in [date, time, timezone] if value]
+            if details:
+                return f"{tool_name} returned {', '.join(details)}."
+            return f"{tool_name} returned current date information."
+
+        compact_fields = []
+        for key, value in result.items() if isinstance(result, dict) else []:
+            if isinstance(value, (str, int, float, bool)) and str(value).strip():
+                compact_fields.append(f"{key}: {value}")
+
+        if compact_fields:
+            return f"{tool_name} returned {'; '.join(compact_fields[:3])}."
+
+        return f"{tool_name} completed successfully."
+
+    def _extract_source_urls(self, tool_event):
+        results = ((tool_event.get("result") or {}).get("results") or [])
+        source_urls = []
+
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            url = str(item.get("url") or "").strip()
+            if url and url not in source_urls:
+                source_urls.append(url)
+
+        return source_urls
+
+    def _extract_source_titles(self, tool_event):
+        results = ((tool_event.get("result") or {}).get("results") or [])
+        source_titles = []
+
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            title = str(item.get("title") or "").strip()
+            if title and title not in source_titles:
+                source_titles.append(title)
+
+        return source_titles

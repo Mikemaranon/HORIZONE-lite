@@ -139,6 +139,11 @@ class ChatService:
         if model_config_id:
             generation_settings["_model_config_id"] = model_config_id
 
+        request_messages = self._build_server_side_request_messages(
+            conversation,
+            data["messages"],
+        )
+
         return PreparedChatRequest(
             conversation_id=conversation_id,
             conversation=conversation,
@@ -148,10 +153,10 @@ class ChatService:
             input_messages=self.context_builder.build_input_messages(
                 project,
                 profile,
-                data["messages"],
+                request_messages,
             ),
             generation_settings=generation_settings,
-            request_messages=data["messages"],
+            request_messages=request_messages,
             request_id=self.stream_service.resolve_request_id(data.get("request_id")),
             stream_requested=self._is_stream_requested(data.get("stream")),
             assistant_message_meta=self._build_assistant_message_meta(
@@ -215,6 +220,125 @@ class ChatService:
         if not conversation:
             raise ChatResourceNotFoundError("Conversation not found")
         return conversation
+
+    def _build_server_side_request_messages(self, conversation, incoming_messages):
+        normalized_incoming_messages = [
+            self._normalize_request_message(message)
+            for message in incoming_messages
+            if self._is_supported_context_message(message)
+        ]
+
+        if not conversation:
+            return normalized_incoming_messages
+
+        stored_messages = [
+            self._stored_message_to_request_message(message)
+            for message in self.db.messages.for_conversation(conversation["id"])
+        ]
+        new_messages = self._extract_unpersisted_request_messages(
+            stored_messages,
+            normalized_incoming_messages,
+        )
+        return stored_messages + new_messages
+
+    def _stored_message_to_request_message(self, message):
+        return {
+            "role": message.get("role"),
+            "content": message.get("content", ""),
+            "model_config_id": message.get("model_config_id"),
+            "model_name": message.get("model_name", ""),
+            "profile_id": message.get("profile_id"),
+            "profile_name": message.get("profile_name", ""),
+            "tool_events": message.get("tool_events") or [],
+        }
+
+    def _extract_unpersisted_request_messages(self, stored_messages, incoming_messages):
+        if not stored_messages:
+            return incoming_messages
+
+        if not incoming_messages:
+            return []
+
+        stored_signatures = [
+            self._message_signature(message)
+            for message in stored_messages
+        ]
+        incoming_signatures = [
+            self._message_signature(message)
+            for message in incoming_messages
+        ]
+
+        if (
+            len(incoming_signatures) >= len(stored_signatures)
+            and incoming_signatures[: len(stored_signatures)] == stored_signatures
+        ):
+            return incoming_messages[len(stored_signatures):]
+
+        if (
+            len(incoming_signatures) <= len(stored_signatures)
+            and stored_signatures[-len(incoming_signatures):] == incoming_signatures
+        ):
+            return []
+
+        overlap_size = self._find_history_overlap_size(
+            stored_signatures,
+            incoming_signatures,
+        )
+        if overlap_size:
+            return incoming_messages[overlap_size:]
+
+        return incoming_messages
+
+    def _find_history_overlap_size(self, stored_signatures, incoming_signatures):
+        max_overlap = min(len(stored_signatures), len(incoming_signatures))
+
+        for size in range(max_overlap, 0, -1):
+            if stored_signatures[-size:] == incoming_signatures[:size]:
+                return size
+
+        return 0
+
+    def _normalize_request_message(self, message):
+        return {
+            **message,
+            "role": str(message.get("role") or "").strip(),
+            "content": self._normalize_message_content(message.get("content")),
+        }
+
+    def _is_supported_context_message(self, message):
+        if not isinstance(message, dict):
+            return False
+
+        return message.get("role") in {"system", "user", "assistant", "tool"}
+
+    def _message_signature(self, message):
+        return (
+            str(message.get("role") or "").strip(),
+            self._normalize_message_content(message.get("content")).strip(),
+        )
+
+    def _normalize_message_content(self, content):
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, str) and item.strip():
+                    parts.append(item.strip())
+                    continue
+
+                if isinstance(item, dict):
+                    text = str(item.get("text", "")).strip()
+                    if text:
+                        parts.append(text)
+
+            return "\n".join(parts)
+
+        if content is None:
+            return ""
+
+        return str(content)
 
     def _is_stream_requested(self, raw_value):
         if isinstance(raw_value, str):

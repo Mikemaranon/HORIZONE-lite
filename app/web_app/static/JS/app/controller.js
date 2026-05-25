@@ -1,5 +1,6 @@
 import { configureAppCallbacks, renderApp } from "./app-runtime.js";
 import { autoResizeComposer } from "./composer-ui.js";
+import { handleToolTraceMessageClick } from "./message-ui.js";
 import {
     disableMessagesAutoScroll,
     ensureActiveConversation,
@@ -67,10 +68,20 @@ import {
 } from "./controllers/tools-controller.js";
 import {
     handleBackToProject,
+    handleDocumentsDirectoryDragLeave,
+    handleDocumentsDirectoryDragOver,
+    handleDocumentsDirectoryDrop,
     handleDocumentsDragLeave,
     handleDocumentsDragOver,
     handleDocumentsDrop,
     handleDocumentsOpen,
+    handleProjectActionsDocumentClick,
+    handleProjectConnectWorkspace,
+    handleProjectDocumentDragEnd,
+    handleProjectDocumentDragStart,
+    handleProjectDocumentFolderCreate,
+    handleProjectDocumentFolderDelete,
+    handleProjectDocumentFolderSelect,
     handleDocumentsSelected,
     handleNewProject,
     handleNewProjectChat,
@@ -79,6 +90,8 @@ import {
     handleProjectDocumentDelete,
     handleProjectSelect,
     handleWorkspaceSettingsOpen,
+    closeProjectActionsMenu,
+    toggleProjectActionsMenu,
 } from "./controllers/projects-controller.js";
 import {
     ensureAuthenticated,
@@ -97,6 +110,7 @@ import {
     closeProjectCustomizeModal,
     closeProviderModal,
     closeSessionProfileModal,
+    closeToolTraceModal,
     closeToolUploadModal,
     openProjectCustomizeModal,
 } from "./modal-ui.js";
@@ -187,8 +201,16 @@ export function bindUI() {
         handleConversationSelect: onConversationSelect,
         closeSidebarOnMobile,
     }));
+    elements.projectActionsMenuButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleProjectActionsMenu();
+    });
     elements.addDocumentsButton?.addEventListener("click", handleDocumentsOpen);
-    elements.customizeProjectButton?.addEventListener("click", openProjectCustomizeModal);
+    elements.customizeProjectButton?.addEventListener("click", () => {
+        closeProjectActionsMenu();
+        openProjectCustomizeModal();
+    });
+    elements.connectWorkspaceButton?.addEventListener("click", handleProjectConnectWorkspace);
     elements.workspaceSettingsButton?.addEventListener("click", () => handleWorkspaceSettingsOpen({ closeSidebarOnMobile }));
     elements.chatSettingsButton?.addEventListener("click", toggleChatPanel);
     elements.chatPanelBackdrop?.addEventListener("click", closeChatPanel);
@@ -210,6 +232,7 @@ export function bindUI() {
     elements.toolUploadNameInput?.addEventListener("input", handleToolUploadNameInput);
     elements.toolUploadForm?.addEventListener("submit", handleToolUploadSubmit);
     elements.closeToolUploadButton?.addEventListener("click", closeToolUploadModal);
+    elements.closeToolTraceButton?.addEventListener("click", closeToolTraceModal);
     elements.toolUploadCancelButton?.addEventListener("click", closeToolUploadModal);
     elements.toolUploadDropzone?.addEventListener("dragover", handleToolUploadDragOver);
     elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
@@ -241,8 +264,17 @@ export function bindUI() {
     elements.documentsDropzone?.addEventListener("dragover", handleDocumentsDragOver);
     elements.documentsDropzone?.addEventListener("dragleave", handleDocumentsDragLeave);
     elements.documentsDropzone?.addEventListener("drop", handleDocumentsDrop);
+    elements.documentsFolderForm?.addEventListener("submit", handleProjectDocumentFolderCreate);
+    elements.documentsDeleteFolderButton?.addEventListener("click", handleProjectDocumentFolderDelete);
+    elements.documentsDirectoryTree?.addEventListener("click", handleProjectDocumentFolderSelect);
+    elements.documentsDirectoryTree?.addEventListener("dragover", handleDocumentsDirectoryDragOver);
+    elements.documentsDirectoryTree?.addEventListener("dragleave", handleDocumentsDirectoryDragLeave);
+    elements.documentsDirectoryTree?.addEventListener("drop", handleDocumentsDirectoryDrop);
+    elements.documentsFileList?.addEventListener("dragstart", handleProjectDocumentDragStart);
+    elements.documentsFileList?.addEventListener("dragend", handleProjectDocumentDragEnd);
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
     elements.messagesContainer?.addEventListener("scroll", syncMessagesAutoScrollState, { passive: true });
+    elements.messagesContainer?.addEventListener("click", handleToolTraceMessageClick);
     elements.messagesContainer?.addEventListener("wheel", (event) => handleMessagesWheel(event, {
         disableMessagesAutoScroll,
     }), { passive: true });
@@ -257,6 +289,7 @@ export function bindUI() {
     elements.projectCustomizeModal?.addEventListener("click", handleProjectModalClick);
     elements.documentsModal?.addEventListener("click", handleDocumentsModalClick);
     elements.toolUploadModal?.addEventListener("click", handleToolUploadModalClick);
+    elements.toolTraceModal?.addEventListener("click", handleToolTraceModalClick);
     elements.modelSwitchSearchInput?.addEventListener("input", handleModelSearchInput);
     document.addEventListener("keydown", handleDocumentKeyDown);
     document.querySelectorAll("[data-prompt]").forEach((element) => {
@@ -267,6 +300,7 @@ export function bindUI() {
         });
     });
     document.addEventListener("click", (event) => handleDocumentClick(event, { handleProjectDocumentDelete }));
+    document.addEventListener("click", handleProjectActionsDocumentClick);
     document.addEventListener("click", handleDocumentToolClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();
@@ -345,5 +379,12 @@ function handleDocumentsModalClick(event) {
 function handleToolUploadModalClick(event) {
     if (event.target.dataset.closeToolUploadModal === "true") {
         closeToolUploadModal();
+    }
+}
+
+
+function handleToolTraceModalClick(event) {
+    if (event.target.dataset.closeToolTraceModal === "true") {
+        closeToolTraceModal();
     }
 }

@@ -35,7 +35,7 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
                 "content": "Amazing work! 🚀 We should celebrate first.",
                 "profile_name": "Coleague",
             },
-            {"role": "user", "content": "What should happen next?"},
+            {"role": "user", "content": "What should happen before the June 5 release?"},
         ]
 
         built_messages = self.builder.build_input_messages(project, profile, messages)
@@ -49,6 +49,7 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
         self.assertIn("[PROJECT CONTEXT - READ ONLY]", built_messages[0]["content"])
         self.assertIn("Active project: Launch Pad", built_messages[0]["content"])
         self.assertIn("brief.md", built_messages[0]["content"])
+        self.assertIn("Relevant project document fragments", built_messages[0]["content"])
         self.assertIn(
             "[CONVERSATION HISTORY - READ ONLY]",
             built_messages[0]["content"],
@@ -70,7 +71,7 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
         self.assertFalse(
             any(line.startswith("user:") for line in built_messages[0]["content"].splitlines())
         )
-        self.assertNotIn("What should happen next?", built_messages[0]["content"])
+        self.assertNotIn("What should happen before the June 5 release?", built_messages[0]["content"])
         self.assertIn(self.builder.FINAL_PROFILE_REMINDER, built_messages[0]["content"])
         self.assertIn(
             "Speaker labels and profile labels are metadata only.",
@@ -82,8 +83,71 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
         )
         self.assertEqual(
             built_messages[1],
-            {"role": "user", "content": "What should happen next?"},
+            {"role": "user", "content": "What should happen before the June 5 release?"},
         )
+
+    def test_project_document_context_uses_relevant_chunks_only(self):
+        project_id = self.db.projects.create("Support Docs", "Answer from docs.")
+        self.db.project_documents.create(
+            project_id=project_id,
+            filename="billing.md",
+            content_type="text/markdown",
+            size_bytes=64,
+            text_content="Refunds require a receipt and manager approval.",
+        )
+        self.db.project_documents.create(
+            project_id=project_id,
+            filename="pets.md",
+            content_type="text/markdown",
+            size_bytes=64,
+            text_content="Office dogs should stay near the reception desk.",
+        )
+
+        built_messages = self.builder.build_input_messages(
+            self.db.projects.get(project_id),
+            {"name": "Support", "system_prompt": "Use available facts."},
+            [{"role": "user", "content": "How do refunds work?"}],
+        )
+
+        system_content = built_messages[0]["content"]
+
+        self.assertIn("billing.md", system_content)
+        self.assertIn("Refunds require a receipt", system_content)
+        self.assertNotIn("pets.md", system_content)
+        self.assertNotIn("Office dogs", system_content)
+
+    def test_project_document_context_excludes_deleted_documents(self):
+        project_id = self.db.projects.create("Support Docs", "Answer from docs.")
+        document_id = self.db.project_documents.create(
+            project_id=project_id,
+            filename="billing.md",
+            content_type="text/markdown",
+            size_bytes=64,
+            text_content="Refunds require a receipt and manager approval.",
+        )
+
+        self.db.project_document_chunks.replace_for_document(
+            document_id=document_id,
+            project_id=project_id,
+            chunks=[
+                {
+                    "chunk_index": 0,
+                    "text_content": "Refunds require a receipt and manager approval.",
+                }
+            ],
+        )
+        self.db.project_documents.delete(document_id)
+
+        built_messages = self.builder.build_input_messages(
+            self.db.projects.get(project_id),
+            {"name": "Support", "system_prompt": "Use available facts."},
+            [{"role": "user", "content": "How do refunds work?"}],
+        )
+
+        system_content = built_messages[0]["content"]
+
+        self.assertNotIn("billing.md", system_content)
+        self.assertNotIn("Refunds require a receipt", system_content)
 
     def test_get_last_user_message_returns_only_latest_user_turn(self):
         last_user_message = self.builder._get_last_user_message(
@@ -137,3 +201,5 @@ class ChatContextBuilderTests(IsolatedDatabaseTestCase):
         self.assertIn("[Previous tool usage]", built_messages[0]["content"])
         self.assertIn("web_search", built_messages[0]["content"])
         self.assertIn("https://example.com/1", built_messages[0]["content"])
+        self.assertIn('searched for "league followers"', built_messages[0]["content"])
+        self.assertNotIn('"results"', built_messages[0]["content"])

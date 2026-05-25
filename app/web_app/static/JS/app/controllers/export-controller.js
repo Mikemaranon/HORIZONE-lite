@@ -44,7 +44,7 @@ export function syncChatExportState() {
         if (canExport) {
             const conversationTitle = state.activeConversation?.title || "Conversation";
             const messageLabel = messageCount === 1 ? "message" : "messages";
-            elements.chatExportSummary.textContent = `${conversationTitle} · ${messageCount} ${messageLabel} listos para descargar.`;
+            elements.chatExportSummary.textContent = `${conversationTitle} · ${messageCount} ${messageLabel} ready to download.`;
         } else if (hasConversation) {
             elements.chatExportSummary.textContent = "This chat does not have saved messages to export yet.";
         } else {

@@ -5,6 +5,7 @@ from api_m.services import (
     ChatService,
     ChatStreamService,
     DocumentIngestionService,
+    ProjectContextRetrievalService,
     ProjectDocumentService,
     ProjectService,
 )
@@ -40,7 +41,15 @@ class ServiceRegistry:
             tool_executor=self.tool_executor,
         )
 
-        self.chat_context_builder = ChatContextBuilder(db_manager)
+        self.document_ingestion_service = DocumentIngestionService()
+        self.project_context_retrieval_service = ProjectContextRetrievalService(
+            db_manager,
+            ingestion_service=self.document_ingestion_service,
+        )
+        self.chat_context_builder = ChatContextBuilder(
+            db_manager,
+            project_context_retrieval_service=self.project_context_retrieval_service,
+        )
         self.chat_export_service = ChatExportService(
             db_manager,
             self.chat_context_builder,
@@ -64,7 +73,6 @@ class ServiceRegistry:
             tool_manager=self.tool_manager,
         )
 
-        self.document_ingestion_service = DocumentIngestionService()
         self.project_service = ProjectService(db_manager)
         self.project_document_service = ProjectDocumentService(
             db_manager,

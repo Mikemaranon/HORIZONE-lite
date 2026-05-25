@@ -1,6 +1,3 @@
-import json
-
-
 class ChatContextBuilder:
     READ_ONLY_CONTEXT_NOTICE = (
         "Use this only for facts and continuity. Do not copy its tone, "
@@ -20,8 +17,13 @@ class ChatContextBuilder:
     )
     DEFAULT_PROFILE_NAME = "Default Assistant"
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, project_context_retrieval_service=None):
         self.db = db_manager
+        if project_context_retrieval_service is None:
+            from .project_context_retrieval_service import ProjectContextRetrievalService
+
+            project_context_retrieval_service = ProjectContextRetrievalService(db_manager)
+        self.project_context_retrieval_service = project_context_retrieval_service
 
     def resolve_project(self, project_id, conversation):
         if project_id is not None:
@@ -92,7 +94,12 @@ class ChatContextBuilder:
     def _build_system_message_content(self, project, profile, messages):
         parts = [self._build_profile_instruction(profile)]
 
-        project_context_message = self._build_project_context_message(project)
+        latest_user_message = self._get_last_user_message(messages)
+        latest_user_content = latest_user_message["content"] if latest_user_message else ""
+        project_context_message = self._build_project_context_message(
+            project,
+            latest_user_content,
+        )
         if project_context_message:
             parts.append(
                 self._wrap_read_only_context(
@@ -157,7 +164,7 @@ class ChatContextBuilder:
 
         return "\n\n".join(block for block in blocks if block)
 
-    def _build_project_context_message(self, project):
+    def _build_project_context_message(self, project, latest_user_content=""):
         if not project:
             return ""
 
@@ -169,60 +176,51 @@ class ChatContextBuilder:
         if project.get("system_prompt"):
             parts.append(f"Project instructions:\n{project['system_prompt']}")
 
-        documents = self.db.project_documents.for_project(project["id"])
-        documents_block = self._build_project_documents_context(documents)
+        documents_block = self._build_project_documents_context(
+            project,
+            latest_user_content,
+        )
         if documents_block:
             parts.append(documents_block)
 
         return "\n\n".join(part for part in parts if part)
 
-    def _build_project_documents_context(self, documents):
-        if not documents:
+    def _build_project_documents_context(self, project, latest_user_content):
+        if not project or not latest_user_content:
             return ""
 
-        max_total_chars = 12_000
-        max_document_chars = 4_000
-        consumed = 0
-        blocks = []
+        return self.project_context_retrieval_service.build_context(
+            project["id"],
+            latest_user_content,
+        )
 
-        for index, document in enumerate(documents, start=1):
-            header = f"[Document {index}] {document['filename']}\n"
-            body = (document.get("text_content") or "").strip()
-            if not body:
-                continue
+    def _build_folder_paths(self, project_id):
+        folders = self.db.project_document_folders.for_project(project_id)
+        folders_by_id = {folder["id"]: folder for folder in folders}
+        paths = {}
 
-            if len(body) > max_document_chars:
-                body = (
-                    f"{body[:max_document_chars].rstrip()}\n"
-                    "[Document truncated for chat context.]"
-                )
+        for folder in folders:
+            self._resolve_folder_path(folder["id"], folders_by_id, paths)
 
-            block = f"{header}{body}"
-            projected_size = consumed + len(block)
-            if projected_size > max_total_chars:
-                remaining = max_total_chars - consumed
-                if remaining <= len(header) + 64:
-                    break
+        return paths
 
-                available_body = remaining - len(header) - len(
-                    "\n[Document truncated for chat context.]"
-                )
-                trimmed_body = body[:available_body].rstrip()
-                block = (
-                    f"{header}{trimmed_body}\n"
-                    "[Document truncated for chat context.]"
-                )
+    def _resolve_folder_path(self, folder_id, folders_by_id, paths):
+        if folder_id in paths:
+            return paths[folder_id]
 
-            blocks.append(block)
-            consumed += len(block)
-
-            if consumed >= max_total_chars:
-                break
-
-        if not blocks:
+        folder = folders_by_id.get(folder_id)
+        if not folder:
             return ""
 
-        return "Project documents:\n\n" + "\n\n".join(blocks)
+        parent_id = folder.get("parent_folder_id")
+        if parent_id:
+            parent_path = self._resolve_folder_path(parent_id, folders_by_id, paths)
+            path = f"{parent_path}/{folder['name']}" if parent_path else folder["name"]
+        else:
+            path = folder["name"]
+
+        paths[folder_id] = path
+        return path
 
     def _find_last_user_message_index(self, messages):
         last_user_index = None
@@ -276,16 +274,99 @@ class ChatContextBuilder:
         if not isinstance(tool_events, list) or not tool_events:
             return ""
 
-        serialized = json.dumps(tool_events, ensure_ascii=False, sort_keys=True)
-        if len(serialized) > 4000:
-            serialized = serialized[:4000].rstrip() + "..."
+        blocks = []
+        for tool_event in tool_events[:5]:
+            block = self._build_compact_tool_event_block(tool_event)
+            if block:
+                blocks.append(block)
+
+        if not blocks:
+            return ""
 
         return (
             "[Previous tool usage]\n"
             "These tool results belong to the assistant message above and can be used "
             "to answer follow-up questions about sources, consulted data, or how the answer was produced.\n"
-            f"{serialized}"
+            f"{chr(10).join(blocks)}"
         )
+
+    def _build_compact_tool_event_block(self, tool_event):
+        if not isinstance(tool_event, dict):
+            return ""
+
+        tool_name = str(tool_event.get("tool_name") or "tool").strip()
+        tool_summary = str(tool_event.get("tool_summary") or "").strip()
+        if not tool_summary:
+            tool_summary = self._derive_tool_summary(tool_event)
+
+        lines = [f"- {tool_name}: {tool_summary}"]
+        source_urls = tool_event.get("source_urls")
+        source_titles = tool_event.get("source_titles")
+
+        if not isinstance(source_urls, list) or not source_urls:
+            source_urls = self._extract_source_urls(tool_event)
+        if not isinstance(source_titles, list):
+            source_titles = []
+
+        if source_urls:
+            lines.append("  Sources:")
+            for index, url in enumerate(source_urls[:5]):
+                title = source_titles[index] if index < len(source_titles) else ""
+                if title:
+                    lines.append(f"  - {title}: {url}")
+                else:
+                    lines.append(f"  - {url}")
+
+        return "\n".join(lines)
+
+    def _derive_tool_summary(self, tool_event):
+        tool_name = str(tool_event.get("tool_name") or "tool").strip()
+        if not tool_event.get("ok"):
+            error = str(tool_event.get("error") or "The tool could not complete.").strip()
+            return f"{tool_name} failed: {error}"
+
+        result = tool_event.get("result") or {}
+        if tool_name == "web_search":
+            query = str((tool_event.get("arguments") or {}).get("query") or result.get("query") or "").strip()
+            count = len(result.get("results") or []) if isinstance(result, dict) else 0
+            if query:
+                return f'searched for "{query}" and returned {count} result(s).'
+            return f"returned {count} result(s)."
+
+        if tool_name == "current_date":
+            details = [
+                str(result.get("date") or "").strip(),
+                str(result.get("time") or "").strip(),
+                str(result.get("timezone") or "").strip(),
+            ]
+            details = [value for value in details if value]
+            if details:
+                return f"returned {', '.join(details)}."
+            return "returned current date information."
+
+        compact_fields = []
+        for key, value in result.items() if isinstance(result, dict) else []:
+            if isinstance(value, (str, int, float, bool)) and str(value).strip():
+                compact_fields.append(f"{key}: {value}")
+
+        if compact_fields:
+            return f"returned {'; '.join(compact_fields[:3])}."
+
+        return "completed successfully."
+
+    def _extract_source_urls(self, tool_event):
+        results = ((tool_event.get("result") or {}).get("results") or [])
+        source_urls = []
+
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+
+            url = str(item.get("url") or "").strip()
+            if url and url not in source_urls:
+                source_urls.append(url)
+
+        return source_urls
 
     def _normalize_message_content(self, content):
         if isinstance(content, str):

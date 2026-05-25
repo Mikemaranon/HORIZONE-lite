@@ -121,9 +121,12 @@ export async function deleteProject(projectId) {
 }
 
 
-export async function uploadProjectDocuments(projectId, files) {
+export async function uploadProjectDocuments(projectId, files, folderId = null) {
     const formData = new FormData();
     formData.append("project_id", String(projectId));
+    if (folderId !== null && folderId !== undefined && folderId !== "") {
+        formData.append("folder_id", String(folderId));
+    }
 
     for (const file of files || []) {
         formData.append("files", file, file.name);
@@ -135,6 +138,24 @@ export async function uploadProjectDocuments(projectId, files) {
 
 export async function deleteProjectDocument(documentId) {
     return apiRequestJson("DELETE", `/api/projects/documents?id=${encodeURIComponent(documentId)}`);
+}
+
+
+export async function moveProjectDocument(documentId, folderId = null) {
+    return apiRequestJson("PATCH", "/api/projects/documents", {
+        id: documentId,
+        folder_id: folderId,
+    });
+}
+
+
+export async function createProjectDocumentFolder(data) {
+    return apiRequestJson("POST", "/api/projects/document-folders", data);
+}
+
+
+export async function deleteProjectDocumentFolder(folderId) {
+    return apiRequestJson("DELETE", `/api/projects/document-folders?id=${encodeURIComponent(folderId)}`);
 }
 
 

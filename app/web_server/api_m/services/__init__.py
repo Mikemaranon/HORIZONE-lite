@@ -12,6 +12,8 @@ from .document_ingestion_service import (
     DocumentIngestionService,
 )
 from .project_document_service import ProjectDocumentService
+from .project_document_service import ProjectDocumentRequestError
+from .project_context_retrieval_service import ProjectContextRetrievalService
 from .project_service import (
     ProjectRequestError,
     ProjectResourceNotFoundError,
@@ -29,6 +31,8 @@ __all__ = [
     "DocumentIngestionError",
     "DocumentIngestionService",
     "ProjectDocumentService",
+    "ProjectDocumentRequestError",
+    "ProjectContextRetrievalService",
     "ProjectRequestError",
     "ProjectResourceNotFoundError",
     "ProjectService",

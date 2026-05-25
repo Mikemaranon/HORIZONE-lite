@@ -26,6 +26,8 @@ export const state = {
     modelModalContext: "settings",
     toolsShowActiveOnly: false,
     projectDocuments: [],
+    projectDocumentFolders: [],
+    activeProjectDocumentFolderId: null,
     activeMessages: [],
     messagesAutoScrollEnabled: true,
     stagedDocuments: [],

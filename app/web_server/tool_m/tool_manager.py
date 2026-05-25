@@ -1,20 +1,11 @@
 import json
 import re
 
+from .deterministic_tool_router import DeterministicToolRouter
+from .model_tool_planner import ModelToolPlanner
+
 
 class ToolManager:
-    TOOL_CALL_SYSTEM_PROMPT = """You may use external tools when they are available.
-
-If a tool is needed, reply with ONLY a JSON object using this exact shape:
-{"tool_call":{"name":"tool_name","arguments":{"key":"value"}}}
-
-Rules:
-- Do not wrap the JSON in markdown fences.
-- Do not include explanation before or after the JSON object.
-- Only request one tool at a time.
-- If no tool is needed, answer the user normally.
-"""
-
     def __init__(
         self,
         *,
@@ -23,6 +14,8 @@ Rules:
         tool_loader,
         tool_registry,
         tool_executor,
+        deterministic_tool_router=None,
+        model_tool_planner=None,
         max_tool_round_trips=3,
     ):
         self.db = db_manager
@@ -30,6 +23,10 @@ Rules:
         self.tool_loader = tool_loader
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
+        self.deterministic_tool_router = (
+            deterministic_tool_router or DeterministicToolRouter()
+        )
+        self.model_tool_planner = model_tool_planner or ModelToolPlanner()
         self.max_tool_round_trips = max_tool_round_trips
 
     def list_tools(self, *, include_inactive=True, refresh=True):
@@ -95,10 +92,21 @@ Rules:
         if not active_tools:
             return self.model_manager.chat(provider_name, messages, model, settings or {})
 
-        tool_aware_messages = self._build_tool_aware_messages(messages, active_tools)
+        forced_tool_call = self.deterministic_tool_router.resolve(messages, active_tools)
+        should_use_planner = (
+            not forced_tool_call
+            and self.model_tool_planner.should_plan(messages, active_tools)
+        )
+        if not forced_tool_call and not should_use_planner:
+            return self.model_manager.chat(provider_name, messages, model, settings or {})
+
+        tool_aware_messages = self._prepare_tool_aware_messages(
+            messages,
+            active_tools,
+            should_use_planner=should_use_planner,
+        )
         tool_events = []
         response = None
-        forced_tool_call = self._resolve_forced_tool_call(messages, active_tools)
         if forced_tool_call:
             self._append_tool_result_to_messages(
                 tool_aware_messages,
@@ -175,11 +183,28 @@ Rules:
             )
             return
 
-        tool_aware_messages = self._build_tool_aware_messages(messages, active_tools)
+        forced_tool_call = self.deterministic_tool_router.resolve(messages, active_tools)
+        should_use_planner = (
+            not forced_tool_call
+            and self.model_tool_planner.should_plan(messages, active_tools)
+        )
+        if not forced_tool_call and not should_use_planner:
+            yield from self.model_manager.stream_chat(
+                provider_name,
+                messages,
+                model,
+                settings or {},
+                should_stop=should_stop,
+            )
+            return
+
+        tool_aware_messages = self._prepare_tool_aware_messages(
+            messages,
+            active_tools,
+            should_use_planner=should_use_planner,
+        )
         tool_events = []
         response = None
-
-        forced_tool_call = self._resolve_forced_tool_call(messages, active_tools)
         if forced_tool_call:
             yield self._build_tool_start_stream_event(forced_tool_call)
             tool_event = self._append_tool_result_to_messages(
@@ -274,33 +299,10 @@ Rules:
             "response": final_response,
         }
 
-    def _build_tool_aware_messages(self, messages, active_tools):
-        tools_context = "\n".join(
-            [
-                f"- {tool['name']}: {tool['description']} | parameters: {json.dumps(tool['parameters'], ensure_ascii=False, sort_keys=True)}"
-                for tool in active_tools
-            ]
-        )
-        tool_instructions = (
-            f"{self.TOOL_CALL_SYSTEM_PROMPT}\nAvailable tools:\n{tools_context}"
-        )
-
-        if messages and messages[0].get("role") == "system":
-            merged_system_message = {
-                **messages[0],
-                "content": (
-                    f"{messages[0].get('content', '').strip()}\n\n{tool_instructions}"
-                ).strip(),
-            }
-            return [merged_system_message, *messages[1:]]
-
-        return [
-            {
-                "role": "system",
-                "content": tool_instructions,
-            },
-            *messages,
-        ]
+    def _prepare_tool_aware_messages(self, messages, active_tools, *, should_use_planner):
+        if should_use_planner:
+            return self.model_tool_planner.build_messages(messages, active_tools)
+        return [*list(messages or [])]
 
     def _extract_tool_call(self, response):
         content = str((response.get("message") or {}).get("content", "")).strip()
@@ -471,91 +473,6 @@ Rules:
             "display_name": tool_event.get("tool_display_name", ""),
             "ok": bool(tool_event.get("ok")),
         }
-
-    def _resolve_forced_tool_call(self, messages, active_tools):
-        active_tool_names = {tool["name"] for tool in active_tools}
-        last_user_message = self._get_last_user_message(messages)
-        if not last_user_message:
-            return None
-
-        if "web_search" in active_tool_names:
-            query = self._extract_forced_web_search_query(last_user_message)
-            if query:
-                return {
-                    "name": "web_search",
-                    "arguments": {
-                        "query": query,
-                        "max_results": 5,
-                    },
-                }
-
-        if "current_date" in active_tool_names and self._should_force_current_date(last_user_message):
-            return {
-                "name": "current_date",
-                "arguments": {},
-            }
-
-        return None
-
-    def _get_last_user_message(self, messages):
-        for message in reversed(messages or []):
-            if message.get("role") == "user":
-                return str(message.get("content") or "").strip()
-        return ""
-
-    def _extract_forced_web_search_query(self, content):
-        normalized = str(content or "").strip()
-        if not normalized:
-            return ""
-
-        lowered = normalized.lower()
-        explicit_search_patterns = [
-            r"^(por favor\s+)?busca(?:me|r)?\s+",
-            r"^(por favor\s+)?buscar\s+",
-            r"^(por favor\s+)?encuentra\s+",
-            r"^(por favor\s+)?investiga\s+",
-            r"^(please\s+)?search\s+",
-            r"^(please\s+)?look up\s+",
-            r"^(please\s+)?find\s+",
-        ]
-        if not any(re.match(pattern, lowered) for pattern in explicit_search_patterns):
-            return ""
-
-        query = re.sub(
-            r"^(por favor\s+)?(busca(?:me|r)?|buscar|encuentra|investiga|search|look up|find)\s+",
-            "",
-            normalized,
-            flags=re.IGNORECASE,
-        )
-        query = re.sub(
-            r"^(en internet|por internet|en la web|online|on the web)\s+",
-            "",
-            query,
-            flags=re.IGNORECASE,
-        )
-        return query.strip(" .,:;!?")
-
-    def _should_force_current_date(self, content):
-        lowered = str(content or "").strip().lower()
-        if not lowered:
-            return False
-
-        triggers = [
-            "que fecha es",
-            "qué fecha es",
-            "fecha de hoy",
-            "dia de hoy",
-            "día de hoy",
-            "que dia es hoy",
-            "qué día es hoy",
-            "hora actual",
-            "what date is it",
-            "what day is it",
-            "today's date",
-            "current date",
-            "current time",
-        ]
-        return any(trigger in lowered for trigger in triggers)
 
     def _attach_tool_events(self, response, tool_events):
         if not tool_events:

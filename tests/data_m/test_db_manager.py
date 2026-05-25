@@ -149,6 +149,93 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(len(cached_models), 1)
         self.assertEqual(cached_models[0]["display_name"], "Llama 3.2 Updated")
 
+    def test_project_documents_support_virtual_folders(self):
+        db = DBManager()
+        project_id = db.projects.create("Docs", "Hierarchy")
+        specs_folder_id = db.project_document_folders.create(project_id, "Specs")
+        nested_folder_id = db.project_document_folders.create(project_id, "API", parent_folder_id=specs_folder_id)
+        document_id = db.project_documents.create(
+            project_id=project_id,
+            filename="contract.txt",
+            content_type="text/plain",
+            size_bytes=12,
+            text_content="Read me",
+            folder_id=specs_folder_id,
+        )
+
+        folders = db.project_document_folders.for_project(project_id)
+        document = db.project_documents.get(document_id)
+        db.project_documents.move_to_folder(document_id, nested_folder_id)
+        moved_document = db.project_documents.get(document_id)
+
+        self.assertEqual(len(folders), 2)
+        self.assertEqual(document["folder_id"], specs_folder_id)
+        self.assertEqual(moved_document["folder_id"], nested_folder_id)
+
+    def test_project_document_chunks_roundtrip_and_replace(self):
+        db = DBManager()
+        project_id = db.projects.create("Docs", "Chunks")
+        document_id = db.project_documents.create(
+            project_id=project_id,
+            filename="guide.txt",
+            content_type="text/plain",
+            size_bytes=24,
+            text_content="First chunk\n\nSecond chunk",
+        )
+
+        db.project_document_chunks.replace_for_document(
+            document_id=document_id,
+            project_id=project_id,
+            chunks=[
+                {"text_content": "First chunk"},
+                {"text_content": "Second chunk"},
+            ],
+        )
+        db.project_document_chunks.replace_for_document(
+            document_id=document_id,
+            project_id=project_id,
+            chunks=[
+                {"text_content": "Replacement chunk"},
+            ],
+        )
+
+        chunks = db.project_document_chunks.for_project(project_id)
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0]["document_id"], document_id)
+        self.assertEqual(chunks[0]["chunk_index"], 0)
+        self.assertEqual(chunks[0]["text_content"], "Replacement chunk")
+        self.assertEqual(chunks[0]["filename"], "guide.txt")
+
+    def test_deleting_folder_returns_nested_documents_to_root(self):
+        db = DBManager()
+        project_id = db.projects.create("Docs", "Hierarchy")
+        specs_folder_id = db.project_document_folders.create(project_id, "Specs")
+        nested_folder_id = db.project_document_folders.create(project_id, "API", parent_folder_id=specs_folder_id)
+        root_document_id = db.project_documents.create(
+            project_id=project_id,
+            filename="overview.txt",
+            content_type="text/plain",
+            size_bytes=8,
+            text_content="overview",
+            folder_id=specs_folder_id,
+        )
+        nested_document_id = db.project_documents.create(
+            project_id=project_id,
+            filename="endpoints.txt",
+            content_type="text/plain",
+            size_bytes=9,
+            text_content="endpoints",
+            folder_id=nested_folder_id,
+        )
+
+        db.project_document_folders.delete(specs_folder_id)
+
+        self.assertIsNone(db.project_document_folders.get(specs_folder_id))
+        self.assertIsNone(db.project_document_folders.get(nested_folder_id))
+        self.assertIsNone(db.project_documents.get(root_document_id)["folder_id"])
+        self.assertIsNone(db.project_documents.get(nested_document_id)["folder_id"])
+
     def test_profiles_support_personality_tags_and_default_reassignment(self):
         db = DBManager()
         original_default = db.profiles.get_default()

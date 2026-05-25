@@ -66,11 +66,17 @@ export function setLoading(isLoading) {
     if (elements.newProjectChatButton) {
         elements.newProjectChatButton.disabled = isLoading;
     }
+    if (elements.projectActionsMenuButton) {
+        elements.projectActionsMenuButton.disabled = isLoading;
+    }
     if (elements.addDocumentsButton) {
         elements.addDocumentsButton.disabled = isLoading;
     }
     if (elements.customizeProjectButton) {
         elements.customizeProjectButton.disabled = isLoading;
+    }
+    if (elements.connectWorkspaceButton) {
+        elements.connectWorkspaceButton.disabled = isLoading;
     }
     syncComposerAvailability();
 }

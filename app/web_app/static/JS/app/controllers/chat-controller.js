@@ -134,6 +134,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
                 );
             },
         });
+        payload.message.tool_events = payload.raw?.tool_events || [];
 
         removeTypingMessage();
         if (streamingAssistantMessage) {
@@ -141,9 +142,11 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
             streamingAssistantMessage.content = payload.message.content;
             if (payload.message.content) {
                 finalizeStreamingAssistantMessage(payload.message.content);
+                renderMessages({ preserveViewport: true });
             } else {
                 state.activeMessages.pop();
                 removeStreamingAssistantMessage();
+                renderMessages({ preserveViewport: true });
             }
         } else if (payload.message.content) {
             state.activeMessages.push(payload.message);

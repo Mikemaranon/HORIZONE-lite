@@ -140,3 +140,13 @@ export function openToolUploadModal() {
 export function closeToolUploadModal() {
     closeModal(elements.toolUploadModal);
 }
+
+
+export function openToolTraceModal() {
+    openModal(elements.toolTraceModal);
+}
+
+
+export function closeToolTraceModal() {
+    closeModal(elements.toolTraceModal);
+}

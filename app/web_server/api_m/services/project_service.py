@@ -50,8 +50,11 @@ class ProjectService:
         if not project:
             raise ProjectResourceNotFoundError("Project not found")
 
+        conversation_count = len(self.db.conversations.all(project_id))
         self.db.projects.delete(project_id)
         return {
             "deleted": True,
             "project_id": project_id,
+            "conversation_retention": "detached",
+            "orphaned_conversation_count": conversation_count,
         }

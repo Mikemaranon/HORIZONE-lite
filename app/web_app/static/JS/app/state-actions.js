@@ -101,6 +101,16 @@ export function setProjectDocuments(documents = []) {
 }
 
 
+export function setProjectDocumentFolders(folders = []) {
+    state.projectDocumentFolders = folders;
+}
+
+
+export function setActiveProjectDocumentFolderId(folderId = null) {
+    state.activeProjectDocumentFolderId = folderId ?? null;
+}
+
+
 export function setStagedDocuments(documents = []) {
     state.stagedDocuments = documents;
 }
@@ -126,6 +136,8 @@ export function applyProjectsPayload(data) {
     if (state.activeProjectId && !state.projects.some((project) => project.id === state.activeProjectId)) {
         state.activeProjectId = null;
         state.projectDocuments = [];
+        state.projectDocumentFolders = [];
+        state.activeProjectDocumentFolderId = null;
     }
 }
 
@@ -142,6 +154,14 @@ export function applyProfilesPayload(data) {
 
 export function applyProjectDocumentsPayload(data) {
     state.projectDocuments = data.documents || [];
+    state.projectDocumentFolders = data.folders || [];
+
+    if (
+        state.activeProjectDocumentFolderId
+        && !state.projectDocumentFolders.some((folder) => folder.id === state.activeProjectDocumentFolderId)
+    ) {
+        state.activeProjectDocumentFolderId = null;
+    }
 }
 
 
@@ -210,6 +230,8 @@ export function enterHomeWorkspace() {
     state.activeProjectId = null;
     clearActiveConversation();
     state.projectDocuments = [];
+    state.projectDocumentFolders = [];
+    state.activeProjectDocumentFolderId = null;
     state.stagedDocuments = [];
 }
 
@@ -217,6 +239,8 @@ export function enterHomeWorkspace() {
 export function enterProjectWorkspace(projectId) {
     state.workspaceMode = "project";
     state.activeProjectId = projectId || null;
+    state.activeProjectDocumentFolderId = null;
+    state.stagedDocuments = [];
     clearActiveConversation();
 }
 

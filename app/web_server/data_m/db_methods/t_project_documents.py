@@ -9,19 +9,21 @@ class ProjectDocumentsTable:
         content_type,
         size_bytes,
         text_content,
+        folder_id=None,
     ):
         _, document_id = self.db.execute(
             """
             INSERT INTO project_documents (
                 project_id,
+                folder_id,
                 filename,
                 content_type,
                 size_bytes,
                 text_content
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (project_id, filename, content_type, size_bytes, text_content),
+            (project_id, folder_id, filename, content_type, size_bytes, text_content),
             lastrowid=True,
         )
         return document_id
@@ -29,7 +31,7 @@ class ProjectDocumentsTable:
     def get(self, document_id):
         _, row = self.db.execute(
             """
-            SELECT id, project_id, filename, content_type, size_bytes, text_content,
+            SELECT id, project_id, folder_id, filename, content_type, size_bytes, text_content,
                    created_at, updated_at
             FROM project_documents
             WHERE id = ?
@@ -42,16 +44,30 @@ class ProjectDocumentsTable:
     def for_project(self, project_id):
         _, rows = self.db.execute(
             """
-            SELECT id, project_id, filename, content_type, size_bytes, text_content,
+            SELECT id, project_id, folder_id, filename, content_type, size_bytes, text_content,
                    created_at, updated_at
             FROM project_documents
             WHERE project_id = ?
-            ORDER BY created_at ASC, id ASC
+            ORDER BY
+                CASE WHEN folder_id IS NULL THEN 0 ELSE 1 END ASC,
+                folder_id ASC,
+                LOWER(filename) ASC,
+                id ASC
             """,
             (project_id,),
             fetchall=True,
         )
         return [self._serialize(row) for row in rows]
+
+    def move_to_folder(self, document_id, folder_id):
+        self.db.execute(
+            """
+            UPDATE project_documents
+            SET folder_id = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (folder_id, document_id),
+        )
 
     def delete(self, document_id):
         self.db.execute(
@@ -72,10 +88,11 @@ class ProjectDocumentsTable:
         return {
             "id": row[0],
             "project_id": row[1],
-            "filename": row[2],
-            "content_type": row[3],
-            "size_bytes": row[4],
-            "text_content": row[5],
-            "created_at": row[6],
-            "updated_at": row[7],
+            "folder_id": row[2],
+            "filename": row[3],
+            "content_type": row[4],
+            "size_bytes": row[5],
+            "text_content": row[6],
+            "created_at": row[7],
+            "updated_at": row[8],
         }

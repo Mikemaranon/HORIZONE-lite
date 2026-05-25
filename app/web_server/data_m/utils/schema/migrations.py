@@ -24,4 +24,5 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("providers", "resolved_adapter", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
     ColumnMigration("tools", "display_name", "TEXT DEFAULT ''"),
+    ColumnMigration("project_documents", "folder_id", "INTEGER"),
 ]

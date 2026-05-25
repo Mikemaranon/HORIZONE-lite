@@ -31,6 +31,12 @@ The experience is designed to feel clear from the first moment: a sidebar for na
 
 The goal is for it to feel light, direct, and friendly. Less friction, more continuity.
 
+## Project Behavior
+
+Projects group chats, project instructions, and uploaded text documents. Chats inside the same project stay independent from each other; they share the project prompt and relevant document fragments, but they do not automatically inherit messages from sibling chats.
+
+When a project is deleted, its conversations are kept as standalone chats with no project attached. Uploaded project documents are removed with the project.
+
 ## Great For
 
 - People who want a more private and controllable AI app.

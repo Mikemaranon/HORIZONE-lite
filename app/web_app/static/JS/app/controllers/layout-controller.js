@@ -12,6 +12,7 @@ import {
     closeProjectCustomizeModal,
     closeToolUploadModal,
 } from "../modal-ui.js";
+import { closeProjectActionsMenu } from "./projects-controller.js";
 import { hideStatus } from "../status-ui.js";
 
 const mobileSidebarMediaQuery = window.matchMedia("(max-width: 1120px)");
@@ -211,6 +212,11 @@ export function syncChatSidebarSections() {
 
 export function handleDocumentKeyDown(event) {
     if (event.key !== "Escape") {
+        return;
+    }
+
+    if (closeProjectActionsMenu()) {
+        event.stopPropagation();
         return;
     }
 

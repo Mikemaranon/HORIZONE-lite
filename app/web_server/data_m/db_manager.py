@@ -6,6 +6,8 @@ from .db_methods import (
     SessionsTable,
     AgentLogsTable,
     ProjectsTable,
+    ProjectDocumentFoldersTable,
+    ProjectDocumentChunksTable,
     ProjectDocumentsTable,
     ProfilesTable,
     ProvidersTable,
@@ -37,6 +39,8 @@ class DBManager:
         self.sessions = SessionsTable(self.db)
         self.agent_logs = AgentLogsTable(self.db)
         self.projects = ProjectsTable(self.db)
+        self.project_document_folders = ProjectDocumentFoldersTable(self.db)
+        self.project_document_chunks = ProjectDocumentChunksTable(self.db)
         self.project_documents = ProjectDocumentsTable(self.db)
         self.profiles = ProfilesTable(self.db)
         self.providers = ProvidersTable(self.db)

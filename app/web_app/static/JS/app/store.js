@@ -29,7 +29,7 @@ export async function loadProviders() {
 
 export async function loadProjectDocuments(projectId) {
     if (!projectId) {
-        return { documents: [] };
+        return { documents: [], folders: [] };
     }
 
     return loadProjectDocumentsData(projectId);

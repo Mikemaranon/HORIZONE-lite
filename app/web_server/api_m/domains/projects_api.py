@@ -3,6 +3,7 @@ from flask import request
 from api_m.domains.base_api import BaseAPI
 from api_m.services import (
     DocumentIngestionError,
+    ProjectDocumentRequestError,
     ProjectDocumentService,
     ProjectRequestError,
     ProjectResourceNotFoundError,
@@ -38,6 +39,21 @@ class ProjectsAPI(BaseAPI):
         self.app.add_url_rule(
             "/api/projects/documents",
             view_func=self.handle_project_documents_delete,
+            methods=["DELETE"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/documents",
+            view_func=self.handle_project_documents_patch,
+            methods=["PATCH"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/document-folders",
+            view_func=self.handle_project_document_folders_post,
+            methods=["POST"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/document-folders",
+            view_func=self.handle_project_document_folders_delete,
             methods=["DELETE"],
         )
 
@@ -124,11 +140,11 @@ class ProjectsAPI(BaseAPI):
             return self.error(str(error), 400)
 
         try:
-            documents = self.project_document_service.list_documents(project_id)
+            payload = self.project_document_service.list_documents(project_id)
         except LookupError as error:
             return self.error(str(error), 404)
 
-        return self.ok({"documents": documents})
+        return self.ok(payload)
 
     def handle_project_documents_post(self):
         auth = self.authenticate_request(request)
@@ -138,6 +154,7 @@ class ProjectsAPI(BaseAPI):
         try:
             project_id = self.parse_int(request.form.get("project_id"), "project_id")
             self.require_fields({"project_id": project_id}, "project_id")
+            folder_id = self.parse_int(request.form.get("folder_id"), "folder_id")
         except ValueError as error:
             return self.error(str(error), 400)
 
@@ -145,8 +162,11 @@ class ProjectsAPI(BaseAPI):
             created_documents = self.project_document_service.create_documents(
                 project_id,
                 request.files.getlist("files"),
+                folder_id=folder_id,
             )
         except DocumentIngestionError as error:
+            return self.error(str(error), 400)
+        except ProjectDocumentRequestError as error:
             return self.error(str(error), 400)
         except LookupError as error:
             return self.error(str(error), 404)
@@ -166,6 +186,77 @@ class ProjectsAPI(BaseAPI):
 
         try:
             payload = self.project_document_service.delete_document(document_id)
+        except LookupError as error:
+            return self.error(str(error), 404)
+
+        return self.ok(payload)
+
+    def handle_project_documents_patch(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        data = self.get_request_json(request)
+
+        try:
+            document_id = self.parse_int(data.get("id"), "id")
+            folder_id = self.parse_int(data.get("folder_id"), "folder_id")
+            self.require_fields({"id": document_id}, "id")
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        try:
+            document = self.project_document_service.move_document(
+                document_id,
+                folder_id=folder_id,
+            )
+        except ProjectDocumentRequestError as error:
+            return self.error(str(error), 400)
+        except LookupError as error:
+            return self.error(str(error), 404)
+
+        return self.ok({"document": document})
+
+    def handle_project_document_folders_post(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        data = self.get_request_json(request)
+
+        try:
+            project_id = self.parse_int(data.get("project_id"), "project_id")
+            parent_folder_id = self.parse_int(data.get("parent_folder_id"), "parent_folder_id")
+            self.require_fields({"project_id": project_id}, "project_id")
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        try:
+            folder = self.project_document_service.create_folder(
+                project_id=project_id,
+                name=data.get("name"),
+                parent_folder_id=parent_folder_id,
+            )
+        except ProjectDocumentRequestError as error:
+            return self.error(str(error), 400)
+        except LookupError as error:
+            return self.error(str(error), 404)
+
+        return self.ok({"folder": folder}, 201)
+
+    def handle_project_document_folders_delete(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        try:
+            folder_id = self.parse_int(request.args.get("id"), "id")
+            self.require_fields({"id": folder_id}, "id")
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        try:
+            payload = self.project_document_service.delete_folder(folder_id)
         except LookupError as error:
             return self.error(str(error), 404)
 

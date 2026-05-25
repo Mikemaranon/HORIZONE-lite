@@ -17,7 +17,7 @@
             tabindex="-1"
         ></button>
 
-        <aside id="app-sidebar" class="sidebar" aria-label="Barra lateral">
+        <aside id="app-sidebar" class="sidebar" aria-label="Sidebar">
             <div class="sidebar__inner">
                 <div class="sidebar__top">
                     <div class="brand">
@@ -134,7 +134,7 @@
                                     aria-label="Open side navigation"
                                     aria-controls="app-sidebar"
                                     aria-expanded="false"
-                                    title="Mostrar u ocultar barra lateral"
+                                    title="Show or hide sidebar"
                                 >
                                     <span class="sidebar-toggle__icon" aria-hidden="true">
                                         <img
@@ -245,28 +245,44 @@
                                 </div>
                                 <div class="project-space__actions">
                                     <button
-                                        id="add-documents-button"
-                                        class="ghost-button"
-                                        type="button"
-                                    >
-                                        Add documents
-                                    </button>
-                                    <button
-                                        id="customize-project-button"
-                                        class="ghost-button"
-                                        type="button"
-                                    >
-                                        Customize
-                                    </button>
-                                    <button
                                         id="new-project-chat-button"
-                                        class="list-add-button list-add-button--large"
+                                        class="ghost-button project-space__new-chat-button"
                                         type="button"
                                         aria-label="Create chat in this project"
-                                        title="New project chat"
                                     >
-                                        +
+                                        New chat
                                     </button>
+                                    <div class="project-actions-menu">
+                                        <button
+                                            id="project-actions-menu-button"
+                                            class="icon-button project-actions-menu__button"
+                                            type="button"
+                                            aria-label="Open project actions"
+                                            aria-haspopup="menu"
+                                            aria-expanded="false"
+                                            aria-controls="project-actions-menu"
+                                        >
+                                            <span aria-hidden="true"></span>
+                                            <span aria-hidden="true"></span>
+                                            <span aria-hidden="true"></span>
+                                        </button>
+                                        <div
+                                            id="project-actions-menu"
+                                            class="project-actions-menu__panel"
+                                            role="menu"
+                                            hidden
+                                        >
+                                            <button id="add-documents-button" class="project-actions-menu__item" type="button" role="menuitem">
+                                                Add documents
+                                            </button>
+                                            <button id="customize-project-button" class="project-actions-menu__item" type="button" role="menuitem">
+                                                Customize
+                                            </button>
+                                            <button id="connect-workspace-button" class="project-actions-menu__item" type="button" role="menuitem">
+                                                Connect to workspace
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
@@ -523,7 +539,7 @@
 
     <div id="chat-export-modal" class="modal" hidden>
         <div class="modal__backdrop" data-close-chat-export-modal="true"></div>
-        <div class="modal__panel modal__panel--narrow">
+        <div class="modal__panel modal__panel--tool-trace">
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Export</p>
@@ -534,14 +550,14 @@
 
             <div class="modal__body">
                 <section class="settings-block chat-export">
-                    <h4>Formatos disponibles</h4>
+                    <h4>Available formats</h4>
                     <p id="chat-export-summary" class="chat-export__summary">
                         Choose how you want to download the current chat history.
                     </p>
                     <div class="chat-export__grid">
                         <button id="chat-export-json-button" class="chat-export__option" type="button">
                             <span class="chat-export__option-top">
-                                <strong>JSON completo</strong>
+                                <strong>Complete JSON</strong>
                                 <span>.json</span>
                             </span>
                             <span class="chat-export__option-copy">
@@ -550,7 +566,7 @@
                         </button>
                         <button id="chat-export-html-button" class="chat-export__option" type="button">
                             <span class="chat-export__option-top">
-                                <strong>HTML visual</strong>
+                                <strong>Visual HTML</strong>
                                 <span>.html</span>
                             </span>
                             <span class="chat-export__option-copy">
@@ -559,7 +575,7 @@
                         </button>
                         <button id="chat-export-markdown-button" class="chat-export__option" type="button">
                             <span class="chat-export__option-top">
-                                <strong>Markdown simple</strong>
+                                <strong>Simple Markdown</strong>
                                 <span>.md</span>
                             </span>
                             <span class="chat-export__option-copy">
@@ -575,7 +591,7 @@
 
     <div id="model-modal" class="modal" hidden>
         <div class="modal__backdrop" data-close-model-modal="true"></div>
-        <div class="modal__panel modal__panel--narrow">
+        <div class="modal__panel modal__panel--tool-trace">
             <div class="modal__header">
                 <div>
                     <p id="model-modal-eyebrow" class="modal__eyebrow">Model</p>
@@ -667,7 +683,7 @@
                         </label>
                         <label class="field field--stacked">
                             <span>Endpoint</span>
-                            <input id="provider-endpoint-input" type="url" placeholder="https://api.openai.com/v1 o http://localhost:11434/api">
+                            <input id="provider-endpoint-input" type="url" placeholder="https://api.openai.com/v1 or http://localhost:11434/api">
                         </label>
                         <label class="field field--stacked">
                             <span>API key</span>
@@ -888,25 +904,64 @@
 
     <div id="documents-modal" class="modal" hidden>
         <div class="modal__backdrop" data-close-documents-modal="true"></div>
-        <div class="modal__panel modal__panel--narrow">
+        <div class="modal__panel modal__panel--documents">
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Documents</p>
-                    <h3>Add documents</h3>
+                    <h3>Project library</h3>
                 </div>
                 <button id="close-documents-button" class="icon-button" type="button" aria-label="Close documents">×</button>
             </div>
 
             <div class="modal__body">
-                <section class="settings-block">
-                    <h4>Project files</h4>
-                    <label id="documents-dropzone" class="documents-dropzone" for="documents-input">
-                        <input id="documents-input" type="file" multiple hidden>
-                        <span class="documents-dropzone__title">Drop documents here</span>
-                        <span class="documents-dropzone__meta">You can also click to choose multiple files.</span>
-                    </label>
-                    <div id="documents-file-list" class="documents-file-list" aria-live="polite"></div>
-                </section>
+                <div class="documents-workspace">
+                    <section class="settings-block documents-panel documents-panel--tree">
+                        <div class="documents-panel__header">
+                            <div>
+                                <h4>Directory</h4>
+                                <p class="settings-block__copy">Choose where each file should live, then drop it into that folder if you need to reorganize it later.</p>
+                            </div>
+                        </div>
+
+                        <form id="documents-folder-form" class="documents-folder-form">
+                            <input
+                                id="documents-folder-input"
+                                class="documents-folder-form__input"
+                                type="text"
+                                maxlength="80"
+                                placeholder="New folder name"
+                            >
+                            <button class="action-button action-button--primary" type="submit">Create folder</button>
+                        </form>
+
+                        <div id="documents-directory-tree" class="documents-directory-tree" aria-live="polite"></div>
+                    </section>
+
+                    <section class="settings-block documents-panel documents-panel--files">
+                        <div class="documents-panel__header">
+                            <div>
+                                <h4 id="documents-current-folder-label">Project root</h4>
+                                <p id="documents-current-folder-meta" class="settings-block__copy">Files dropped here will be saved in the selected location.</p>
+                            </div>
+                            <button
+                                id="documents-delete-folder-button"
+                                class="ghost-button ghost-button--compact"
+                                type="button"
+                                hidden
+                            >
+                                Delete folder
+                            </button>
+                        </div>
+
+                        <label id="documents-dropzone" class="documents-dropzone documents-dropzone--compact" for="documents-input">
+                            <input id="documents-input" type="file" multiple hidden>
+                            <span class="documents-dropzone__title">Drop documents here</span>
+                            <span class="documents-dropzone__meta">You can also click to choose multiple files for the current folder.</span>
+                        </label>
+
+                        <div id="documents-file-list" class="documents-file-list documents-file-list--workspace" aria-live="polite"></div>
+                    </section>
+                </div>
             </div>
         </div>
     </div>
@@ -953,6 +1008,26 @@
                     <button id="tool-upload-submit-button" class="action-button action-button--primary" type="submit">Upload tool</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="tool-trace-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-tool-trace-modal="true"></div>
+        <div class="modal__panel modal__panel--tool-trace">
+            <div class="modal__header">
+                <div>
+                    <p id="tool-trace-modal-eyebrow" class="modal__eyebrow">Tool</p>
+                    <h3 id="tool-trace-modal-title">Tool details</h3>
+                </div>
+                <button id="close-tool-trace-button" class="icon-button" type="button" aria-label="Close tool details">×</button>
+            </div>
+
+            <div class="modal__body">
+                <section class="settings-block tool-trace">
+                    <p id="tool-trace-modal-summary" class="tool-trace__summary"></p>
+                    <div id="tool-trace-modal-content" class="tool-trace__content"></div>
+                </section>
+            </div>
         </div>
     </div>
 </body>

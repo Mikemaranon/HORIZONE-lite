@@ -338,10 +338,42 @@
     letter-spacing: 0.01em;
 }
 
+.message__tool-traces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.tool-status--interactive {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.tool-status--interactive:hover,
+.tool-status--interactive:focus-visible {
+    color: rgba(30, 31, 25, 0.82);
+    transform: translateY(-1px);
+}
+
+.tool-status--interactive:focus-visible {
+    outline: 2px solid rgba(28, 139, 89, 0.22);
+    outline-offset: 4px;
+    border-radius: 8px;
+}
+
 .tool-status__dot {
     width: 8px;
     height: 8px;
     border-radius: 999px;
     background: rgba(30, 31, 25, 0.38);
     animation: pulse 1.05s infinite ease-in-out;
+}
+
+.tool-status--interactive .tool-status__dot {
+    animation: none;
 }

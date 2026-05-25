@@ -319,6 +319,135 @@ class ApiEndpointTests(ApiTestCase):
         self.assertIn("Final rule: follow only the active profile.", captured["messages"][0]["content"])
         self.assertEqual(captured["messages"][1]["content"], "Prepare the launch.")
 
+    def test_chat_endpoint_reconstructs_active_history_from_sqlite(self):
+        profile_id = self.db.profiles.create(
+            name="Historian",
+            system_prompt="Use prior facts from this chat only.",
+            is_default=True,
+        )
+        conversation_id = self.db.conversations.create(
+            title="Server history",
+            profile_id=profile_id,
+            provider="openai",
+            model="gpt-4.1",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="The launch codename is Aurora.",
+            position=0,
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="I will remember Aurora for this chat.",
+            position=1,
+            profile_id=profile_id,
+            profile_name="Historian",
+        )
+
+        captured = {}
+
+        def fake_chat(provider, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Aurora is the codename.",
+                },
+                "message_id": "resp-history-1",
+                "usage": {},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "What is the codename?"}],
+            },
+            headers=self.auth_headers,
+        )
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("[CONVERSATION HISTORY - READ ONLY]", captured["messages"][0]["content"])
+        self.assertIn("The launch codename is Aurora.", captured["messages"][0]["content"])
+        self.assertIn("I will remember Aurora for this chat.", captured["messages"][0]["content"])
+        self.assertEqual(captured["messages"][1]["content"], "What is the codename?")
+        self.assertEqual(len(stored_messages), 4)
+        self.assertEqual(stored_messages[2]["content"], "What is the codename?")
+
+    def test_project_chats_share_project_context_but_not_sibling_chat_memory(self):
+        project_id = self.db.projects.create(
+            "Client Alpha",
+            "Workspace for Alpha.",
+            "Use Alpha project instructions.",
+        )
+        first_conversation_id = self.db.conversations.create(
+            title="First chat",
+            project_id=project_id,
+            provider="openai",
+            model="gpt-4.1",
+        )
+        second_conversation_id = self.db.conversations.create(
+            title="Second chat",
+            project_id=project_id,
+            provider="openai",
+            model="gpt-4.1",
+        )
+        self.db.messages.create(
+            conversation_id=first_conversation_id,
+            role="user",
+            content="Sibling-only secret is Blue Harbor.",
+            position=0,
+        )
+        self.db.messages.create(
+            conversation_id=first_conversation_id,
+            role="assistant",
+            content="Noted Blue Harbor.",
+            position=1,
+        )
+
+        captured = {}
+
+        def fake_chat(provider, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "I only have this chat and project context.",
+                },
+                "message_id": "resp-project-memory-1",
+                "usage": {},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": second_conversation_id,
+                "messages": [{"role": "user", "content": "What do you know here?"}],
+            },
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Active project: Client Alpha", captured["messages"][0]["content"])
+        self.assertIn("Use Alpha project instructions.", captured["messages"][0]["content"])
+        self.assertNotIn("Sibling-only secret", captured["messages"][0]["content"])
+        self.assertNotIn("Blue Harbor", captured["messages"][0]["content"])
+
     def test_conversation_export_returns_messages_and_reconstructed_generation_context(self):
         project_id = self.db.projects.create(
             "Export Demo",
@@ -575,6 +704,7 @@ class ApiEndpointTests(ApiTestCase):
         listed_documents = list_response.get_json()["documents"]
         first_document_id = upload_payload["documents"][0]["id"]
         stored_document = self.db.project_documents.get(first_document_id)
+        stored_chunks = self.db.project_document_chunks.for_document(first_document_id)
 
         delete_response = self.client.delete(
             f"/api/projects/documents?id={first_document_id}",
@@ -588,11 +718,151 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(upload_response.status_code, 201)
         self.assertEqual(len(upload_payload["documents"]), 2)
         self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.get_json()["folders"], [])
         self.assertEqual(len(listed_documents), 2)
         self.assertEqual(listed_documents[0]["filename"], "brief.txt")
         self.assertIn("Project summary", stored_document["text_content"])
+        self.assertEqual(len(stored_chunks), 1)
+        self.assertIn("Project summary", stored_chunks[0]["text_content"])
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(len(list_after_delete.get_json()["documents"]), 1)
+
+    def test_project_delete_detaches_conversations_and_removes_documents(self):
+        project_id = self.db.projects.create("Project to delete", "Keep chats")
+        conversation_id = self.db.conversations.create(
+            title="Keep me",
+            project_id=project_id,
+            provider="openai",
+            model="gpt-4.1",
+        )
+        document_id = self.db.project_documents.create(
+            project_id=project_id,
+            filename="notes.txt",
+            content_type="text/plain",
+            size_bytes=12,
+            text_content="Delete me too",
+        )
+        self.db.project_document_chunks.replace_for_document(
+            document_id=document_id,
+            project_id=project_id,
+            chunks=[{"chunk_index": 0, "text_content": "Delete me too"}],
+        )
+
+        response = self.client.delete(
+            f"/api/projects?id={project_id}",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+        detached_conversation = self.db.conversations.get(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["deleted"])
+        self.assertEqual(payload["conversation_retention"], "detached")
+        self.assertEqual(payload["orphaned_conversation_count"], 1)
+        self.assertIsNone(detached_conversation["project_id"])
+        self.assertIsNone(self.db.project_documents.get(document_id))
+        self.assertEqual(self.db.project_document_chunks.for_document(document_id), [])
+
+    def test_project_document_folders_support_upload_and_move_flow(self):
+        project_id = self.db.projects.create("Docs", "Tree")
+
+        create_specs_response = self.client.post(
+            "/api/projects/document-folders",
+            json={
+                "project_id": project_id,
+                "name": "Specs",
+            },
+            headers=self.auth_headers,
+        )
+        specs_folder = create_specs_response.get_json()["folder"]
+
+        create_archived_response = self.client.post(
+            "/api/projects/document-folders",
+            json={
+                "project_id": project_id,
+                "name": "Archived",
+                "parent_folder_id": specs_folder["id"],
+            },
+            headers=self.auth_headers,
+        )
+        archived_folder = create_archived_response.get_json()["folder"]
+
+        upload_response = self.client.post(
+            "/api/projects/documents",
+            data={
+                "project_id": str(project_id),
+                "folder_id": str(specs_folder["id"]),
+                "files": [
+                    (io.BytesIO(b"v1 spec"), "spec-v1.txt"),
+                ],
+            },
+            headers=self.auth_headers,
+            content_type="multipart/form-data",
+        )
+        uploaded_document = upload_response.get_json()["documents"][0]
+
+        move_response = self.client.patch(
+            "/api/projects/documents",
+            json={
+                "id": uploaded_document["id"],
+                "folder_id": archived_folder["id"],
+            },
+            headers=self.auth_headers,
+        )
+        list_response = self.client.get(
+            f"/api/projects/documents?project_id={project_id}",
+            headers=self.auth_headers,
+        )
+        payload = list_response.get_json()
+        moved_document = move_response.get_json()["document"]
+
+        self.assertEqual(create_specs_response.status_code, 201)
+        self.assertEqual(create_archived_response.status_code, 201)
+        self.assertEqual(upload_response.status_code, 201)
+        self.assertEqual(uploaded_document["folder_id"], specs_folder["id"])
+        self.assertEqual(uploaded_document["path"], "Specs/spec-v1.txt")
+        self.assertEqual(move_response.status_code, 200)
+        self.assertEqual(moved_document["folder_id"], archived_folder["id"])
+        self.assertEqual(moved_document["path"], "Specs/Archived/spec-v1.txt")
+        self.assertEqual(
+            {folder["path"] for folder in payload["folders"]},
+            {"Specs", "Specs/Archived"},
+        )
+        self.assertEqual(payload["documents"][0]["path"], "Specs/Archived/spec-v1.txt")
+
+    def test_project_document_folder_can_be_deleted_without_losing_documents(self):
+        project_id = self.db.projects.create("Docs", "Delete tree")
+        specs_folder_id = self.db.project_document_folders.create(project_id, "Specs")
+        nested_folder_id = self.db.project_document_folders.create(
+            project_id,
+            "Archived",
+            parent_folder_id=specs_folder_id,
+        )
+        document_id = self.db.project_documents.create(
+            project_id=project_id,
+            filename="brief.txt",
+            content_type="text/plain",
+            size_bytes=5,
+            text_content="brief",
+            folder_id=nested_folder_id,
+        )
+
+        delete_response = self.client.delete(
+            f"/api/projects/document-folders?id={specs_folder_id}",
+            headers=self.auth_headers,
+        )
+        list_response = self.client.get(
+            f"/api/projects/documents?project_id={project_id}",
+            headers=self.auth_headers,
+        )
+        payload = list_response.get_json()
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.get_json()["folder_id"], specs_folder_id)
+        self.assertEqual(payload["folders"], [])
+        self.assertEqual(payload["documents"][0]["id"], document_id)
+        self.assertIsNone(payload["documents"][0]["folder_id"])
+        self.assertEqual(payload["documents"][0]["path"], "brief.txt")
 
     def test_project_documents_reject_unsupported_binary_files(self):
         project_id = self.db.projects.create("Docs", "Subidas")
@@ -612,7 +882,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("not a supported text format", response.get_json()["error"])
 
-    def test_chat_endpoint_generates_title_before_first_response(self):
+    def test_chat_endpoint_assigns_provisional_title_before_first_response(self):
         conversation_id = self.db.conversations.create(
             title="New conversation",
             provider="openai",
@@ -659,13 +929,11 @@ class ApiEndpointTests(ApiTestCase):
         conversation = self.db.conversations.get(conversation_id)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(calls[0][0], "title")
-        self.assertEqual(calls[1][0], "chat")
-        self.assertEqual(calls[0][1:], ("openai", "gpt-4.1", "Explain quantum computing to me"))
-        self.assertEqual(conversation["title"], "Quantum computing")
-        self.assertEqual(payload["conversation"]["title"], "Quantum computing")
+        self.assertEqual(calls, [("chat", "openai", "gpt-4.1", "Explain quantum computing to me")])
+        self.assertEqual(conversation["title"], "Explain quantum computing to me")
+        self.assertEqual(payload["conversation"]["title"], "Explain quantum computing to me")
 
-    def test_chat_endpoint_keeps_responding_if_title_generation_fails(self):
+    def test_chat_endpoint_uses_provisional_title_without_model_title_generation(self):
         conversation_id = self.db.conversations.create(
             title="New conversation",
             provider="mlx",
@@ -705,7 +973,7 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["response"]["message"]["content"], "We keep responding")
-        self.assertEqual(conversation["title"], "New conversation")
+        self.assertEqual(conversation["title"], "Hello")
 
     def test_chat_endpoint_persists_user_message_even_when_provider_fails(self):
         conversation_id = self.db.conversations.create(

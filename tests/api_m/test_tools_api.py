@@ -137,3 +137,177 @@ def run(arguments):
             payload["response"]["raw"]["tool_events"][0]["tool_name"],
             "current_date_override",
         )
+        self.assertIn(
+            "2026-05-12",
+            payload["response"]["raw"]["tool_events"][0]["tool_summary"],
+        )
+
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+        stored_tool_event = stored_messages[-1]["tool_events"][0]
+        self.assertEqual(stored_tool_event["tool_name"], "current_date_override")
+        self.assertIn("2026-05-12", stored_tool_event["tool_summary"])
+
+    def test_chat_endpoint_rechecks_temporal_claim_after_correction(self):
+        tool = self.db.tools.get_by_name("web_search")
+        self.client.patch(
+            "/api/tools",
+            json={"id": tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="KOI check",
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="when did KOI, league of legends team played last time?",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="KOI last played on November 18, 2023.",
+            profile_id=profile["id"],
+            profile_name=profile["name"],
+        )
+
+        runtime_tool = self.api_manager.services.tool_registry._runtime_catalog["web_search"]
+        runtime_tool["runner"] = lambda arguments: {
+            "query": arguments.get("query", ""),
+            "results": [
+                {
+                    "title": "Liquipedia",
+                    "url": "https://example.com/liquipedia",
+                    "snippet": "Recent KOI result",
+                }
+            ],
+            "result_count": 1,
+        }
+
+        captured = {}
+
+        def fake_chat(provider, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "I rechecked it and found a more recent match.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-koi-recheck-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [
+                    {"role": "user", "content": "when did KOI, league of legends team played last time?"},
+                    {"role": "assistant", "content": "KOI last played on November 18, 2023."},
+                    {"role": "user", "content": "incorrect, you didnt look it up"},
+                ],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [message["role"] for message in captured["messages"]],
+            ["system", "user", "assistant", "user"],
+        )
+        self.assertEqual(
+            payload["response"]["raw"]["tool_events"][0]["tool_name"],
+            "web_search",
+        )
+        self.assertEqual(
+            payload["response"]["raw"]["tool_events"][0]["arguments"]["query"],
+            "when did KOI, league of legends team played last time",
+        )
+
+    def test_chat_endpoint_prioritizes_current_date_over_web_search_for_date_questions(self):
+        date_tool = self.db.tools.get_by_name("current_date")
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.client.patch(
+            "/api/tools",
+            json={"id": date_tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+        self.client.patch(
+            "/api/tools",
+            json={"id": search_tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Date first",
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        self.api_manager.services.tool_registry._runtime_catalog["current_date"]["runner"] = (
+            lambda arguments: {
+                "date": "2026-05-25",
+                "time": "09:45:00",
+                "timezone": "Europe/Madrid",
+            }
+        )
+        self.api_manager.services.tool_registry._runtime_catalog["web_search"]["runner"] = (
+            lambda arguments: {
+                "query": arguments.get("query", ""),
+                "results": [],
+                "result_count": 0,
+            }
+        )
+
+        captured = {}
+
+        def fake_chat(provider, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Today's date is 2026-05-25.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-date-priority-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "What's today's date?"}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [message["role"] for message in captured["messages"]],
+            ["system", "user", "assistant", "user"],
+        )
+        self.assertEqual(
+            payload["response"]["raw"]["tool_events"][0]["tool_name"],
+            "current_date",
+        )

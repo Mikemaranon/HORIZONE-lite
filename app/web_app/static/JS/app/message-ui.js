@@ -1,6 +1,7 @@
 import { elements } from "./dom.js";
 import { createModelAvatarMarkup, escapeHtml } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
+import { closeToolTraceModal, openToolTraceModal } from "./modal-ui.js";
 import {
     getModelConfigById,
     getModelDisplayNameById,
@@ -11,6 +12,7 @@ import {
 import { state } from "./state.js";
 
 const MESSAGES_AUTO_SCROLL_THRESHOLD = 24;
+let messageClientKeyCounter = 0;
 
 
 export function createMessageMarkup(message) {
@@ -20,10 +22,14 @@ export function createMessageMarkup(message) {
     const renderedContent = isUser
         ? escapeHtml(message.content || "")
         : renderMarkdown(message.content || "");
+    const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message);
 
     return createMessageFrameMarkup(
         message,
-        `<div class="message__content ${contentClass}" data-message-content="true">${renderedContent}</div>`,
+        `
+            <div class="message__content ${contentClass}" data-message-content="true">${renderedContent}</div>
+            ${persistentToolStatusMarkup}
+        `,
         createMessageMetaMarkup(message, roleLabel),
     );
 }
@@ -163,6 +169,34 @@ export function removeStreamingAssistantMessage() {
 }
 
 
+export function handleToolTraceMessageClick(event) {
+    const traceButton = event.target.closest("[data-tool-trace-button]");
+    if (!traceButton) {
+        return;
+    }
+
+    const messageKey = traceButton.dataset.messageKey || "";
+    const toolEventIndex = Number(traceButton.dataset.toolEventIndex);
+    const message = findMessageByKey(messageKey);
+    const toolEvents = Array.isArray(message?.tool_events) ? message.tool_events : [];
+    const toolEvent = toolEvents[toolEventIndex];
+
+    if (!toolEvent) {
+        return;
+    }
+
+    renderToolTraceModal(toolEvent);
+    openToolTraceModal();
+}
+
+
+export function handleToolTraceModalClick(event) {
+    if (event.target.dataset.closeToolTraceModal === "true") {
+        closeToolTraceModal();
+    }
+}
+
+
 export function createPendingAssistantMessage() {
     const selectedModel = getModelConfigById(getSelectedModelConfigId()) || null;
     const selectedProfileId = getSelectedProfileId();
@@ -180,6 +214,7 @@ export function createPendingAssistantMessage() {
 
 function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttributes = "") {
     const isUser = message.role === "user";
+    const messageKey = getOrCreateMessageClientKey(message);
     const avatarMarkup = isUser
         ? `<div class="message__avatar">YOU</div>`
         : createModelAvatarMarkup(
@@ -189,7 +224,7 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
         );
 
     return `
-        <article class="message message--${isUser ? "user" : "assistant"}"${articleAttributes}>
+        <article class="message message--${isUser ? "user" : "assistant"}" data-message-key="${escapeHtml(messageKey)}"${articleAttributes}>
             ${avatarMarkup}
             <div class="message__card">
                 <div class="message__meta">${metaMarkup}</div>
@@ -243,11 +278,201 @@ function createTypingIndicatorMarkup() {
 }
 
 
-function createToolStatusMarkup(toolDisplayName) {
+function createToolStatusMarkup(toolDisplayName, options = {}) {
+    const {
+        interactive = false,
+        messageKey = "",
+        toolEventIndex = 0,
+    } = options;
+    const label = interactive
+        ? `Tool used: ${escapeHtml(toolDisplayName)}`
+        : `Using tool: ${escapeHtml(toolDisplayName)}`;
+    if (!interactive) {
+        return `
+            <p class="tool-status" aria-live="polite">
+                <span class="tool-status__dot" aria-hidden="true"></span>
+                <span>${label}</span>
+            </p>
+        `;
+    }
+
     return `
-        <p class="tool-status" aria-live="polite">
+        <button
+            class="tool-status tool-status--interactive"
+            type="button"
+            data-tool-trace-button="true"
+            data-message-key="${escapeHtml(messageKey)}"
+            data-tool-event-index="${toolEventIndex}"
+        >
             <span class="tool-status__dot" aria-hidden="true"></span>
-            <span>Using tool: ${escapeHtml(toolDisplayName)}</span>
-        </p>
+            <span>${label}</span>
+        </button>
+    `;
+}
+
+
+function createPersistentToolStatusListMarkup(message) {
+    const toolEvents = Array.isArray(message?.tool_events) ? message.tool_events : [];
+    if (!toolEvents.length) {
+        return "";
+    }
+
+    const messageKey = getOrCreateMessageClientKey(message);
+    const itemsMarkup = toolEvents.map((toolEvent, index) => {
+        const toolDisplayName = resolveToolDisplayName(toolEvent);
+        return createToolStatusMarkup(toolDisplayName, {
+            interactive: true,
+            messageKey,
+            toolEventIndex: index,
+        });
+    }).join("");
+
+    return `<div class="message__tool-traces">${itemsMarkup}</div>`;
+}
+
+
+function getOrCreateMessageClientKey(message) {
+    if (message?.id) {
+        return `message-${message.id}`;
+    }
+
+    if (!message.__clientKey) {
+        messageClientKeyCounter += 1;
+        message.__clientKey = `local-message-${messageClientKeyCounter}`;
+    }
+
+    return message.__clientKey;
+}
+
+
+function findMessageByKey(messageKey) {
+    return (state.activeMessages || []).find((message) => getOrCreateMessageClientKey(message) === messageKey) || null;
+}
+
+
+function resolveToolDisplayName(toolEvent) {
+    return String(toolEvent?.tool_display_name || toolEvent?.tool_name || "tool")
+        .replace(/_/g, " ")
+        .trim();
+}
+
+
+function renderToolTraceModal(toolEvent) {
+    const toolDisplayName = resolveToolDisplayName(toolEvent);
+    const toolName = String(toolEvent?.tool_name || "tool").trim();
+    const toolSummary = String(toolEvent?.tool_summary || "").trim();
+
+    if (elements.toolTraceModalEyebrow) {
+        elements.toolTraceModalEyebrow.textContent = "Tool";
+    }
+    if (elements.toolTraceModalTitle) {
+        elements.toolTraceModalTitle.textContent = toolDisplayName;
+    }
+    if (elements.toolTraceModalSummary) {
+        elements.toolTraceModalSummary.textContent = toolSummary || `${toolDisplayName} details`;
+    }
+    if (elements.toolTraceModalContent) {
+        elements.toolTraceModalContent.innerHTML = createToolTraceContentMarkup(toolName, toolEvent);
+    }
+}
+
+
+function createToolTraceContentMarkup(toolName, toolEvent) {
+    if (!toolEvent?.ok) {
+        return `
+            <div class="tool-trace__group">
+                <h4>Status</h4>
+                <p>${escapeHtml(String(toolEvent?.error || "The tool could not complete."))}</p>
+            </div>
+        `;
+    }
+
+    if (toolName === "web_search") {
+        return createWebSearchTraceMarkup(toolEvent);
+    }
+
+    if (toolName === "current_date") {
+        return createCurrentDateTraceMarkup(toolEvent);
+    }
+
+    return createGenericToolTraceMarkup(toolEvent);
+}
+
+
+function createWebSearchTraceMarkup(toolEvent) {
+    const result = toolEvent?.result || {};
+    const query = String(toolEvent?.arguments?.query || result?.query || "").trim();
+    const results = Array.isArray(result?.results) ? result.results : [];
+    const resultCount = Number(result?.result_count || results.length || 0);
+
+    const headerMarkup = `
+        <div class="tool-trace__group">
+            <h4>Search query</h4>
+            <p>${escapeHtml(query || "No query recorded.")}</p>
+            <p class="tool-trace__meta">${escapeHtml(`${resultCount} result${resultCount === 1 ? "" : "s"}`)}</p>
+        </div>
+    `;
+
+    const resultsMarkup = results.length
+        ? results.map((item, index) => `
+            <article class="tool-trace-result">
+                <div class="tool-trace-result__index">${index + 1}</div>
+                <div class="tool-trace-result__body">
+                    <a class="tool-trace-result__title" href="${escapeHtml(String(item?.url || "#"))}" target="_blank" rel="noreferrer">
+                        ${escapeHtml(String(item?.title || item?.url || "Search result"))}
+                    </a>
+                </div>
+            </article>
+        `).join("")
+        : `<p class="tool-trace__empty">No search results were recorded for this tool run.</p>`;
+
+    return `
+        ${headerMarkup}
+        <div class="tool-trace__group">
+            <h4>Visited results</h4>
+            <div class="tool-trace-results">${resultsMarkup}</div>
+        </div>
+    `;
+}
+
+
+function createCurrentDateTraceMarkup(toolEvent) {
+    const result = toolEvent?.result || {};
+    const fields = [
+        ["Date", result?.date],
+        ["Time", result?.time],
+        ["Timezone", result?.timezone],
+        ["ISO datetime", result?.iso_datetime],
+    ].filter(([, value]) => String(value || "").trim());
+
+    const rowsMarkup = fields.map(([label, value]) => `
+        <div class="tool-trace-kv">
+            <span class="tool-trace-kv__label">${escapeHtml(label)}</span>
+            <span class="tool-trace-kv__value">${escapeHtml(String(value))}</span>
+        </div>
+    `).join("");
+
+    return `
+        <div class="tool-trace__group">
+            <h4>Returned values</h4>
+            <div class="tool-trace-kv-list">${rowsMarkup}</div>
+        </div>
+    `;
+}
+
+
+function createGenericToolTraceMarkup(toolEvent) {
+    const argumentsMarkup = escapeHtml(JSON.stringify(toolEvent?.arguments || {}, null, 2));
+    const resultMarkup = escapeHtml(JSON.stringify(toolEvent?.result || {}, null, 2));
+
+    return `
+        <div class="tool-trace__group">
+            <h4>Arguments</h4>
+            <pre class="tool-trace__pre"><code>${argumentsMarkup}</code></pre>
+        </div>
+        <div class="tool-trace__group">
+            <h4>Result</h4>
+            <pre class="tool-trace__pre"><code>${resultMarkup}</code></pre>
+        </div>
     `;
 }

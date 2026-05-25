@@ -195,13 +195,216 @@ def run(arguments):
 
         self.assertEqual(
             [message["role"] for message in captured["messages"]],
-            ["system", "user", "assistant", "user"],
+            ["user", "assistant", "user"],
         )
         self.assertIn("Mikemaranon's GitHub profile", captured["messages"][-1]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
         self.assertEqual(
             response["raw"]["tool_events"][0]["arguments"]["query"],
             "for Mikemaranon's GitHub profile",
+        )
+
+    def test_chat_skips_tool_catalog_for_regular_prompts(self):
+        tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(tool["id"], True)
+        captured = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Soft rain drifts over the hill.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-haiku-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "Write a haiku about rain."}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(
+            captured["messages"],
+            [{"role": "user", "content": "Write a haiku about rain."}],
+        )
+        self.assertEqual(response["message"]["content"], "Soft rain drifts over the hill.")
+        self.assertNotIn("tool_events", response.get("raw", {}))
+
+    def test_time_sensitive_query_forces_web_search_without_explicit_search_command(self):
+        tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(tool["id"], True)
+        self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
+            "query": arguments.get("query", ""),
+            "results": [
+                {
+                    "title": "Liquipedia",
+                    "url": "https://example.com/liquipedia",
+                    "snippet": "Latest KOI match page",
+                }
+            ],
+            "result_count": 1,
+        }
+
+        captured = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "KOI last played on March 10, 2024.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-koi-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "when did KOI, league of legends team played last time?"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(
+            [message["role"] for message in captured["messages"]],
+            ["user", "assistant", "user"],
+        )
+        self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
+        self.assertEqual(
+            response["raw"]["tool_events"][0]["arguments"]["query"],
+            "when did KOI, league of legends team played last time",
+        )
+
+    def test_current_date_has_priority_over_web_search_for_direct_date_questions(self):
+        date_tool = self.db.tools.get_by_name("current_date")
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(date_tool["id"], True)
+        self.manager.set_tool_active(search_tool["id"], True)
+        self.registry._runtime_catalog["current_date"]["runner"] = lambda arguments: {
+            "date": "2026-05-25",
+            "time": "09:45:00",
+            "timezone": "Europe/Madrid",
+        }
+        self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
+            "query": arguments.get("query", ""),
+            "results": [],
+            "result_count": 0,
+        }
+
+        captured = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Today's date is 2026-05-25.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-current-date-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "What's today's date?"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(
+            [message["role"] for message in captured["messages"]],
+            ["user", "assistant", "user"],
+        )
+        self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "current_date")
+        self.assertEqual(
+            response["raw"]["tool_events"][0]["result"]["date"],
+            "2026-05-25",
+        )
+
+    def test_correction_follow_up_reuses_previous_user_question_for_web_search(self):
+        tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(tool["id"], True)
+        self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
+            "query": arguments.get("query", ""),
+            "results": [
+                {
+                    "title": "Ensigame",
+                    "url": "https://example.com/ensigame",
+                    "snippet": "Recent KOI result",
+                }
+            ],
+            "result_count": 1,
+        }
+
+        captured = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "I looked it up and found a more recent match.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-correction-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        system_message = {
+            "role": "system",
+            "content": (
+                "[CONVERSATION HISTORY - READ ONLY]\n"
+                "[Previous user message]\n"
+                "Content:\n"
+                "when did KOI, league of legends team played last time?\n\n"
+                "[Previous assistant message]\n"
+                "Content:\n"
+                "KOI last played on November 18, 2023."
+            ),
+        }
+
+        response = self.manager.chat(
+            "ollama",
+            [system_message, {"role": "user", "content": "incorrect, you didnt look it up"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(
+            [message["role"] for message in captured["messages"]],
+            ["system", "user", "assistant", "user"],
+        )
+        self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
+        self.assertEqual(
+            response["raw"]["tool_events"][0]["arguments"]["query"],
+            "when did KOI, league of legends team played last time",
         )
 
     def test_extract_tool_call_accepts_json_with_prefix_text(self):
