@@ -1,17 +1,21 @@
 import {
+    connectProjectWorkspace,
     createProjectDocumentFolder,
     createConversation,
     createProject,
+    deleteProjectWorkspace,
     deleteProjectDocumentFolder,
     deleteProject,
     deleteProjectDocument,
+    indexProjectWorkspace,
+    loadWorkspaceFiles,
     moveProjectDocument,
     updateProject,
     uploadProjectDocuments,
 } from "../api.js";
 import { renderApp } from "../app-runtime.js";
 import { setLoading } from "../composer-ui.js";
-import { requestProjectDetails, confirmAction } from "../dialogs.js";
+import { requestProjectDetails, requestWorkspaceDetails, confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
 import { openDocumentsModal, closeProjectCustomizeModal } from "../modal-ui.js";
 import { renderDocumentsFileList } from "../render.js";
@@ -19,6 +23,8 @@ import { getActiveProject, getSelectedProfileId } from "../selectors.js";
 import {
     applyConversationsPayload,
     applyProjectDocumentsPayload,
+    applyProjectWorkspacePayload,
+    applyWorkspaceFilesPayload,
     applyProjectsPayload,
     clearActiveConversation,
     enterHomeWorkspace,
@@ -26,11 +32,13 @@ import {
     setActiveProjectDocumentFolderId,
     setProjectDocumentFolders,
     setProjectDocuments,
+    setProjectWorkspace,
+    setProjectWorkspaceFiles,
     setStagedDocuments,
 } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
-import { loadConversations, loadProjectDocuments, loadProjects } from "../store.js";
+import { loadConversations, loadProjectDocuments, loadProjectWorkspace, loadProjects } from "../store.js";
 import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
 
 
@@ -38,11 +46,18 @@ export async function handleProjectSelect(projectId, { closeSidebarOnMobile }) {
     enterProjectWorkspace(projectId);
 
     try {
-        const data = await loadProjectDocuments(projectId);
-        applyProjectDocumentsPayload(data);
+        const [documentsData, workspaceData] = await Promise.all([
+            loadProjectDocuments(projectId),
+            loadProjectWorkspace(projectId),
+        ]);
+        applyProjectDocumentsPayload(documentsData);
+        applyProjectWorkspacePayload(workspaceData);
+        await refreshWorkspaceFilesIfConnected();
     } catch (error) {
         setProjectDocuments([]);
         setProjectDocumentFolders([]);
+        setProjectWorkspace(null);
+        setProjectWorkspaceFiles([]);
         setActiveProjectDocumentFolderId(null);
         showStatus(error.message || "The project documents could not be loaded.", true);
     }
@@ -157,9 +172,26 @@ export function handleProjectActionsDocumentClick(event) {
 }
 
 
-export function handleProjectConnectWorkspace() {
+export async function handleProjectConnectWorkspace() {
     closeProjectActionsMenu();
-    showStatus("Connect to workspace is ready for the next design step.");
+    await openWorkspaceConnectionFlow();
+}
+
+
+export async function handleProjectWorkspaceDocumentClick(event) {
+    if (event.target.closest("[data-connect-project-workspace]")) {
+        await openWorkspaceConnectionFlow();
+        return;
+    }
+
+    if (event.target.closest("[data-reindex-project-workspace]")) {
+        await handleProjectWorkspaceReindex();
+        return;
+    }
+
+    if (event.target.closest("[data-disconnect-project-workspace]")) {
+        await handleProjectWorkspaceDisconnect();
+    }
 }
 
 
@@ -524,6 +556,100 @@ async function moveDocumentToFolder(documentId, folderId) {
 async function refreshProjectDocuments(projectId) {
     const data = await loadProjectDocuments(projectId);
     applyProjectDocumentsPayload(data);
+}
+
+
+async function openWorkspaceConnectionFlow() {
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        showStatus("Select a project first.", true);
+        return;
+    }
+
+    const workspaceDetails = await requestWorkspaceDetails(state.projectWorkspace);
+    if (!workspaceDetails) {
+        return;
+    }
+
+    try {
+        setLoading(true);
+        const payload = await connectProjectWorkspace({
+            project_id: activeProject.id,
+            ...workspaceDetails,
+        });
+        applyProjectWorkspacePayload(payload);
+        await refreshWorkspaceFilesIfConnected();
+        renderApp();
+        showStatus("Workspace connected and indexed.");
+    } catch (error) {
+        showStatus(error.message || "The workspace could not be connected.", true);
+    } finally {
+        setLoading(false);
+    }
+}
+
+
+async function handleProjectWorkspaceReindex() {
+    if (!state.projectWorkspace) {
+        showStatus("Connect a workspace first.", true);
+        return;
+    }
+
+    try {
+        setLoading(true);
+        const payload = await indexProjectWorkspace(state.projectWorkspace.id);
+        applyProjectWorkspacePayload(payload);
+        await refreshWorkspaceFilesIfConnected();
+        renderApp();
+        showStatus("Workspace index refreshed.");
+    } catch (error) {
+        showStatus(error.message || "The workspace could not be indexed.", true);
+    } finally {
+        setLoading(false);
+    }
+}
+
+
+async function handleProjectWorkspaceDisconnect() {
+    if (!state.projectWorkspace) {
+        return;
+    }
+
+    const confirmed = await confirmAction({
+        eyebrow: "Workspace",
+        title: `Disconnect "${state.projectWorkspace.display_name}"`,
+        message: "This removes the link from the project. Local files stay untouched.",
+        confirmLabel: "Disconnect",
+        confirmVariant: "danger",
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        setLoading(true);
+        await deleteProjectWorkspace(state.projectWorkspace.id);
+        setProjectWorkspace(null);
+        setProjectWorkspaceFiles([]);
+        renderApp();
+        showStatus("Workspace disconnected.");
+    } catch (error) {
+        showStatus(error.message || "The workspace could not be disconnected.", true);
+    } finally {
+        setLoading(false);
+    }
+}
+
+
+async function refreshWorkspaceFilesIfConnected() {
+    if (!state.projectWorkspace) {
+        setProjectWorkspaceFiles([]);
+        return;
+    }
+
+    const payload = await loadWorkspaceFiles(state.projectWorkspace.id);
+    applyWorkspaceFilesPayload(payload);
 }
 
 

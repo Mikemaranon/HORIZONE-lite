@@ -82,6 +82,7 @@ import {
     handleProjectDocumentFolderCreate,
     handleProjectDocumentFolderDelete,
     handleProjectDocumentFolderSelect,
+    handleProjectWorkspaceDocumentClick,
     handleDocumentsSelected,
     handleNewProject,
     handleNewProjectChat,
@@ -301,6 +302,7 @@ export function bindUI() {
     });
     document.addEventListener("click", (event) => handleDocumentClick(event, { handleProjectDocumentDelete }));
     document.addEventListener("click", handleProjectActionsDocumentClick);
+    document.addEventListener("click", handleProjectWorkspaceDocumentClick);
     document.addEventListener("click", handleDocumentToolClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();

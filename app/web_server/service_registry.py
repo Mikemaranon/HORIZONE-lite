@@ -8,8 +8,10 @@ from api_m.services import (
     ProjectContextRetrievalService,
     ProjectDocumentService,
     ProjectService,
+    WorkspaceService,
 )
 from tool_m import ToolExecutor, ToolLoader, ToolManager, ToolRegistry
+from tool_m import WorkspaceToolProvider
 
 
 class ServiceRegistry:
@@ -33,12 +35,15 @@ class ServiceRegistry:
             default_is_active=False,
         )
         self.tool_executor = ToolExecutor(db_manager)
+        self.workspace_service = WorkspaceService(db_manager)
+        self.workspace_tool_provider = WorkspaceToolProvider(self.workspace_service)
         self.tool_manager = ToolManager(
             db_manager=db_manager,
             model_manager=model_manager,
             tool_loader=self.tool_loader,
             tool_registry=self.tool_registry,
             tool_executor=self.tool_executor,
+            workspace_tool_provider=self.workspace_tool_provider,
         )
 
         self.document_ingestion_service = DocumentIngestionService()

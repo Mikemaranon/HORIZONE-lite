@@ -19,6 +19,11 @@ from .project_service import (
     ProjectResourceNotFoundError,
     ProjectService,
 )
+from .workspace_service import (
+    WorkspaceRequestError,
+    WorkspaceResourceNotFoundError,
+    WorkspaceService,
+)
 
 __all__ = [
     "ChatContextBuilder",
@@ -36,4 +41,7 @@ __all__ = [
     "ProjectRequestError",
     "ProjectResourceNotFoundError",
     "ProjectService",
+    "WorkspaceRequestError",
+    "WorkspaceResourceNotFoundError",
+    "WorkspaceService",
 ]

@@ -42,6 +42,7 @@ class ChatStreamService:
         generation_settings,
         request_id,
         assistant_message_meta,
+        tool_context=None,
     ):
         cancel_event = self._register_stream(request_id)
 
@@ -62,14 +63,25 @@ class ChatStreamService:
                 final_response = None
                 streamed_text_parts = []
 
-                stream_source = self.tool_manager or self.model_manager
-                for event in stream_source.stream_chat(
-                    provider,
-                    input_messages,
-                    model,
-                    generation_settings,
-                    should_stop=cancel_event.is_set,
-                ):
+                if self.tool_manager:
+                    event_stream = self.tool_manager.stream_chat(
+                        provider,
+                        input_messages,
+                        model,
+                        generation_settings,
+                        should_stop=cancel_event.is_set,
+                        tool_context=tool_context,
+                    )
+                else:
+                    event_stream = self.model_manager.stream_chat(
+                        provider,
+                        input_messages,
+                        model,
+                        generation_settings,
+                        should_stop=cancel_event.is_set,
+                    )
+
+                for event in event_stream:
                     event_type = event.get("type")
 
                     if event_type == "delta":

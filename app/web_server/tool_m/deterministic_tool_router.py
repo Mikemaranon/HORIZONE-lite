@@ -114,6 +114,18 @@ class DeterministicToolRouter:
         "monday tuesday wednesday thursday friday saturday sunday "
         "lunes martes miércoles miercoles jueves viernes sábado sabado domingo"
     ).split()
+    WORKSPACE_CREATE_FILE_PATTERNS = [
+        r"\bcrea(?:r)?\s+(?:un\s+)?archivo\b",
+        r"\bcrear\s+(?:un\s+)?archivo\b",
+        r"\bgenera(?:r)?\s+(?:un\s+)?archivo\b",
+        r"\bguarda(?:r)?\s+(?:un\s+)?archivo\b",
+        r"\bcreate\s+(?:a\s+)?file\b",
+        r"\bwrite\s+(?:a\s+)?file\b",
+        r"\bsave\s+(?:a\s+)?file\b",
+    ]
+    FILE_PATH_PATTERN = re.compile(
+        r"(?P<path>(?:[\w.-]+/)*[\w.-]+\.[A-Za-z0-9_+-]{1,12})"
+    )
 
     def resolve(self, messages, active_tools):
         active_tool_names = {
@@ -125,6 +137,11 @@ class DeterministicToolRouter:
         previous_user_message = self._extract_previous_user_message(messages)
         if not last_user_message:
             return None
+
+        if "workspace_write_file" in active_tool_names:
+            workspace_write_call = self._resolve_workspace_write_file(last_user_message)
+            if workspace_write_call:
+                return workspace_write_call
 
         if "current_date" in active_tool_names and self._should_force_current_date(last_user_message):
             return {
@@ -166,6 +183,66 @@ class DeterministicToolRouter:
                 }
 
         return None
+
+    def _resolve_workspace_write_file(self, content):
+        normalized = str(content or "").strip()
+        lowered = normalized.lower()
+        if not normalized:
+            return None
+
+        if not any(re.search(pattern, lowered) for pattern in self.WORKSPACE_CREATE_FILE_PATTERNS):
+            return None
+
+        path = self._extract_file_path(normalized)
+        if not path:
+            return None
+
+        return {
+            "name": "workspace_write_file",
+            "arguments": {
+                "path": path,
+                "content": self._resolve_workspace_file_content(path, normalized),
+                "overwrite": False,
+                "create_dirs": "/" in path,
+            },
+        }
+
+    def _extract_file_path(self, content):
+        match = self.FILE_PATH_PATTERN.search(content)
+        if not match:
+            return ""
+
+        path = match.group("path").strip().strip("`'\".,:;!?")
+        return path.lstrip("/")
+
+    def _resolve_workspace_file_content(self, path, content):
+        explicit_content = self._extract_explicit_file_content(content)
+        if explicit_content:
+            return explicit_content
+
+        filename = path.rsplit("/", 1)[-1].lower()
+        if filename in {"helloworld.sh", "hello-world.sh"}:
+            return "#!/usr/bin/env bash\necho \"Hello, world!\"\n"
+
+        if path.lower().endswith(".sh"):
+            return "#!/usr/bin/env bash\n"
+
+        return ""
+
+    def _extract_explicit_file_content(self, content):
+        fenced_match = re.search(r"```(?:[A-Za-z0-9_+-]+)?\n(.*?)```", content, flags=re.DOTALL)
+        if fenced_match:
+            return fenced_match.group(1)
+
+        quoted_match = re.search(
+            r"(?:contenido|content)\s*(?:necesario)?\s*(?:es|:|=)\s*['\"](?P<content>.*?)['\"]",
+            content,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if quoted_match:
+            return quoted_match.group("content")
+
+        return ""
 
     def _get_last_user_message(self, messages):
         for message in reversed(messages or []):

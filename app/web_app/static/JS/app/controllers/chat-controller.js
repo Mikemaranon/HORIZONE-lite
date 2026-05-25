@@ -32,6 +32,9 @@ import {
     setActiveMessages,
     setGenerationStopRequested,
     setProjectDocuments,
+    setProjectWorkspace,
+    setProjectWorkspaceFiles,
+    applyProjectWorkspacePayload,
 } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
@@ -39,6 +42,7 @@ import {
     loadConversationDetail,
     loadConversations,
     loadProjectDocuments,
+    loadProjectWorkspace,
 } from "../store.js";
 
 
@@ -47,10 +51,16 @@ export async function handleConversationSelect(conversationId, { closeSidebarOnM
     applyConversationDetailPayload(data);
 
     if (state.activeProjectId) {
-        const documents = await loadProjectDocuments(state.activeProjectId);
+        const [documents, workspace] = await Promise.all([
+            loadProjectDocuments(state.activeProjectId),
+            loadProjectWorkspace(state.activeProjectId),
+        ]);
         setProjectDocuments(documents.documents || []);
+        applyProjectWorkspacePayload(workspace);
     } else {
         setProjectDocuments([]);
+        setProjectWorkspace(null);
+        setProjectWorkspaceFiles([]);
     }
 
     renderApp();

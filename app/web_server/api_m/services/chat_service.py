@@ -16,6 +16,7 @@ class ChatResourceNotFoundError(LookupError):
 class PreparedChatRequest:
     conversation_id: int | None
     conversation: dict | None
+    project: dict | None
     model_config_id: int | None
     provider: str
     model: str
@@ -92,6 +93,7 @@ class ChatService:
                 prepared.generation_settings,
                 prepared.request_id,
                 prepared.assistant_message_meta,
+                self._build_tool_context(prepared),
             )
 
         response = self._run_chat(prepared)
@@ -147,6 +149,7 @@ class ChatService:
         return PreparedChatRequest(
             conversation_id=conversation_id,
             conversation=conversation,
+            project=project,
             model_config_id=model_config_id,
             provider=provider,
             model=model,
@@ -175,6 +178,7 @@ class ChatService:
                     prepared.input_messages,
                     prepared.model,
                     prepared.generation_settings,
+                    tool_context=self._build_tool_context(prepared),
                 )
             else:
                 response = self.model_manager.chat(
@@ -194,6 +198,17 @@ class ChatService:
             )
 
         return response
+
+    def _build_tool_context(self, prepared):
+        workspace = None
+        if prepared.project:
+            workspace = self.db.project_workspaces.get_by_project(prepared.project["id"])
+
+        return {
+            "conversation_id": prepared.conversation_id,
+            "project": prepared.project,
+            "workspace": workspace,
+        }
 
     def _validate_messages(self, data):
         if "messages" not in data:

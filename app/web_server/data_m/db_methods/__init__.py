@@ -15,6 +15,10 @@ from .t_providers import ProvidersTable
 from .t_settings import SettingsTable
 from .t_models_cache import ModelsCacheTable
 from .t_tools import ToolsTable
+from .t_project_workspaces import ProjectWorkspacesTable
+from .t_workspace_command_runs import WorkspaceCommandRunsTable
+from .t_workspace_events import WorkspaceEventsTable
+from .t_workspace_file_index import WorkspaceFileIndexTable
 
 __all__ = [
     "UsersTable",
@@ -32,4 +36,8 @@ __all__ = [
     "SettingsTable",
     "ModelsCacheTable",
     "ToolsTable",
+    "ProjectWorkspacesTable",
+    "WorkspaceCommandRunsTable",
+    "WorkspaceEventsTable",
+    "WorkspaceFileIndexTable",
 ]

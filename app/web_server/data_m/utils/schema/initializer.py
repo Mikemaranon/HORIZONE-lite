@@ -4,6 +4,7 @@ from .migrations import SCHEMA_MIGRATIONS
 from .project_tables import PROJECT_SCHEMA_STATEMENTS
 from .settings_tables import SETTINGS_SCHEMA_STATEMENTS
 from .tool_tables import TOOL_SCHEMA_STATEMENTS
+from .workspace_tables import WORKSPACE_SCHEMA_STATEMENTS
 
 
 class DatabaseSchemaInitializer:
@@ -12,6 +13,7 @@ class DatabaseSchemaInitializer:
             CORE_SCHEMA_STATEMENTS
             + PROJECT_SCHEMA_STATEMENTS
             + CHAT_SCHEMA_STATEMENTS
+            + WORKSPACE_SCHEMA_STATEMENTS
             + SETTINGS_SCHEMA_STATEMENTS
             + TOOL_SCHEMA_STATEMENTS
         )

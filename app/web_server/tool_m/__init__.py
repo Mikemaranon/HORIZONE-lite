@@ -5,6 +5,7 @@ from .tool_executor import ToolExecutionError, ToolExecutor
 from .tool_loader import ToolLoader
 from .tool_manager import ToolManager
 from .tool_registry import ToolRegistry
+from .workspace_tools import WorkspaceToolProvider
 
 __all__ = [
     "DeterministicToolRouter",
@@ -15,4 +16,5 @@ __all__ = [
     "ToolLoader",
     "ToolManager",
     "ToolRegistry",
+    "WorkspaceToolProvider",
 ]

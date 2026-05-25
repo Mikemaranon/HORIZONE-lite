@@ -49,6 +49,14 @@ export async function loadProjectDocumentsData(projectId) {
 }
 
 
+export async function loadProjectWorkspaceData(projectId) {
+    return apiRequestJson(
+        "GET",
+        `/api/projects/workspace?project_id=${encodeURIComponent(projectId)}`
+    );
+}
+
+
 export async function loadConversationsData(projectId) {
     const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
     return apiRequestJson("GET", `/api/conversations${query}`);
@@ -118,6 +126,34 @@ export async function updateProject(data) {
 
 export async function deleteProject(projectId) {
     return apiRequestJson("DELETE", `/api/projects?id=${encodeURIComponent(projectId)}`);
+}
+
+
+export async function connectProjectWorkspace(data) {
+    return apiRequestJson("POST", "/api/projects/workspace", data);
+}
+
+
+export async function deleteProjectWorkspace(workspaceId) {
+    return apiRequestJson("DELETE", `/api/projects/workspace?id=${encodeURIComponent(workspaceId)}`);
+}
+
+
+export async function indexProjectWorkspace(workspaceId) {
+    return apiRequestJson("POST", "/api/workspaces/index", { workspace_id: workspaceId });
+}
+
+
+export async function loadWorkspaceFiles(workspaceId, query = "") {
+    const params = new URLSearchParams({
+        workspace_id: String(workspaceId),
+        limit: "20",
+    });
+    if (query) {
+        params.set("query", query);
+    }
+
+    return apiRequestJson("GET", `/api/workspaces/files?${params.toString()}`);
 }
 
 

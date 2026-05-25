@@ -106,6 +106,18 @@ export function setProjectDocumentFolders(folders = []) {
 }
 
 
+export function setProjectWorkspace(workspace = null, fileCount = 0, recentEvents = []) {
+    state.projectWorkspace = workspace;
+    state.projectWorkspaceFileCount = fileCount || 0;
+    state.projectWorkspaceEvents = recentEvents || [];
+}
+
+
+export function setProjectWorkspaceFiles(files = []) {
+    state.projectWorkspaceFiles = files;
+}
+
+
 export function setActiveProjectDocumentFolderId(folderId = null) {
     state.activeProjectDocumentFolderId = folderId ?? null;
 }
@@ -137,6 +149,8 @@ export function applyProjectsPayload(data) {
         state.activeProjectId = null;
         state.projectDocuments = [];
         state.projectDocumentFolders = [];
+        setProjectWorkspace(null);
+        setProjectWorkspaceFiles([]);
         state.activeProjectDocumentFolderId = null;
     }
 }
@@ -161,6 +175,25 @@ export function applyProjectDocumentsPayload(data) {
         && !state.projectDocumentFolders.some((folder) => folder.id === state.activeProjectDocumentFolderId)
     ) {
         state.activeProjectDocumentFolderId = null;
+    }
+}
+
+
+export function applyProjectWorkspacePayload(data) {
+    setProjectWorkspace(data.workspace || null, data.file_count || 0, data.recent_events || []);
+    if (!data.workspace) {
+        setProjectWorkspaceFiles([]);
+    }
+}
+
+
+export function applyWorkspaceFilesPayload(data) {
+    setProjectWorkspaceFiles(data.files || []);
+    if (data.workspace) {
+        state.projectWorkspace = data.workspace;
+    }
+    if (Number.isFinite(data.file_count)) {
+        state.projectWorkspaceFileCount = data.file_count;
     }
 }
 
@@ -231,6 +264,8 @@ export function enterHomeWorkspace() {
     clearActiveConversation();
     state.projectDocuments = [];
     state.projectDocumentFolders = [];
+    setProjectWorkspace(null);
+    setProjectWorkspaceFiles([]);
     state.activeProjectDocumentFolderId = null;
     state.stagedDocuments = [];
 }
@@ -240,6 +275,8 @@ export function enterProjectWorkspace(projectId) {
     state.workspaceMode = "project";
     state.activeProjectId = projectId || null;
     state.activeProjectDocumentFolderId = null;
+    setProjectWorkspace(null);
+    setProjectWorkspaceFiles([]);
     state.stagedDocuments = [];
     clearActiveConversation();
 }

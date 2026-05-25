@@ -1,5 +1,6 @@
 let confirmState = null;
 let projectDialogState = null;
+let workspaceDialogState = null;
 
 
 export function confirmAction({
@@ -37,6 +38,20 @@ export function requestProjectDetails() {
         state.errorNode.hidden = true;
         openDialog(state);
         state.nameInput.focus({ preventScroll: true });
+    });
+}
+
+
+export function requestWorkspaceDetails(existingWorkspace = null) {
+    const state = ensureWorkspaceDialog();
+
+    return new Promise((resolve) => {
+        state.resolve = resolve;
+        state.pathInput.value = existingWorkspace?.root_path || "";
+        state.displayNameInput.value = existingWorkspace?.display_name || "";
+        state.errorNode.hidden = true;
+        openDialog(state);
+        state.pathInput.focus({ preventScroll: true });
     });
 }
 
@@ -184,6 +199,88 @@ function ensureProjectDialog() {
 }
 
 
+function ensureWorkspaceDialog() {
+    if (workspaceDialogState) {
+        return workspaceDialogState;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `
+        <div id="workspace-connect-dialog" class="modal workspace-connect-dialog" hidden>
+            <div class="modal__backdrop" data-dialog-cancel="true"></div>
+            <div class="modal__panel modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="workspace-connect-dialog-title">
+                <button id="workspace-connect-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Close">×</button>
+                <div class="modal__header">
+                    <div>
+                        <p class="modal__eyebrow">Workspace</p>
+                        <h3 id="workspace-connect-dialog-title">Connect workspace</h3>
+                    </div>
+                </div>
+                <form id="workspace-connect-dialog-form" class="modal__body project-create-dialog__form">
+                    <label class="field field--stacked">
+                        <span>Local folder path</span>
+                        <input id="workspace-connect-path-input" type="text" autocomplete="off" placeholder="/Users/name/code/project">
+                    </label>
+                    <label class="field field--stacked">
+                        <span>Display name</span>
+                        <input id="workspace-connect-name-input" type="text" autocomplete="off" placeholder="Optional">
+                    </label>
+                    <p id="workspace-connect-error" class="form-error" hidden>Enter a local folder path.</p>
+                    <div class="confirm-dialog__actions">
+                        <button id="workspace-connect-cancel" class="ghost-button" type="button">Cancel</button>
+                        <button class="action-button action-button--primary" type="submit">Connect</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `.trim();
+    document.body.appendChild(wrapper.firstElementChild);
+
+    workspaceDialogState = {
+        modal: document.getElementById("workspace-connect-dialog"),
+        form: document.getElementById("workspace-connect-dialog-form"),
+        pathInput: document.getElementById("workspace-connect-path-input"),
+        displayNameInput: document.getElementById("workspace-connect-name-input"),
+        errorNode: document.getElementById("workspace-connect-error"),
+        closeButton: document.getElementById("workspace-connect-dialog-close"),
+        cancelButton: document.getElementById("workspace-connect-cancel"),
+        isClosing: false,
+        resolve: null,
+        lastFocusedElement: null,
+    };
+
+    workspaceDialogState.modal.addEventListener("click", (event) => {
+        if (event.target.dataset.dialogCancel === "true") {
+            resolveWorkspaceDialog(null);
+        }
+    });
+    workspaceDialogState.closeButton.addEventListener("click", () => resolveWorkspaceDialog(null));
+    workspaceDialogState.cancelButton.addEventListener("click", () => resolveWorkspaceDialog(null));
+    workspaceDialogState.form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const rootPath = workspaceDialogState.pathInput.value.trim();
+        if (!rootPath) {
+            workspaceDialogState.errorNode.hidden = false;
+            workspaceDialogState.pathInput.focus({ preventScroll: true });
+            return;
+        }
+
+        resolveWorkspaceDialog({
+            root_path: rootPath,
+            display_name: workspaceDialogState.displayNameInput.value.trim(),
+        });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !workspaceDialogState.modal.hidden) {
+            resolveWorkspaceDialog(null);
+        }
+    });
+
+    return workspaceDialogState;
+}
+
+
 function pumpConfirmQueue(state) {
     if (state.activeRequest || state.isClosing) {
         return;
@@ -262,6 +359,18 @@ function resolveConfirm(result) {
 
 function resolveProjectDialog(result) {
     const state = ensureProjectDialog();
+    if (!state.resolve) {
+        return;
+    }
+
+    const resolve = state.resolve;
+    state.resolve = null;
+    closeDialog(state, () => resolve(result));
+}
+
+
+function resolveWorkspaceDialog(result) {
+    const state = ensureWorkspaceDialog();
     if (!state.resolve) {
         return;
     }

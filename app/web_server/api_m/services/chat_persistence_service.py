@@ -183,6 +183,29 @@ class ChatPersistenceService:
                 return f"{tool_name} returned {', '.join(details)}."
             return f"{tool_name} returned current date information."
 
+        if tool_name == "workspace_write_file":
+            file_payload = result.get("file") if isinstance(result, dict) else {}
+            path = str((file_payload or {}).get("path") or arguments.get("path") or "").strip()
+            action = "created" if (file_payload or {}).get("created") else "updated"
+            if path:
+                return f"{tool_name} {action} {path}."
+            return f"{tool_name} wrote a file in the connected workspace."
+
+        if tool_name == "workspace_read_file":
+            file_payload = result.get("file") if isinstance(result, dict) else {}
+            path = str((file_payload or {}).get("path") or arguments.get("path") or "").strip()
+            if path:
+                return f"{tool_name} read {path}."
+            return f"{tool_name} read a file from the connected workspace."
+
+        if tool_name == "workspace_search":
+            matches = result.get("matches") if isinstance(result, dict) else []
+            match_count = len(matches) if isinstance(matches, list) else 0
+            query = str(arguments.get("query") or "").strip()
+            if query:
+                return f'{tool_name} searched for "{query}" and returned {match_count} match(es).'
+            return f"{tool_name} returned {match_count} match(es)."
+
         compact_fields = []
         for key, value in result.items() if isinstance(result, dict) else []:
             if isinstance(value, (str, int, float, bool)) and str(value).strip():

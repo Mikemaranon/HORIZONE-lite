@@ -17,6 +17,10 @@ from .db_methods import (
     SettingsTable,
     ModelsCacheTable,
     ToolsTable,
+    ProjectWorkspacesTable,
+    WorkspaceCommandRunsTable,
+    WorkspaceEventsTable,
+    WorkspaceFileIndexTable,
 )
 
 class DBManager:
@@ -50,6 +54,10 @@ class DBManager:
         self.settings = SettingsTable(self.db)
         self.models_cache = ModelsCacheTable(self.db)
         self.tools = ToolsTable(self.db)
+        self.project_workspaces = ProjectWorkspacesTable(self.db)
+        self.workspace_file_index = WorkspaceFileIndexTable(self.db)
+        self.workspace_events = WorkspaceEventsTable(self.db)
+        self.workspace_command_runs = WorkspaceCommandRunsTable(self.db)
 
         self._ensure_defaults()
 

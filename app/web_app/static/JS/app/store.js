@@ -6,6 +6,7 @@ import {
     loadProfilesData,
     loadProvidersData,
     loadProjectDocumentsData,
+    loadProjectWorkspaceData,
     loadProjectsData,
     loadSettingsData,
     loadToolsData,
@@ -33,6 +34,15 @@ export async function loadProjectDocuments(projectId) {
     }
 
     return loadProjectDocumentsData(projectId);
+}
+
+
+export async function loadProjectWorkspace(projectId) {
+    if (!projectId) {
+        return { workspace: null, file_count: 0, recent_events: [] };
+    }
+
+    return loadProjectWorkspaceData(projectId);
 }
 
 

@@ -283,9 +283,10 @@ function createToolStatusMarkup(toolDisplayName, options = {}) {
         interactive = false,
         messageKey = "",
         toolEventIndex = 0,
+        labelOverride = "",
     } = options;
     const label = interactive
-        ? `Tool used: ${escapeHtml(toolDisplayName)}`
+        ? (labelOverride || `Tool used: ${escapeHtml(toolDisplayName)}`)
         : `Using tool: ${escapeHtml(toolDisplayName)}`;
     if (!interactive) {
         return `
@@ -324,6 +325,7 @@ function createPersistentToolStatusListMarkup(message) {
             interactive: true,
             messageKey,
             toolEventIndex: index,
+            labelOverride: createToolStatusLabel(toolEvent),
         });
     }).join("");
 
@@ -354,6 +356,37 @@ function resolveToolDisplayName(toolEvent) {
     return String(toolEvent?.tool_display_name || toolEvent?.tool_name || "tool")
         .replace(/_/g, " ")
         .trim();
+}
+
+
+function createToolStatusLabel(toolEvent) {
+    const toolName = String(toolEvent?.tool_name || "").trim();
+    const result = toolEvent?.result || {};
+    const argumentsPayload = toolEvent?.arguments || {};
+
+    if (!toolEvent?.ok) {
+        return `Tool failed: ${escapeHtml(resolveToolDisplayName(toolEvent))}`;
+    }
+
+    if (toolName === "workspace_write_file") {
+        const filePayload = result?.file || {};
+        const path = String(filePayload?.path || argumentsPayload?.path || "").trim();
+        const action = filePayload?.created ? "File created" : "File updated";
+        return path ? `${action}: ${escapeHtml(path)}` : `${action} in workspace`;
+    }
+
+    if (toolName === "workspace_read_file") {
+        const filePayload = result?.file || {};
+        const path = String(filePayload?.path || argumentsPayload?.path || "").trim();
+        return path ? `File read: ${escapeHtml(path)}` : "Workspace file read";
+    }
+
+    if (toolName === "workspace_search") {
+        const query = String(argumentsPayload?.query || "").trim();
+        return query ? `Workspace searched: ${escapeHtml(query)}` : "Workspace searched";
+    }
+
+    return "";
 }
 
 
@@ -393,6 +426,10 @@ function createToolTraceContentMarkup(toolName, toolEvent) {
 
     if (toolName === "current_date") {
         return createCurrentDateTraceMarkup(toolEvent);
+    }
+
+    if (toolName.startsWith("workspace_")) {
+        return createWorkspaceTraceMarkup(toolName, toolEvent);
     }
 
     return createGenericToolTraceMarkup(toolEvent);
@@ -456,6 +493,79 @@ function createCurrentDateTraceMarkup(toolEvent) {
         <div class="tool-trace__group">
             <h4>Returned values</h4>
             <div class="tool-trace-kv-list">${rowsMarkup}</div>
+        </div>
+    `;
+}
+
+
+function createWorkspaceTraceMarkup(toolName, toolEvent) {
+    if (toolName === "workspace_search") {
+        return createWorkspaceSearchTraceMarkup(toolEvent);
+    }
+
+    const result = toolEvent?.result || {};
+    const filePayload = result?.file || {};
+    const path = String(filePayload?.path || toolEvent?.arguments?.path || "").trim();
+    const sizeBytes = Number(filePayload?.size_bytes || 0);
+    const action = toolName === "workspace_write_file"
+        ? (filePayload?.created ? "Created" : "Updated")
+        : "Read";
+    const rows = [
+        ["Action", action],
+        ["Path", path],
+        ["Size", sizeBytes ? `${sizeBytes} B` : ""],
+    ].filter(([, value]) => String(value || "").trim());
+    const rowsMarkup = rows.map(([label, value]) => `
+        <div class="tool-trace-kv">
+            <span class="tool-trace-kv__label">${escapeHtml(label)}</span>
+            <span class="tool-trace-kv__value">${escapeHtml(String(value))}</span>
+        </div>
+    `).join("");
+    const content = String(filePayload?.content || "").trim();
+    const contentMarkup = content
+        ? `
+            <div class="tool-trace__group">
+                <h4>Content preview</h4>
+                <pre class="tool-trace__pre"><code>${escapeHtml(content.slice(0, 4000))}</code></pre>
+            </div>
+        `
+        : "";
+
+    return `
+        <div class="tool-trace__group">
+            <h4>Workspace action</h4>
+            <div class="tool-trace-kv-list">${rowsMarkup}</div>
+        </div>
+        ${contentMarkup}
+    `;
+}
+
+
+function createWorkspaceSearchTraceMarkup(toolEvent) {
+    const result = toolEvent?.result || {};
+    const query = String(toolEvent?.arguments?.query || "").trim();
+    const matches = Array.isArray(result?.matches) ? result.matches : [];
+    const matchesMarkup = matches.length
+        ? matches.map((match, index) => `
+            <article class="tool-trace-result">
+                <div class="tool-trace-result__index">${index + 1}</div>
+                <div class="tool-trace-result__body">
+                    <strong class="tool-trace-result__title">${escapeHtml(String(match?.path || "workspace file"))}:${escapeHtml(String(match?.line || ""))}</strong>
+                    <p class="tool-trace__meta">${escapeHtml(String(match?.preview || ""))}</p>
+                </div>
+            </article>
+        `).join("")
+        : `<p class="tool-trace__empty">No workspace matches were recorded for this tool run.</p>`;
+
+    return `
+        <div class="tool-trace__group">
+            <h4>Search query</h4>
+            <p>${escapeHtml(query || "No query recorded.")}</p>
+            <p class="tool-trace__meta">${escapeHtml(`${matches.length} match${matches.length === 1 ? "" : "es"}`)}</p>
+        </div>
+        <div class="tool-trace__group">
+            <h4>Matches</h4>
+            <div class="tool-trace-results">${matchesMarkup}</div>
         </div>
     `;
 }

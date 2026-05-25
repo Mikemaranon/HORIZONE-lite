@@ -52,6 +52,23 @@ Rules:
         "sources",
         "tool",
         "tools",
+        "workspace",
+        "file",
+        "archivo",
+        "archivos",
+        "create file",
+        "write file",
+        "edit file",
+        "modify file",
+        "save file",
+        "crea un archivo",
+        "crear archivo",
+        "edita",
+        "editar",
+        "modifica",
+        "modificar",
+        "guarda",
+        "guardar",
     ]
 
     def should_plan(self, messages, active_tools):

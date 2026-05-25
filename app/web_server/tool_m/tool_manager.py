@@ -14,6 +14,7 @@ class ToolManager:
         tool_loader,
         tool_registry,
         tool_executor,
+        workspace_tool_provider=None,
         deterministic_tool_router=None,
         model_tool_planner=None,
         max_tool_round_trips=3,
@@ -23,6 +24,7 @@ class ToolManager:
         self.tool_loader = tool_loader
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
+        self.workspace_tool_provider = workspace_tool_provider
         self.deterministic_tool_router = (
             deterministic_tool_router or DeterministicToolRouter()
         )
@@ -87,8 +89,9 @@ class ToolManager:
         model,
         settings=None,
         should_stop=None,
+        tool_context=None,
     ):
-        active_tools = self.list_active_tools()
+        active_tools = self._list_active_tools(tool_context=tool_context)
         if not active_tools:
             return self.model_manager.chat(provider_name, messages, model, settings or {})
 
@@ -112,6 +115,7 @@ class ToolManager:
                 tool_aware_messages,
                 tool_events,
                 forced_tool_call,
+                active_tools=active_tools,
             )
 
         for _ in range(self.max_tool_round_trips + 1):
@@ -137,6 +141,7 @@ class ToolManager:
                 tool_aware_messages,
                 tool_events,
                 tool_call,
+                active_tools=active_tools,
             )
 
         if response is None:
@@ -171,8 +176,9 @@ class ToolManager:
         model,
         settings=None,
         should_stop=None,
+        tool_context=None,
     ):
-        active_tools = self.list_active_tools()
+        active_tools = self._list_active_tools(tool_context=tool_context)
         if not active_tools:
             yield from self.model_manager.stream_chat(
                 provider_name,
@@ -211,6 +217,7 @@ class ToolManager:
                 tool_aware_messages,
                 tool_events,
                 forced_tool_call,
+                active_tools=active_tools,
             )
             yield self._build_tool_result_stream_event(tool_event)
 
@@ -257,6 +264,7 @@ class ToolManager:
                 tool_aware_messages,
                 tool_events,
                 tool_call,
+                active_tools=active_tools,
             )
             yield self._build_tool_result_stream_event(tool_event)
 
@@ -387,16 +395,16 @@ class ToolManager:
             "If you still need another tool, request it using the exact JSON contract."
         )
 
-    def _append_tool_result_to_messages(self, tool_aware_messages, tool_events, tool_call):
-        tool_event = self._execute_tool_call(tool_call)
+    def _append_tool_result_to_messages(self, tool_aware_messages, tool_events, tool_call, *, active_tools=None):
+        tool_event = self._execute_tool_call(tool_call, active_tools=active_tools)
         tool_events.append(tool_event)
         tool_aware_messages.extend(
             self._build_tool_exchange_messages(tool_call, tool_event)
         )
         return tool_event
 
-    def _execute_tool_call(self, tool_call):
-        runtime_tool = self.tool_registry.get_runtime_tool(tool_call["name"])
+    def _execute_tool_call(self, tool_call, *, active_tools=None):
+        runtime_tool = self._resolve_runtime_tool(tool_call["name"], active_tools=active_tools)
         if not runtime_tool:
             tool_result_payload = {
                 "ok": False,
@@ -566,6 +574,18 @@ class ToolManager:
                 return f"Current date and time: {', '.join(details)}."
             return "I checked the current date."
 
+        if tool_name == "workspace_write_file":
+            result = tool_event.get("result") or {}
+            file_payload = result.get("file") or {}
+            path = str(file_payload.get("path") or "").strip()
+            if path:
+                action = "created" if file_payload.get("created") else "updated"
+                return f"I {action} `{path}` in the connected workspace."
+            return "I wrote the requested file in the connected workspace."
+
+        if tool_name in {"workspace_read_file", "workspace_search"}:
+            return f"I used {display_name} in the connected workspace."
+
         result = tool_event.get("result")
         if isinstance(result, dict):
             compact_fields = []
@@ -587,6 +607,19 @@ class ToolManager:
             return str(stored_tool["display_name"]).strip()
 
         return str(tool_name or "tool").replace("_", " ").strip()
+
+    def _list_active_tools(self, *, tool_context=None):
+        tools = self.list_active_tools()
+        if self.workspace_tool_provider:
+            tools = [*tools, *self.workspace_tool_provider.build_tools(tool_context)]
+        return tools
+
+    def _resolve_runtime_tool(self, tool_name, *, active_tools=None):
+        for tool in active_tools or []:
+            if tool.get("name") == tool_name and tool.get("runner"):
+                return tool
+
+        return self.tool_registry.get_runtime_tool(tool_name)
 
     def _build_cancelled_response(self, provider_name, model, tool_events):
         response = {

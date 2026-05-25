@@ -1,0 +1,160 @@
+from pathlib import Path
+
+from tests.test_support import ApiTestCase
+
+
+class WorkspacesApiTests(ApiTestCase):
+    def test_project_workspace_can_connect_index_read_and_search(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        (workspace_root / "app.py").write_text("def hello():\n    return 'polar'\n", encoding="utf-8")
+        (workspace_root / "node_modules").mkdir()
+        (workspace_root / "node_modules" / "ignored.js").write_text("ignored", encoding="utf-8")
+
+        project_id = self.db.projects.create("Workspace Project")
+
+        connect_response = self.client.post(
+            "/api/projects/workspace",
+            json={
+                "project_id": project_id,
+                "root_path": str(workspace_root),
+                "display_name": "Workspace",
+            },
+            headers=self.auth_headers,
+        )
+        connect_payload = connect_response.get_json()
+        workspace = connect_payload["workspace"]
+
+        self.assertEqual(connect_response.status_code, 201)
+        self.assertEqual(workspace["project_id"], project_id)
+        self.assertEqual(workspace["root_path"], str(workspace_root.resolve()))
+        self.assertEqual(connect_payload["file_count"], 1)
+
+        files_response = self.client.get(
+            f"/api/workspaces/files?workspace_id={workspace['id']}",
+            headers=self.auth_headers,
+        )
+        files_payload = files_response.get_json()
+
+        self.assertEqual(files_response.status_code, 200)
+        self.assertEqual([file["path"] for file in files_payload["files"]], ["app.py"])
+
+        read_response = self.client.get(
+            f"/api/workspaces/file?workspace_id={workspace['id']}&path=app.py",
+            headers=self.auth_headers,
+        )
+        read_payload = read_response.get_json()
+
+        self.assertEqual(read_response.status_code, 200)
+        self.assertIn("return 'polar'", read_payload["file"]["content"])
+
+        search_response = self.client.post(
+            "/api/workspaces/search",
+            json={"workspace_id": workspace["id"], "query": "polar"},
+            headers=self.auth_headers,
+        )
+        search_payload = search_response.get_json()
+
+        self.assertEqual(search_response.status_code, 200)
+        self.assertEqual(search_payload["matches"][0]["path"], "app.py")
+        self.assertEqual(search_payload["matches"][0]["line"], 2)
+
+    def test_workspace_file_read_blocks_path_traversal(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        outside_file = Path(self.temp_dir.name) / "outside.txt"
+        outside_file.write_text("secret", encoding="utf-8")
+        project_id = self.db.projects.create("Guarded Project")
+        workspace_id = self.db.project_workspaces.upsert(
+            project_id,
+            str(workspace_root),
+            "Workspace",
+        )
+
+        response = self.client.get(
+            f"/api/workspaces/file?workspace_id={workspace_id}&path=../outside.txt",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["error"], "Path is outside the workspace")
+
+    def test_workspace_file_can_be_written_through_api(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        project_id = self.db.projects.create("Writable Project")
+        workspace_id = self.db.project_workspaces.upsert(
+            project_id,
+            str(workspace_root),
+            "Workspace",
+        )
+
+        response = self.client.post(
+            "/api/workspaces/file",
+            json={
+                "workspace_id": workspace_id,
+                "path": "scripts/helloworld.sh",
+                "content": "#!/usr/bin/env bash\necho \"Hello, world!\"\n",
+                "create_dirs": True,
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(payload["file"]["path"], "scripts/helloworld.sh")
+        self.assertTrue((workspace_root / "scripts" / "helloworld.sh").exists())
+        self.assertIn("Hello, world!", (workspace_root / "scripts" / "helloworld.sh").read_text(encoding="utf-8"))
+
+    def test_chat_can_create_workspace_file_with_contextual_tool(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        project_id = self.db.projects.create("Agent Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Workspace edit",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            self.assertIn("Tool result for workspace_write_file", messages[-1]["content"])
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Created `helloworld.sh` in the connected workspace.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-workspace-write-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "crea un archivo helloworld.sh"}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(model_calls["count"], 1)
+        self.assertTrue((workspace_root / "helloworld.sh").exists())
+        self.assertIn("Hello, world!", (workspace_root / "helloworld.sh").read_text(encoding="utf-8"))
+        self.assertIn("workspace_write_file", payload["response"]["raw"]["tool_events"][0]["tool_name"])
+        self.assertIn("created helloworld.sh", payload["response"]["raw"]["tool_events"][0]["tool_summary"])
+        self.assertIn("Created", payload["response"]["message"]["content"])
