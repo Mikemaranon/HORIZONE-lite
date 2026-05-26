@@ -134,6 +134,11 @@ export async function connectProjectWorkspace(data) {
 }
 
 
+export async function requestNativeDirectoryPicker(data) {
+    return apiRequestJson("POST", "/api/native/directory-picker", data);
+}
+
+
 export async function deleteProjectWorkspace(workspaceId) {
     return apiRequestJson("DELETE", `/api/projects/workspace?id=${encodeURIComponent(workspaceId)}`);
 }

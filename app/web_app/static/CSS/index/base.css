@@ -120,6 +120,16 @@ select:disabled {
     color: var(--text);
 }
 
+.ghost-button--danger {
+    color: #8e381e;
+    border-color: rgba(171, 63, 38, 0.18);
+    background: rgba(171, 63, 38, 0.04);
+}
+
+.ghost-button--danger:hover {
+    background: rgba(171, 63, 38, 0.08);
+}
+
 .icon-button {
     width: 42px;
     height: 42px;

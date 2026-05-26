@@ -178,23 +178,6 @@ export async function handleProjectConnectWorkspace() {
 }
 
 
-export async function handleProjectWorkspaceDocumentClick(event) {
-    if (event.target.closest("[data-connect-project-workspace]")) {
-        await openWorkspaceConnectionFlow();
-        return;
-    }
-
-    if (event.target.closest("[data-reindex-project-workspace]")) {
-        await handleProjectWorkspaceReindex();
-        return;
-    }
-
-    if (event.target.closest("[data-disconnect-project-workspace]")) {
-        await handleProjectWorkspaceDisconnect();
-    }
-}
-
-
 export function handleBackToProject() {
     if (!state.activeProjectId) {
         return;
@@ -566,8 +549,21 @@ async function openWorkspaceConnectionFlow() {
         return;
     }
 
-    const workspaceDetails = await requestWorkspaceDetails(state.projectWorkspace);
+    const workspaceDetails = await requestWorkspaceDetails(state.projectWorkspace, {
+        fileCount: state.projectWorkspaceFileCount,
+        files: state.projectWorkspaceFiles,
+    });
     if (!workspaceDetails) {
+        return;
+    }
+
+    if (workspaceDetails.action === "reindex") {
+        await handleProjectWorkspaceReindex();
+        return;
+    }
+
+    if (workspaceDetails.action === "disconnect") {
+        await handleProjectWorkspaceDisconnect();
         return;
     }
 
@@ -575,7 +571,8 @@ async function openWorkspaceConnectionFlow() {
         setLoading(true);
         const payload = await connectProjectWorkspace({
             project_id: activeProject.id,
-            ...workspaceDetails,
+            root_path: workspaceDetails.root_path,
+            display_name: workspaceDetails.display_name,
         });
         applyProjectWorkspacePayload(payload);
         await refreshWorkspaceFilesIfConnected();

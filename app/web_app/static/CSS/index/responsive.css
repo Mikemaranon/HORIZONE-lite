@@ -215,6 +215,14 @@
         grid-template-columns: 1fr;
     }
 
+    .workspace-folder-picker {
+        grid-template-columns: 1fr;
+    }
+
+    .workspace-folder-picker__button {
+        justify-self: stretch;
+    }
+
     .documents-panel--tree,
     .documents-panel--files {
         grid-template-rows: auto auto minmax(180px, 1fr);

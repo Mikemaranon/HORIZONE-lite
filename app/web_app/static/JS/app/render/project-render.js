@@ -31,7 +31,6 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
         : "no workspace";
     elements.projectChatCount.textContent = `${totalChats} chat${totalChats === 1 ? "" : "s"} · ${totalDocuments} document${totalDocuments === 1 ? "" : "s"} · ${workspaceLabel}`;
 
-    const workspaceMarkup = renderWorkspacePanel();
     const conversationsMarkup = !projectConversations.length
         ? createEmptyListItem("This project does not have chats yet. Use the + button to create the first one.")
         : projectConversations
@@ -56,7 +55,7 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
         })
         .join("");
 
-    elements.projectConversationsList.innerHTML = `${workspaceMarkup}${conversationsMarkup}`;
+    elements.projectConversationsList.innerHTML = conversationsMarkup;
 
     if (onConversationSelect) {
         elements.projectConversationsList.querySelectorAll("[data-conversation-id]").forEach((element) => {
@@ -71,63 +70,6 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
             });
         });
     }
-}
-
-
-function renderWorkspacePanel() {
-    const workspace = state.projectWorkspace;
-    if (!workspace) {
-        return `
-            <div class="project-workspace-card project-workspace-card--empty">
-                <div>
-                    <span class="project-workspace-card__kicker">Workspace</span>
-                    <strong>Not connected</strong>
-                </div>
-                <button class="ghost-button ghost-button--compact" type="button" data-connect-project-workspace="true">
-                    Connect
-                </button>
-            </div>
-        `;
-    }
-
-    const files = (state.projectWorkspaceFiles || []).slice(0, 5);
-    const filesMarkup = files.length
-        ? files.map((file) => `
-            <span class="project-workspace-file" title="${escapeHtml(file.path)}">
-                ${escapeHtml(file.path)}
-            </span>
-        `).join("")
-        : `<span class="project-workspace-card__muted">No indexed files shown yet.</span>`;
-    const indexedLabel = workspace.last_indexed_at
-        ? `Last indexed ${escapeHtml(workspace.last_indexed_at)}`
-        : "Not indexed yet";
-
-    return `
-        <div class="project-workspace-card">
-            <div class="project-workspace-card__header">
-                <div class="project-workspace-card__copy">
-                    <span class="project-workspace-card__kicker">Workspace</span>
-                    <strong>${escapeHtml(workspace.display_name || "Workspace")}</strong>
-                    <span title="${escapeHtml(workspace.root_path)}">${escapeHtml(workspace.root_path)}</span>
-                    <em>${escapeHtml(indexedLabel)} · ${state.projectWorkspaceFileCount} file${state.projectWorkspaceFileCount === 1 ? "" : "s"}</em>
-                </div>
-                <div class="project-workspace-card__actions">
-                    <button class="ghost-button ghost-button--compact" type="button" data-connect-project-workspace="true">
-                        Change
-                    </button>
-                    <button class="ghost-button ghost-button--compact" type="button" data-reindex-project-workspace="true">
-                        Reindex
-                    </button>
-                    <button class="ghost-button ghost-button--compact" type="button" data-disconnect-project-workspace="true">
-                        Disconnect
-                    </button>
-                </div>
-            </div>
-            <div class="project-workspace-card__files">
-                ${filesMarkup}
-            </div>
-        </div>
-    `;
 }
 
 

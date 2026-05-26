@@ -19,7 +19,7 @@ This is not just about sending prompts back and forth. HORIZONE lite aims to be 
 - Choose between local and remote providers depending on what each conversation needs.
 - Run local models with MLX on Apple Silicon.
 - Connect to Ollama and use your local model library.
-- Use OpenAI whenever you want access to cloud models.
+- Use OpenAI or other providers whenever you want access to cloud models.
 - Create projects to separate topics, clients, ideas, or workstreams.
 - Save conversations and return to them later without losing context.
 - Define profiles with different instructions, tone, and generation settings.

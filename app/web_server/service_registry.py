@@ -8,6 +8,8 @@ from api_m.services import (
     ProjectContextRetrievalService,
     ProjectDocumentService,
     ProjectService,
+    NativeDirectoryPickerService,
+    SourceAttributionService,
     WorkspaceService,
 )
 from tool_m import ToolExecutor, ToolLoader, ToolManager, ToolRegistry
@@ -70,6 +72,7 @@ class ServiceRegistry:
             self.chat_persistence_service,
             tool_manager=self.tool_manager,
         )
+        self.source_attribution_service = SourceAttributionService(db_manager)
         self.chat_service = ChatService(
             db_manager,
             model_manager,
@@ -77,9 +80,11 @@ class ServiceRegistry:
             self.chat_persistence_service,
             self.chat_stream_service,
             tool_manager=self.tool_manager,
+            source_attribution_service=self.source_attribution_service,
         )
 
         self.project_service = ProjectService(db_manager)
+        self.native_directory_picker = NativeDirectoryPickerService()
         self.project_document_service = ProjectDocumentService(
             db_manager,
             ingestion_service=self.document_ingestion_service,

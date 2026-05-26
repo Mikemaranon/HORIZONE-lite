@@ -1,3 +1,5 @@
+import { selectWorkspaceDirectory } from "./native-directory-picker.js";
+
 let confirmState = null;
 let projectDialogState = null;
 let workspaceDialogState = null;
@@ -42,16 +44,14 @@ export function requestProjectDetails() {
 }
 
 
-export function requestWorkspaceDetails(existingWorkspace = null) {
+export function requestWorkspaceDetails(existingWorkspace = null, workspaceMeta = {}) {
     const state = ensureWorkspaceDialog();
 
     return new Promise((resolve) => {
         state.resolve = resolve;
-        state.pathInput.value = existingWorkspace?.root_path || "";
-        state.displayNameInput.value = existingWorkspace?.display_name || "";
-        state.errorNode.hidden = true;
+        configureWorkspaceDialog(state, existingWorkspace, workspaceMeta);
         openDialog(state);
-        state.pathInput.focus({ preventScroll: true });
+        state.browseButton.focus({ preventScroll: true });
     });
 }
 
@@ -208,27 +208,50 @@ function ensureWorkspaceDialog() {
     wrapper.innerHTML = `
         <div id="workspace-connect-dialog" class="modal workspace-connect-dialog" hidden>
             <div class="modal__backdrop" data-dialog-cancel="true"></div>
-            <div class="modal__panel modal__panel--narrow" role="dialog" aria-modal="true" aria-labelledby="workspace-connect-dialog-title">
+            <div class="modal__panel modal__panel--narrow workspace-connect-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="workspace-connect-dialog-title">
                 <button id="workspace-connect-dialog-close" class="icon-button modal__close-button" type="button" aria-label="Close">×</button>
                 <div class="modal__header">
                     <div>
                         <p class="modal__eyebrow">Workspace</p>
-                        <h3 id="workspace-connect-dialog-title">Connect workspace</h3>
+                        <h3 id="workspace-connect-dialog-title">Workspace</h3>
                     </div>
                 </div>
                 <form id="workspace-connect-dialog-form" class="modal__body project-create-dialog__form">
-                    <label class="field field--stacked">
-                        <span>Local folder path</span>
-                        <input id="workspace-connect-path-input" type="text" autocomplete="off" placeholder="/Users/name/code/project">
-                    </label>
+                    <section id="workspace-connect-summary" class="workspace-dialog-summary">
+                        <div>
+                            <span class="workspace-dialog-summary__kicker">Status</span>
+                            <strong id="workspace-connect-status-title">Not connected</strong>
+                            <span id="workspace-connect-status-meta">Choose a local folder to make project files available to chats.</span>
+                        </div>
+                    </section>
+                    <div class="workspace-folder-picker">
+                        <label class="field field--stacked workspace-folder-picker__path">
+                            <span>Workspace folder</span>
+                            <input id="workspace-connect-path-input" type="text" autocomplete="off" readonly placeholder="No folder selected">
+                        </label>
+                        <button id="workspace-folder-picker-button" class="ghost-button workspace-folder-picker__button" type="button">Choose folder</button>
+                    </div>
                     <label class="field field--stacked">
                         <span>Display name</span>
                         <input id="workspace-connect-name-input" type="text" autocomplete="off" placeholder="Optional">
                     </label>
+                    <section id="workspace-connect-files-section" class="workspace-dialog-files" hidden>
+                        <div class="workspace-dialog-files__header">
+                            <span>Indexed files</span>
+                            <span id="workspace-connect-file-count">0 files</span>
+                        </div>
+                        <div id="workspace-connect-files" class="workspace-dialog-files__list"></div>
+                    </section>
                     <p id="workspace-connect-error" class="form-error" hidden>Enter a local folder path.</p>
-                    <div class="confirm-dialog__actions">
-                        <button id="workspace-connect-cancel" class="ghost-button" type="button">Cancel</button>
-                        <button class="action-button action-button--primary" type="submit">Connect</button>
+                    <div class="workspace-dialog-actions">
+                        <div class="workspace-dialog-actions__secondary">
+                            <button id="workspace-reindex-button" class="ghost-button" type="button" hidden>Reindex</button>
+                            <button id="workspace-disconnect-button" class="ghost-button ghost-button--danger" type="button" hidden>Disconnect</button>
+                        </div>
+                        <div class="workspace-dialog-actions__primary">
+                            <button id="workspace-connect-cancel" class="ghost-button" type="button">Cancel</button>
+                            <button id="workspace-connect-submit" class="action-button action-button--primary" type="submit">Connect</button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -240,10 +263,19 @@ function ensureWorkspaceDialog() {
         modal: document.getElementById("workspace-connect-dialog"),
         form: document.getElementById("workspace-connect-dialog-form"),
         pathInput: document.getElementById("workspace-connect-path-input"),
+        browseButton: document.getElementById("workspace-folder-picker-button"),
         displayNameInput: document.getElementById("workspace-connect-name-input"),
+        statusTitle: document.getElementById("workspace-connect-status-title"),
+        statusMeta: document.getElementById("workspace-connect-status-meta"),
+        filesSection: document.getElementById("workspace-connect-files-section"),
+        fileCount: document.getElementById("workspace-connect-file-count"),
+        filesList: document.getElementById("workspace-connect-files"),
         errorNode: document.getElementById("workspace-connect-error"),
         closeButton: document.getElementById("workspace-connect-dialog-close"),
         cancelButton: document.getElementById("workspace-connect-cancel"),
+        submitButton: document.getElementById("workspace-connect-submit"),
+        reindexButton: document.getElementById("workspace-reindex-button"),
+        disconnectButton: document.getElementById("workspace-disconnect-button"),
         isClosing: false,
         resolve: null,
         lastFocusedElement: null,
@@ -256,16 +288,26 @@ function ensureWorkspaceDialog() {
     });
     workspaceDialogState.closeButton.addEventListener("click", () => resolveWorkspaceDialog(null));
     workspaceDialogState.cancelButton.addEventListener("click", () => resolveWorkspaceDialog(null));
+    workspaceDialogState.browseButton.addEventListener("click", handleWorkspaceFolderBrowse);
+    workspaceDialogState.pathInput.addEventListener("click", handleWorkspaceFolderBrowse);
+    workspaceDialogState.reindexButton.addEventListener("click", () => {
+        resolveWorkspaceDialog({ action: "reindex" });
+    });
+    workspaceDialogState.disconnectButton.addEventListener("click", () => {
+        resolveWorkspaceDialog({ action: "disconnect" });
+    });
     workspaceDialogState.form.addEventListener("submit", (event) => {
         event.preventDefault();
         const rootPath = workspaceDialogState.pathInput.value.trim();
         if (!rootPath) {
+            workspaceDialogState.errorNode.textContent = "Choose a local folder.";
             workspaceDialogState.errorNode.hidden = false;
-            workspaceDialogState.pathInput.focus({ preventScroll: true });
+            workspaceDialogState.browseButton.focus({ preventScroll: true });
             return;
         }
 
         resolveWorkspaceDialog({
+            action: "connect",
             root_path: rootPath,
             display_name: workspaceDialogState.displayNameInput.value.trim(),
         });
@@ -278,6 +320,89 @@ function ensureWorkspaceDialog() {
     });
 
     return workspaceDialogState;
+}
+
+
+async function handleWorkspaceFolderBrowse() {
+    if (!workspaceDialogState || workspaceDialogState.modal.hidden) {
+        return;
+    }
+
+    const originalLabel = workspaceDialogState.browseButton.textContent;
+    workspaceDialogState.errorNode.hidden = true;
+    workspaceDialogState.browseButton.disabled = true;
+    workspaceDialogState.browseButton.textContent = "Choosing...";
+
+    try {
+        const directory = await selectWorkspaceDirectory({
+            currentPath: workspaceDialogState.pathInput.value.trim(),
+            title: "Choose workspace folder",
+        });
+        if (!directory) {
+            return;
+        }
+
+        workspaceDialogState.pathInput.value = directory.root_path;
+        if (!workspaceDialogState.displayNameInput.value.trim()) {
+            workspaceDialogState.displayNameInput.value = directory.display_name || "";
+        }
+    } catch (error) {
+        workspaceDialogState.errorNode.textContent = error.message || "The folder picker could not be opened.";
+        workspaceDialogState.errorNode.hidden = false;
+    } finally {
+        workspaceDialogState.browseButton.disabled = false;
+        workspaceDialogState.browseButton.textContent = originalLabel;
+        workspaceDialogState.browseButton.focus({ preventScroll: true });
+    }
+}
+
+
+function configureWorkspaceDialog(state, existingWorkspace, workspaceMeta) {
+    const isConnected = !!existingWorkspace;
+    const fileCount = Number(workspaceMeta.fileCount || 0);
+    const files = (workspaceMeta.files || []).slice(0, 5);
+    const indexedLabel = existingWorkspace?.last_indexed_at
+        ? `Last indexed ${existingWorkspace.last_indexed_at}`
+        : "Not indexed yet";
+
+    state.pathInput.value = existingWorkspace?.root_path || "";
+    state.displayNameInput.value = existingWorkspace?.display_name || "";
+    state.browseButton.textContent = "Choose folder";
+    state.browseButton.disabled = false;
+    state.errorNode.hidden = true;
+    state.errorNode.textContent = "Choose a local folder.";
+    state.submitButton.textContent = isConnected ? "Save" : "Connect";
+    state.reindexButton.hidden = !isConnected;
+    state.disconnectButton.hidden = !isConnected;
+    state.filesSection.hidden = !isConnected;
+    state.statusTitle.textContent = isConnected
+        ? (existingWorkspace.display_name || "Workspace connected")
+        : "Not connected";
+    state.statusMeta.textContent = isConnected
+        ? `${indexedLabel} · ${fileCount} file${fileCount === 1 ? "" : "s"}`
+        : "Choose a local folder to make project files available to chats.";
+    state.fileCount.textContent = `${fileCount} file${fileCount === 1 ? "" : "s"}`;
+    state.filesList.innerHTML = "";
+
+    if (!isConnected) {
+        return;
+    }
+
+    if (!files.length) {
+        const emptyNode = document.createElement("span");
+        emptyNode.className = "workspace-dialog-files__empty";
+        emptyNode.textContent = "No indexed files shown yet.";
+        state.filesList.appendChild(emptyNode);
+        return;
+    }
+
+    files.forEach((file) => {
+        const fileNode = document.createElement("span");
+        fileNode.className = "workspace-dialog-file";
+        fileNode.title = file.path || "";
+        fileNode.textContent = file.path || "";
+        state.filesList.appendChild(fileNode);
+    });
 }
 
 

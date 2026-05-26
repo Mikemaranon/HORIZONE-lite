@@ -19,6 +19,12 @@ from .project_service import (
     ProjectResourceNotFoundError,
     ProjectService,
 )
+from .native_dialog_service import (
+    NativeDialogError,
+    NativeDialogUnavailableError,
+    NativeDirectoryPickerService,
+)
+from .source_attribution_service import SourceAttributionService
 from .workspace_service import (
     WorkspaceRequestError,
     WorkspaceResourceNotFoundError,
@@ -41,6 +47,10 @@ __all__ = [
     "ProjectRequestError",
     "ProjectResourceNotFoundError",
     "ProjectService",
+    "NativeDialogError",
+    "NativeDialogUnavailableError",
+    "NativeDirectoryPickerService",
+    "SourceAttributionService",
     "WorkspaceRequestError",
     "WorkspaceResourceNotFoundError",
     "WorkspaceService",
