@@ -4,7 +4,7 @@ from data_m import DBManager
 from model_m import ModelManager
 from config_m import ConfigManager
 from tests.test_support import IsolatedDatabaseTestCase
-from tool_m import ToolExecutor, ToolLoader, ToolManager, ToolRegistry
+from tool_m import ToolCallParser, ToolExecutor, ToolLoader, ToolManager, ToolRegistry
 
 
 class ToolManagerTests(IsolatedDatabaseTestCase):
@@ -152,7 +152,80 @@ def run(arguments):
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "current_date_override")
         self.assertTrue(response["raw"]["tool_events"][0]["ok"])
 
-    def test_explicit_web_search_request_forces_tool_execution_before_model_reply(self):
+    def test_invalid_tool_call_shape_is_recoverable(self):
+        tool = self.manager.upload_tool(
+            filename="echo_tool.py",
+            source_text="""
+TOOL_NAME = "echo_tool"
+TOOL_DESCRIPTION = "Echoes a value."
+TOOL_PARAMETERS = {"value": {"type": "string", "required": True}}
+
+def run(arguments):
+    return {"echo": arguments.get("value", "")}
+""".strip(),
+        )
+        self.manager.set_tool_active(tool["id"], True)
+        model_calls = {"count": 0}
+        captured = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
+            captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"echo_tool","arguments":"hello"}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+            if model_calls["count"] == 2:
+                self.assertIn("Tool call was invalid", messages[-1]["content"])
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"echo_tool","arguments":{"value":"hello"},"reason":"Retry with valid arguments."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Echoed hello.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-echo-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "Echo hello"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(model_calls["count"], 3)
+        self.assertIn("Tool result for echo_tool", captured["messages"][-1]["content"])
+        self.assertEqual(response["raw"]["tool_events"][0]["result"]["echo"], "hello")
+
+    def test_model_requested_web_search_executes_before_final_reply(self):
         tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(tool["id"], True)
         self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
@@ -169,8 +242,27 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                self.assertEqual(messages[0]["role"], "system")
+                self.assertIn("web_search", messages[0]["content"])
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"Mikemaranon GitHub profile","max_results":5},"reason":"The user asks for web-backed information."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider_name,
                 "model": model,
@@ -195,22 +287,39 @@ def run(arguments):
 
         self.assertEqual(
             [message["role"] for message in captured["messages"]],
-            ["user", "assistant", "user"],
+            ["system", "user", "assistant", "user"],
         )
-        self.assertIn("Mikemaranon's GitHub profile", captured["messages"][-1]["content"])
+        self.assertIn("Tool result for web_search", captured["messages"][-1]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
         self.assertEqual(
             response["raw"]["tool_events"][0]["arguments"]["query"],
-            "for Mikemaranon's GitHub profile",
+            "Mikemaranon GitHub profile",
         )
+        self.assertIn("web-backed information", response["raw"]["tool_events"][0]["reason"])
 
-    def test_chat_skips_tool_catalog_for_regular_prompts(self):
+    def test_chat_includes_tool_catalog_for_regular_prompts_without_forcing_tool(self):
         tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(tool["id"], True)
         captured = {}
+        model_calls = {"count": 0}
 
         def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_decision":{"needs_tool":false,"reason":"A haiku does not need external state."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider_name,
                 "model": model,
@@ -233,14 +342,76 @@ def run(arguments):
             {},
         )
 
-        self.assertEqual(
-            captured["messages"],
-            [{"role": "user", "content": "Write a haiku about rain."}],
-        )
+        self.assertEqual(model_calls["count"], 2)
+        self.assertEqual(captured["messages"][0]["role"], "system")
+        self.assertIn("web_search", captured["messages"][0]["content"])
+        self.assertEqual(captured["messages"][1], {"role": "user", "content": "Write a haiku about rain."})
         self.assertEqual(response["message"]["content"], "Soft rain drifts over the hill.")
         self.assertNotIn("tool_events", response.get("raw", {}))
 
-    def test_time_sensitive_query_forces_web_search_without_explicit_search_command(self):
+    def test_invalid_planning_response_retry_preserves_alternating_roles(self):
+        tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(tool["id"], True)
+        model_calls = {"count": 0}
+        captured_retry_roles = []
+
+        def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": "```c\nint main(void) { return 0; }\n```",
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
+            if model_calls["count"] == 2:
+                captured_retry_roles.extend(message["role"] for message in messages)
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_decision":{"needs_tool":false,"reason":"No tool is needed."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Final answer.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-final",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "necesito que crees un archivo snake.c"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(captured_retry_roles, ["system", "user", "assistant", "user"])
+        self.assertEqual(response["message"]["content"], "Final answer.")
+
+    def test_time_sensitive_query_can_use_model_selected_web_search(self):
         tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(tool["id"], True)
         self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
@@ -257,8 +428,25 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"when did KOI league of legends team play last time","max_results":5},"reason":"The answer may depend on recent match data."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider_name,
                 "model": model,
@@ -283,15 +471,15 @@ def run(arguments):
 
         self.assertEqual(
             [message["role"] for message in captured["messages"]],
-            ["user", "assistant", "user"],
+            ["system", "user", "assistant", "user"],
         )
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
         self.assertEqual(
             response["raw"]["tool_events"][0]["arguments"]["query"],
-            "when did KOI, league of legends team played last time",
+            "when did KOI league of legends team play last time",
         )
 
-    def test_current_date_has_priority_over_web_search_for_direct_date_questions(self):
+    def test_model_can_select_current_date_when_multiple_tools_are_available(self):
         date_tool = self.db.tools.get_by_name("current_date")
         search_tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(date_tool["id"], True)
@@ -309,8 +497,25 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"current_date","arguments":{},"reason":"The user asks for the current date."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider_name,
                 "model": model,
@@ -335,7 +540,7 @@ def run(arguments):
 
         self.assertEqual(
             [message["role"] for message in captured["messages"]],
-            ["user", "assistant", "user"],
+            ["system", "user", "assistant", "user"],
         )
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "current_date")
         self.assertEqual(
@@ -343,7 +548,7 @@ def run(arguments):
             "2026-05-25",
         )
 
-    def test_correction_follow_up_reuses_previous_user_question_for_web_search(self):
+    def test_correction_follow_up_can_use_model_selected_web_search(self):
         tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(tool["id"], True)
         self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
@@ -360,8 +565,25 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"when did KOI, league of legends team played last time","max_results":5},"reason":"The user challenged a previous answer that needs verification."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider_name,
                 "model": model,
@@ -408,7 +630,7 @@ def run(arguments):
         )
 
     def test_extract_tool_call_accepts_json_with_prefix_text(self):
-        tool_call = self.manager._extract_tool_call(
+        tool_call = ToolCallParser().parse_response(
             {
                 "message": {
                     "content": 'JSON\n{"tool_call":{"name":"web_search","arguments":{"query":"lol stats"}}}',
@@ -416,18 +638,13 @@ def run(arguments):
             }
         )
 
-        self.assertEqual(
-            tool_call,
-            {
-                "name": "web_search",
-                "arguments": {"query": "lol stats"},
-            },
-        )
+        self.assertEqual(tool_call.name, "web_search")
+        self.assertEqual(tool_call.arguments, {"query": "lol stats"})
 
     def test_chat_falls_back_to_user_facing_tool_response_when_model_keeps_returning_tool_call(self):
         tool = self.db.tools.get_by_name("web_search")
         self.manager.set_tool_active(tool["id"], True)
-        self.manager.max_tool_round_trips = 0
+        self.manager.tool_call_orchestrator.max_tool_round_trips = 0
         self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
             "query": arguments.get("query", ""),
             "results": [
@@ -460,6 +677,5 @@ def run(arguments):
             {},
         )
 
-        self.assertIn("I searched the web", response["message"]["content"])
-        self.assertIn("https://example.com/breaking-news", response["message"]["content"])
+        self.assertIn("I used web search", response["message"]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")

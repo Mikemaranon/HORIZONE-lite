@@ -528,6 +528,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(payload["summary"]["message_count"], 2)
         self.assertEqual(payload["summary"]["tool_enabled_count"], 1)
         self.assertEqual(payload["active_tools"][0]["id"], tool_id)
+        self.assertEqual(payload["messages"][1]["generation"]["available_tools"][0]["id"], tool_id)
         self.assertEqual(payload["project_documents"][0]["filename"], "notes.txt")
         self.assertEqual(payload["messages"][0]["author_label"], "You")
         self.assertEqual(payload["messages"][1]["author_label"], "Qwen 3 Export")
@@ -539,6 +540,10 @@ class ApiEndpointTests(ApiTestCase):
         )
         self.assertIn(
             "Active profile: Exporter",
+            payload["messages"][1]["generation"]["input_messages"][0]["content"],
+        )
+        self.assertIn(
+            "export_lookup",
             payload["messages"][1]["generation"]["input_messages"][0]["content"],
         )
         self.assertIn(
@@ -882,7 +887,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("not a supported text format", response.get_json()["error"])
 
-    def test_chat_endpoint_assigns_provisional_title_before_first_response(self):
+    def test_chat_endpoint_assigns_generated_title_after_first_response(self):
         conversation_id = self.db.conversations.create(
             title="New conversation",
             provider="openai",
@@ -890,9 +895,16 @@ class ApiEndpointTests(ApiTestCase):
         )
         calls = []
 
-        def fake_generate_title(provider, model, first_user_message, settings=None):
-            calls.append(("title", provider, model, first_user_message))
-            return "Quantum computing"
+        def fake_generate_title(provider, model, title_context, settings=None):
+            calls.append(
+                (
+                    "title",
+                    provider,
+                    model,
+                    [(message["role"], message["content"]) for message in title_context],
+                )
+            )
+            return "Quantum computing basics"
 
         def fake_chat(provider, messages, model, settings):
             calls.append(("chat", provider, model, messages[-1]["content"]))
@@ -929,18 +941,32 @@ class ApiEndpointTests(ApiTestCase):
         conversation = self.db.conversations.get(conversation_id)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(calls, [("chat", "openai", "gpt-4.1", "Explain quantum computing to me")])
-        self.assertEqual(conversation["title"], "Explain quantum computing to me")
-        self.assertEqual(payload["conversation"]["title"], "Explain quantum computing to me")
+        self.assertEqual(
+            calls,
+            [
+                ("chat", "openai", "gpt-4.1", "Explain quantum computing to me"),
+                (
+                    "title",
+                    "openai",
+                    "gpt-4.1",
+                    [
+                        ("user", "Explain quantum computing to me"),
+                        ("assistant", "Quantum computing uses qubits"),
+                    ],
+                ),
+            ],
+        )
+        self.assertEqual(conversation["title"], "Quantum computing basics")
+        self.assertEqual(payload["conversation"]["title"], "Quantum computing basics")
 
-    def test_chat_endpoint_uses_provisional_title_without_model_title_generation(self):
+    def test_chat_endpoint_uses_provisional_title_when_model_title_generation_fails(self):
         conversation_id = self.db.conversations.create(
             title="New conversation",
             provider="mlx",
             model="gemma-3",
         )
 
-        def failing_generate_title(provider, model, first_user_message, settings=None):
+        def failing_generate_title(provider, model, title_context, settings=None):
             raise ProviderUnavailableError("MLX offline", provider="mlx")
 
         def fake_chat(provider, messages, model, settings):
@@ -1123,6 +1149,57 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(stored_messages[1]["content"], "Hello world")
         self.assertEqual(stored_messages[1]["provider_message_id"], "resp-stream-1")
 
+    def test_chat_endpoint_splits_large_stream_delta_for_visible_progress(self):
+        conversation_id = self.db.conversations.create(
+            title="Streaming large delta",
+            provider="openai",
+            model="gpt-4.1",
+        )
+        content = (
+            "This answer arrived from the provider as one large chunk, "
+            "but the client should still receive visible progress."
+        )
+
+        def fake_stream_chat(provider, messages, model, settings, should_stop=None):
+            yield {"type": "delta", "delta": content}
+            yield {
+                "type": "response",
+                "response": {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": content,
+                    },
+                    "message_id": "resp-stream-large-delta",
+                    "usage": {},
+                    "finish_reason": "stop",
+                    "raw": {"streamed": True},
+                },
+            }
+
+        self.model_manager.stream_chat = fake_stream_chat
+        self.api_manager.services.chat_stream_service.display_delta_delay_seconds = 0
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "Say it slowly"}],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+            buffered=True,
+        )
+
+        payload = response.get_data(as_text=True)
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(payload.count("event: delta"), 1)
+        self.assertIn('"delta": "This answer arrived "', payload)
+        self.assertEqual(stored_messages[1]["content"], content)
+
     def test_chat_endpoint_streams_tool_progress_before_final_response(self):
         conversation_id = self.db.conversations.create(
             title="Streaming tool progress",
@@ -1143,18 +1220,38 @@ class ApiEndpointTests(ApiTestCase):
             "result_count": 1,
         }
 
-        self.model_manager.chat = lambda provider, messages, model, settings: {
-            "provider": provider,
-            "model": model,
-            "message": {
-                "role": "assistant",
-                "content": "Here is a recent news item: https://example.com/breaking-news",
-            },
-            "message_id": "resp-stream-tool-1",
-            "usage": {"completion_tokens": 6},
-            "finish_reason": "stop",
-            "raw": {},
-        }
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"breaking news","max_results":5},"reason":"The user asks for current web information."}}',
+                    },
+                    "message_id": None,
+                    "usage": {},
+                    "finish_reason": None,
+                    "raw": {},
+                }
+
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Here is a recent news item: https://example.com/breaking-news",
+                },
+                "message_id": "resp-stream-tool-1",
+                "usage": {"completion_tokens": 6},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
 
         response = self.client.post(
             "/api/chat",

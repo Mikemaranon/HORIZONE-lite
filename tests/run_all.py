@@ -16,6 +16,7 @@ DOMAINS = [
     "tests.config_m.run",
     "tests.data_m.run",
     "tests.model_m.run",
+    "tests.tool_m.run",
 ]
 
 

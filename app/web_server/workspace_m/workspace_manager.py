@@ -29,6 +29,23 @@ class WorkspaceManager:
             create_dirs=create_dirs,
         )
 
+    def append_file(
+        self,
+        root_path,
+        relative_path,
+        content,
+        *,
+        ensure_newline_before=True,
+        ensure_newline_after=False,
+    ):
+        return self.file_writer.append(
+            root_path,
+            relative_path,
+            content,
+            ensure_newline_before=ensure_newline_before,
+            ensure_newline_after=ensure_newline_after,
+        )
+
     def search(self, root_path, indexed_files, query, limit=50):
         normalized_query = (query or "").strip()
         if not normalized_query:

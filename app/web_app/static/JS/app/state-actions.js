@@ -39,10 +39,22 @@ export function setActiveMessages(messages = []) {
 }
 
 
+export function setConversationTitleEditMode(isEditing, draft = "") {
+    state.isEditingConversationTitle = Boolean(isEditing);
+    state.conversationTitleDraft = draft;
+}
+
+
+export function setConversationTitleDraft(draft = "") {
+    state.conversationTitleDraft = draft;
+}
+
+
 export function clearActiveConversation() {
     setActiveConversationId(null);
     setActiveConversation(null);
     setActiveMessages([]);
+    setConversationTitleEditMode(false);
 }
 
 
@@ -228,6 +240,8 @@ export function applyConversationDetailPayload(data) {
     state.activeMessages = data.messages || [];
     state.activeProjectId = conversation.project_id || null;
     state.pendingModelConfigId = null;
+    state.isEditingConversationTitle = false;
+    state.conversationTitleDraft = "";
     state.workspaceMode = "conversation";
 }
 

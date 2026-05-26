@@ -8,6 +8,9 @@ import {
     handleComposerSubmit,
     handleConversationDelete,
     handleConversationSelect,
+    handleConversationTitleClick,
+    handleConversationTitleInput,
+    handleConversationTitleKeyDown,
     handleSendButtonClick,
     openNewConversationWorkspace,
     registerChatCallbacks,
@@ -194,6 +197,9 @@ export function bindUI() {
     elements.sendButton?.addEventListener("click", handleSendButtonClick);
     elements.composerInput.addEventListener("keydown", handleComposerKeyDown);
     elements.composerInput.addEventListener("input", autoResizeComposer);
+    elements.conversationTitle?.addEventListener("click", handleConversationTitleClick);
+    elements.conversationTitle?.addEventListener("input", handleConversationTitleInput);
+    elements.conversationTitle?.addEventListener("keydown", handleConversationTitleKeyDown);
     elements.newChatButton.addEventListener("click", () => openNewConversationWorkspace({
         closeSidebarOnMobile,
     }));

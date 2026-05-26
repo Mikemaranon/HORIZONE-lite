@@ -20,6 +20,15 @@ TOOL_PARAMETERS = {
         "description": "Maximum number of results to return.",
     },
 }
+TOOL_CAPABILITIES = [
+    "find current or external information on the public web",
+    "return source URLs, titles, and short snippets",
+]
+TOOL_USE_WHEN = [
+    "The user needs recent, changing, or source-backed information.",
+    "The model needs to verify a fact outside the local conversation.",
+]
+TOOL_RISK_LEVEL = "external_network"
 
 SEARCH_ENDPOINT = "https://duckduckgo.com/html/?q={query}"
 RESULT_PATTERN = re.compile(

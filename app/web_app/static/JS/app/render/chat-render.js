@@ -1,6 +1,7 @@
 import { syncComposerAvailability } from "../composer-ui.js";
+import { syncChatExportState } from "../controllers/export-controller.js";
 import { elements } from "../dom.js";
-import { createMetaChipsMarkup } from "../html.js";
+import { createMetaChipsMarkup, escapeHtml } from "../html.js";
 import { createMessageMarkup, enableMessagesAutoScroll, scrollMessagesToBottom } from "../message-ui.js";
 import { getActualProvider, getProviderDisplayName, getSelectedModel, getSelectedModelConfig } from "../provider-helpers.js";
 import { getActiveProject, getProfileNameById, getSelectedProfileId } from "../selectors.js";
@@ -10,6 +11,8 @@ import { state } from "../state.js";
 export function renderMessages({ preserveViewport = false } = {}) {
     const showConversation = state.workspaceMode === "conversation" && !!state.activeConversation;
     const showEmptyState = state.workspaceMode === "home";
+
+    syncChatExportState();
 
     elements.emptyState.hidden = !showEmptyState;
 
@@ -45,7 +48,9 @@ export function renderConversationHeader() {
         const profileName = getProfileNameById(state.activeConversation?.profile_id || getSelectedProfileId());
 
         elements.workspaceEyebrow.textContent = activeProject ? "Project chat" : "Chat";
-        elements.conversationTitle.textContent = state.activeConversation.title || "New conversation";
+        elements.conversationTitle.innerHTML = createConversationTitleMarkup(
+            state.activeConversation.title || "New conversation",
+        );
         elements.conversationMeta.innerHTML = createMetaChipsMarkup([
             { group: "provider", label: "Provider", value: provider },
             { group: "model", label: "Model", value: model },
@@ -99,4 +104,54 @@ export function renderChatSurface() {
     renderMessages();
     renderConversationHeader();
     syncComposerAvailability();
+}
+
+
+function createConversationTitleMarkup(title) {
+    const safeTitle = escapeHtml(title || "New conversation");
+    const draft = state.conversationTitleDraft || title || "";
+
+    if (state.isEditingConversationTitle) {
+        return `
+            <span class="conversation-title-editor">
+                <input
+                    id="conversation-title-input"
+                    class="conversation-title-editor__input"
+                    type="text"
+                    value="${escapeHtml(draft)}"
+                    maxlength="120"
+                    aria-label="Chat title"
+                >
+                <span class="conversation-title-editor__actions">
+                    <button
+                        class="conversation-title-editor__button"
+                        type="button"
+                        data-conversation-title-save="true"
+                        aria-label="Save title"
+                        title="Save title"
+                    >&check;</button>
+                    <button
+                        class="conversation-title-editor__button"
+                        type="button"
+                        data-conversation-title-cancel="true"
+                        aria-label="Cancel title edit"
+                        title="Cancel"
+                    >&times;</button>
+                </span>
+            </span>
+        `;
+    }
+
+    return `
+        <span class="workspace__title-text">${safeTitle}</span>
+        <button
+            class="workspace__title-edit-button"
+            type="button"
+            data-conversation-title-edit="true"
+            aria-label="Edit chat title"
+            title="Edit title"
+        >
+            <img src="/static/assets/icons/pencil.png" alt="">
+        </button>
+    `;
 }

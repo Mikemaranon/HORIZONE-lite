@@ -195,64 +195,66 @@ class ModelsTable:
         return row[0] if row else 0
 
     def delete(self, model_id):
-        _, row = self.db.execute(
-            """
-            SELECT m.id, m.name, m.provider
-            FROM models AS m
-            WHERE m.id != ?
-            ORDER BY m.is_default DESC, m.is_builtin DESC, m.updated_at DESC, m.id DESC
-            LIMIT 1
-            """,
-            (model_id,),
-            fetchone=True,
-        )
-        fallback = row if row else None
-
-        if fallback:
-            self.db.execute(
+        with self.db.transaction():
+            _, row = self.db.execute(
                 """
-                UPDATE conversations
-                SET model_config_id = ?,
-                    provider = ?,
-                    model = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE model_config_id = ?
+                SELECT m.id, m.name, m.provider
+                FROM models AS m
+                WHERE m.id != ?
+                ORDER BY m.is_default DESC, m.is_builtin DESC, m.updated_at DESC, m.id DESC
+                LIMIT 1
                 """,
-                (fallback[0], fallback[2], fallback[1], model_id),
+                (model_id,),
+                fetchone=True,
+            )
+            fallback = row if row else None
+
+            if fallback:
+                self.db.execute(
+                    """
+                    UPDATE conversations
+                    SET model_config_id = ?,
+                        provider = ?,
+                        model = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE model_config_id = ?
+                    """,
+                    (fallback[0], fallback[2], fallback[1], model_id),
+                )
+
+            self.db.execute(
+                "DELETE FROM models WHERE id = ?",
+                (model_id,),
             )
 
-        self.db.execute(
-            "DELETE FROM models WHERE id = ?",
-            (model_id,),
-        )
-
-        if fallback and not self.get_default():
-            self.set_default(fallback[0])
+            if fallback and not self.get_default():
+                self.set_default(fallback[0])
 
     def sync_provider_snapshot(self, provider_config_id):
         provider = self._require_provider(provider_config_id)
-        self.db.execute(
-            """
-            UPDATE models
-            SET provider = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE provider_config_id = ?
-            """,
-            (provider["provider_type"], provider_config_id),
-        )
-        self.db.execute(
-            """
-            UPDATE conversations
-            SET provider = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE model_config_id IN (
-                SELECT id
-                FROM models
+        with self.db.transaction():
+            self.db.execute(
+                """
+                UPDATE models
+                SET provider = ?,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE provider_config_id = ?
+                """,
+                (provider["provider_type"], provider_config_id),
             )
-            """,
-            (provider["provider_type"], provider_config_id),
-        )
+            self.db.execute(
+                """
+                UPDATE conversations
+                SET provider = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE model_config_id IN (
+                    SELECT id
+                    FROM models
+                    WHERE provider_config_id = ?
+                )
+                """,
+                (provider["provider_type"], provider_config_id),
+            )
 
     def ensure_seed_models(self):
         self._upgrade_builtin_model_names()

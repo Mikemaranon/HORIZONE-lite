@@ -144,11 +144,12 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
 
         def fake_chat(messages, model, settings=None):
             self.assertEqual(messages[0]["role"], "system")
-            self.assertEqual(messages[1]["content"], "I need help with linear algebra")
+            self.assertIn("User: I need help with linear algebra", messages[1]["content"])
+            self.assertIn("Assistant: We can focus on vectors and matrices", messages[1]["content"])
             self.assertEqual(settings["max_tokens"], 24)
             return {
                 "message": {
-                    "content": '  "Algebra lineal aplicada"\n',
+                    "content": '  Título: "Algebra lineal aplicada"\n',
                 }
             }
 
@@ -157,7 +158,10 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         title = manager.generate_conversation_title(
             "ollama",
             "qwen3",
-            "I need help with linear algebra",
+            [
+                {"role": "user", "content": "I need help with linear algebra"},
+                {"role": "assistant", "content": "We can focus on vectors and matrices"},
+            ],
         )
 
         self.assertEqual(title, "Algebra lineal aplicada")

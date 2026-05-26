@@ -33,6 +33,8 @@ export const state = {
     projectWorkspaceFiles: [],
     activeProjectDocumentFolderId: null,
     activeMessages: [],
+    isEditingConversationTitle: false,
+    conversationTitleDraft: "",
     messagesAutoScrollEnabled: true,
     stagedDocuments: [],
     loading: false,

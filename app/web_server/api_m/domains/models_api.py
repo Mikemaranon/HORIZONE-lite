@@ -69,10 +69,10 @@ class ModelsAPI(BaseAPI):
         if current_model.get("is_builtin"):
             model_data["is_builtin"] = True
 
-        self.db.models.update(model_id=model_id, **model_data)
-
-        updated_model = self.db.models.get(model_id)
-        self._sync_conversations_for_model(updated_model)
+        with self.db.transaction():
+            self.db.models.update(model_id=model_id, **model_data)
+            updated_model = self.db.models.get(model_id)
+            self._sync_conversations_for_model(updated_model)
         return self.ok({"model": updated_model})
 
     def delete_model(self):

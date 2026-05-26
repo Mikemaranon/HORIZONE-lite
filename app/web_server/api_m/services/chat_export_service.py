@@ -1,7 +1,8 @@
 class ChatExportService:
-    def __init__(self, db_manager, context_builder):
+    def __init__(self, db_manager, context_builder, tool_manager=None):
         self.db = db_manager
         self.context_builder = context_builder
+        self.tool_manager = tool_manager
 
     def build_conversation_export(self, conversation_id):
         conversation = self.db.conversations.get(conversation_id)
@@ -9,17 +10,20 @@ class ChatExportService:
             raise LookupError("Conversation not found")
 
         project = self._get_project_snapshot(conversation.get("project_id"))
+        workspace = self._get_workspace_snapshot(project)
         profile = self._get_profile_snapshot(conversation.get("profile_id"))
         model = self._get_model_snapshot(conversation.get("model_config_id"))
         provider = self._get_provider_snapshot(model)
         messages = self.db.messages.for_conversation(conversation_id)
-        active_tools = self.db.tools.active()
+        tool_context = self._build_tool_context(conversation, project, workspace)
+        active_tools = self._get_available_tools(tool_context)
         project_documents = self.db.project_documents.for_project(project["id"]) if project else []
         folder_paths = self.context_builder._build_folder_paths(project["id"]) if project else {}
 
         return {
             "conversation": conversation,
             "project": project,
+            "workspace": workspace,
             "profile": profile,
             "model": model,
             "provider": provider,
@@ -42,6 +46,7 @@ class ChatExportService:
                 conversation=conversation,
                 project=project,
                 fallback_profile=profile,
+                tool_context=tool_context,
             ),
             "summary": {
                 "message_count": len(messages),
@@ -65,7 +70,7 @@ class ChatExportService:
             },
         }
 
-    def _build_export_messages(self, messages, *, conversation, project, fallback_profile):
+    def _build_export_messages(self, messages, *, conversation, project, fallback_profile, tool_context):
         export_messages = []
 
         for index, message in enumerate(messages):
@@ -89,33 +94,77 @@ class ChatExportService:
                     conversation=conversation,
                     model=model,
                     provider=provider,
+                    tool_context=tool_context,
                 )
 
             export_messages.append(export_message)
 
         return export_messages
 
-    def _build_generation_snapshot(self, history_messages, *, project, profile, conversation, model, provider):
+    def _build_generation_snapshot(
+        self,
+        history_messages,
+        *,
+        project,
+        profile,
+        conversation,
+        model,
+        provider,
+        tool_context,
+    ):
         settings = self.context_builder.build_generation_settings(profile, None)
         if model and model.get("id") is not None:
             settings["_model_config_id"] = model["id"]
 
         last_user_message = self._find_last_user_message(history_messages)
+        input_messages = self.context_builder.build_input_messages(
+            project,
+            profile,
+            history_messages,
+        )
+        tool_aware_messages = self._build_tool_aware_messages(
+            input_messages,
+            tool_context=tool_context,
+        )
 
         return {
             "provider": provider or self._fallback_provider_snapshot(conversation),
             "model": model or self._fallback_model_snapshot(conversation),
             "profile": profile,
             "settings": settings,
-            "input_messages": self.context_builder.build_input_messages(
-                project,
-                profile,
-                history_messages,
-            ),
+            "input_messages": tool_aware_messages,
+            "available_tools": self._get_available_tools(tool_context),
             "source_user_message_id": last_user_message.get("id") if last_user_message else None,
             "source_user_message_position": last_user_message.get("position") if last_user_message else None,
             "reconstructed": True,
         }
+
+    def _get_available_tools(self, tool_context):
+        if self.tool_manager:
+            return self.tool_manager.list_available_tools(tool_context=tool_context)
+
+        return self.db.tools.active()
+
+    def _build_tool_aware_messages(self, messages, *, tool_context):
+        if self.tool_manager:
+            return self.tool_manager.build_tool_aware_messages(
+                messages,
+                tool_context=tool_context,
+            )
+
+        return messages
+
+    def _build_tool_context(self, conversation, project, workspace):
+        return {
+            "conversation_id": conversation.get("id") if conversation else None,
+            "project": project,
+            "workspace": workspace,
+        }
+
+    def _get_workspace_snapshot(self, project):
+        if not project:
+            return None
+        return self.db.project_workspaces.get_by_project(project["id"])
 
     def _resolve_author_label(self, message, model):
         role = str(message.get("role") or "").strip().lower()

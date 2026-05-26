@@ -58,6 +58,7 @@ class ServiceRegistry:
         self.chat_export_service = ChatExportService(
             db_manager,
             self.chat_context_builder,
+            tool_manager=self.tool_manager,
         )
         self.chat_persistence_service = ChatPersistenceService(
             db_manager,

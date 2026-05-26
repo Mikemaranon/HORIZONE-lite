@@ -117,18 +117,66 @@ class WorkspaceService:
             raise WorkspaceRequestError(str(error))
 
         indexed_files = self.workspace_manager.scan(workspace["root_path"])
-        self.db.workspace_file_index.replace_for_workspace(workspace_id, indexed_files)
-        self.db.project_workspaces.update_indexed_at(workspace_id)
-        refreshed_workspace = self.db.project_workspaces.get(workspace_id)
-        action = "Created" if file_payload.get("created") else "Updated"
-        self._record_event(
-            refreshed_workspace,
-            "workspace_file_written",
-            f"{action} {file_payload['path']}.",
-            {"path": file_payload["path"], "size_bytes": file_payload["size_bytes"], "created": file_payload["created"]},
-            conversation_id=conversation_id,
-            message_id=message_id,
-        )
+        with self.db.transaction():
+            self.db.workspace_file_index.replace_for_workspace(workspace_id, indexed_files)
+            self.db.project_workspaces.update_indexed_at(workspace_id)
+            refreshed_workspace = self.db.project_workspaces.get(workspace_id)
+            action = "Created" if file_payload.get("created") else "Updated"
+            self._record_event(
+                refreshed_workspace,
+                "workspace_file_written",
+                f"{action} {file_payload['path']}.",
+                {"path": file_payload["path"], "size_bytes": file_payload["size_bytes"], "created": file_payload["created"]},
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
+        return {
+            "workspace": refreshed_workspace,
+            "file": file_payload,
+            "file_count": len(indexed_files),
+        }
+
+    def append_file(self, data, *, conversation_id=None, message_id=None):
+        workspace_id = self._require_int(data.get("workspace_id"), "workspace_id")
+        workspace = self._get_workspace(workspace_id)
+        relative_path = (data.get("path") or "").strip()
+        if not relative_path:
+            raise WorkspaceRequestError("Missing path")
+
+        try:
+            file_payload = self.workspace_manager.append_file(
+                workspace["root_path"],
+                relative_path,
+                data.get("content", ""),
+                ensure_newline_before=self._coerce_bool(
+                    data.get("ensure_newline_before"),
+                    default=True,
+                ),
+                ensure_newline_after=self._coerce_bool(
+                    data.get("ensure_newline_after"),
+                    default=False,
+                ),
+            )
+        except (OSError, PathGuardError, ValueError, UnicodeError) as error:
+            raise WorkspaceRequestError(str(error))
+
+        indexed_files = self.workspace_manager.scan(workspace["root_path"])
+        with self.db.transaction():
+            self.db.workspace_file_index.replace_for_workspace(workspace_id, indexed_files)
+            self.db.project_workspaces.update_indexed_at(workspace_id)
+            refreshed_workspace = self.db.project_workspaces.get(workspace_id)
+            self._record_event(
+                refreshed_workspace,
+                "workspace_file_appended",
+                f"Appended to {file_payload['path']}.",
+                {
+                    "path": file_payload["path"],
+                    "size_bytes": file_payload["size_bytes"],
+                    "appended_bytes": file_payload["appended_bytes"],
+                },
+                conversation_id=conversation_id,
+                message_id=message_id,
+            )
         return {
             "workspace": refreshed_workspace,
             "file": file_payload,
@@ -204,3 +252,18 @@ class WorkspaceService:
             return int(value)
         except (TypeError, ValueError):
             return 50
+
+    def _coerce_bool(self, value, *, default=False):
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return default

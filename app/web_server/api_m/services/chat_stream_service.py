@@ -1,5 +1,7 @@
 import json
+import re
 import threading
+import time
 import uuid
 
 from flask import Response, stream_with_context
@@ -8,11 +10,27 @@ from model_m import ProviderError
 
 
 class ChatStreamService:
-    def __init__(self, db_manager, model_manager, persistence_service, tool_manager=None):
+    DISPLAY_DELTA_SPLIT_THRESHOLD = 48
+    DISPLAY_DELTA_TARGET_CHARS = 24
+    DISPLAY_DELTA_DELAY_SECONDS = 0.018
+
+    def __init__(
+        self,
+        db_manager,
+        model_manager,
+        persistence_service,
+        tool_manager=None,
+        display_delta_delay_seconds=None,
+    ):
         self.db = db_manager
         self.model_manager = model_manager
         self.persistence_service = persistence_service
         self.tool_manager = tool_manager
+        self.display_delta_delay_seconds = (
+            self.DISPLAY_DELTA_DELAY_SECONDS
+            if display_delta_delay_seconds is None
+            else display_delta_delay_seconds
+        )
         self._active_streams = {}
         self._active_streams_lock = threading.Lock()
 
@@ -87,8 +105,9 @@ class ChatStreamService:
                     if event_type == "delta":
                         delta = event.get("delta") or ""
                         if delta:
-                            streamed_text_parts.append(delta)
-                            yield self._format_sse("delta", {"delta": delta})
+                            for display_delta in self._iter_display_deltas(delta):
+                                streamed_text_parts.append(display_delta)
+                                yield self._format_sse("delta", {"delta": display_delta})
                         continue
 
                     if event_type == "tool_start":
@@ -180,6 +199,7 @@ class ChatStreamService:
             mimetype="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
             },
         )
@@ -208,7 +228,8 @@ class ChatStreamService:
 
             content = ((response.get("message") or {}).get("content") or "")
             if content:
-                yield self._format_sse("delta", {"delta": content})
+                for display_delta in self._iter_display_deltas(content):
+                    yield self._format_sse("delta", {"delta": display_delta})
 
             if conversation_id:
                 self.persistence_service.finalize_response(
@@ -233,6 +254,7 @@ class ChatStreamService:
             mimetype="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
             },
         )
@@ -250,3 +272,45 @@ class ChatStreamService:
     def _format_sse(self, event_name, payload):
         serialized = json.dumps(payload, ensure_ascii=False)
         return f"event: {event_name}\ndata: {serialized}\n\n"
+
+    def _iter_display_deltas(self, delta):
+        if len(delta) <= self.DISPLAY_DELTA_SPLIT_THRESHOLD:
+            yield delta
+            return
+
+        chunks = list(self._split_delta_for_display(delta))
+        for index, chunk in enumerate(chunks):
+            if not chunk:
+                continue
+
+            yield chunk
+            if index < len(chunks) - 1:
+                self._pause_between_display_deltas()
+
+    def _split_delta_for_display(self, delta):
+        current = ""
+        for token in re.findall(r"\S+\s*|\s+", delta):
+            if len(token) > self.DISPLAY_DELTA_TARGET_CHARS * 2:
+                if current:
+                    yield current
+                    current = ""
+                yield from self._split_long_token(token)
+                continue
+
+            if current and len(current) + len(token) > self.DISPLAY_DELTA_TARGET_CHARS:
+                yield current
+                current = token
+            else:
+                current += token
+
+        if current:
+            yield current
+
+    def _split_long_token(self, token):
+        size = self.DISPLAY_DELTA_TARGET_CHARS
+        for index in range(0, len(token), size):
+            yield token[index:index + size]
+
+    def _pause_between_display_deltas(self):
+        if self.display_delta_delay_seconds > 0:
+            time.sleep(self.display_delta_delay_seconds)

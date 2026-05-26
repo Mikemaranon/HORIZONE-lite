@@ -89,6 +89,53 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         renamed_conversation = db.conversations.get(conversation_id)
         self.assertEqual(renamed_conversation["title"], "Workspace kickoff")
 
+    def test_transaction_rolls_back_grouped_writes(self):
+        db = DBManager()
+
+        with self.assertRaises(RuntimeError):
+            with db.transaction():
+                db.projects.create("Rollback Project", "Should not persist")
+                raise RuntimeError("fail after write")
+
+        project_names = [project["name"] for project in db.projects.all()]
+        self.assertNotIn("Rollback Project", project_names)
+
+    def test_model_delete_rolls_back_conversation_reassignment_on_failure(self):
+        db = DBManager()
+        profile = db.profiles.get_default()
+        ollama_provider = db.providers.get_first_by_type("ollama")
+        fallback_model_id = db.models.create(
+            name="fallback",
+            provider_config_id=ollama_provider["id"],
+        )
+        deleted_model_id = db.models.create(
+            name="delete-me",
+            provider_config_id=ollama_provider["id"],
+        )
+        conversation_id = db.conversations.create(
+            title="Atomic model delete",
+            profile_id=profile["id"],
+            model_config_id=deleted_model_id,
+            provider="ollama",
+            model="delete-me",
+        )
+        original_execute = db.db.execute
+
+        def fail_model_delete(query, *args, **kwargs):
+            if query.strip().lower().startswith("delete from models"):
+                raise RuntimeError("delete failed")
+            return original_execute(query, *args, **kwargs)
+
+        with patch.object(db.db, "execute", side_effect=fail_model_delete):
+            with self.assertRaises(RuntimeError):
+                db.models.delete(deleted_model_id)
+
+        conversation = db.conversations.get(conversation_id)
+        self.assertIsNotNone(db.models.get(deleted_model_id))
+        self.assertIsNotNone(db.models.get(fallback_model_id))
+        self.assertEqual(conversation["model_config_id"], deleted_model_id)
+        self.assertEqual(conversation["model"], "delete-me")
+
     def test_messages_persist_tool_events(self):
         db = DBManager()
         profile = db.profiles.get_default()

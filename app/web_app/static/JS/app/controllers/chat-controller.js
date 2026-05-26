@@ -30,6 +30,8 @@ import {
     setActiveConversationId,
     setActiveGenerationRequestId,
     setActiveMessages,
+    setConversationTitleDraft,
+    setConversationTitleEditMode,
     setGenerationStopRequested,
     setProjectDocuments,
     setProjectWorkspace,
@@ -324,6 +326,50 @@ export async function handleConversationDelete(conversationId) {
 }
 
 
+export function handleConversationTitleClick(event) {
+    if (event.target.closest("[data-conversation-title-edit]")) {
+        openConversationTitleEditor();
+        return;
+    }
+
+    if (event.target.closest("[data-conversation-title-save]")) {
+        commitConversationTitleEdit();
+        return;
+    }
+
+    if (event.target.closest("[data-conversation-title-cancel]")) {
+        cancelConversationTitleEdit();
+    }
+}
+
+
+export function handleConversationTitleInput(event) {
+    if (event.target?.id !== "conversation-title-input") {
+        return;
+    }
+
+    setConversationTitleDraft(event.target.value);
+}
+
+
+export function handleConversationTitleKeyDown(event) {
+    if (event.target?.id !== "conversation-title-input") {
+        return;
+    }
+
+    if (event.key === "Enter") {
+        event.preventDefault();
+        commitConversationTitleEdit();
+        return;
+    }
+
+    if (event.key === "Escape") {
+        event.preventDefault();
+        cancelConversationTitleEdit();
+    }
+}
+
+
 export function getChatCallbacks() {
     return {
         handleConversationDelete: chatCallbacks.handleConversationDelete,
@@ -346,6 +392,90 @@ export {
 function autoResizeComposerHeight() {
     elements.composerInput.style.height = "auto";
     elements.composerInput.style.height = `${Math.min(elements.composerInput.scrollHeight, 220)}px`;
+}
+
+
+function openConversationTitleEditor() {
+    if (state.workspaceMode !== "conversation" || !state.activeConversation) {
+        return;
+    }
+
+    const titleRect = elements.conversationTitle?.getBoundingClientRect();
+    const titleWidth = titleRect?.width || 0;
+    const titleHeight = titleRect?.height || 0;
+    if (titleWidth > 0 && titleHeight > 0) {
+        elements.conversationTitle.style.setProperty(
+            "--conversation-title-editor-width",
+            `${Math.ceil(titleWidth)}px`,
+        );
+        elements.conversationTitle.style.setProperty(
+            "--conversation-title-editor-height",
+            `${Math.ceil(titleHeight)}px`,
+        );
+        elements.conversationTitle.style.width = `${Math.ceil(titleWidth)}px`;
+        elements.conversationTitle.style.height = `${Math.ceil(titleHeight)}px`;
+    }
+
+    setConversationTitleEditMode(true, state.activeConversation.title || "");
+    renderConversationHeader();
+
+    window.requestAnimationFrame(() => {
+        const input = document.getElementById("conversation-title-input");
+        input?.focus();
+        input?.select();
+    });
+}
+
+
+function cancelConversationTitleEdit() {
+    setConversationTitleEditMode(false);
+    elements.conversationTitle?.style.removeProperty("--conversation-title-editor-width");
+    elements.conversationTitle?.style.removeProperty("--conversation-title-editor-height");
+    elements.conversationTitle?.style.removeProperty("width");
+    elements.conversationTitle?.style.removeProperty("height");
+    renderConversationHeader();
+}
+
+
+async function commitConversationTitleEdit() {
+    if (!state.activeConversationId || !state.activeConversation) {
+        cancelConversationTitleEdit();
+        return;
+    }
+
+    const nextTitle = String(state.conversationTitleDraft || "").trim();
+    if (!nextTitle) {
+        showStatus("The chat title cannot be empty.", true);
+        document.getElementById("conversation-title-input")?.focus();
+        return;
+    }
+
+    const currentTitle = String(state.activeConversation.title || "").trim();
+    if (nextTitle === currentTitle) {
+        cancelConversationTitleEdit();
+        return;
+    }
+
+    try {
+        const payload = await updateConversation({
+            id: state.activeConversationId,
+            title: nextTitle,
+        });
+        patchActiveConversation(payload.conversation || { title: nextTitle });
+        setConversationTitleEditMode(false);
+        elements.conversationTitle?.style.removeProperty("--conversation-title-editor-width");
+        elements.conversationTitle?.style.removeProperty("--conversation-title-editor-height");
+        elements.conversationTitle?.style.removeProperty("width");
+        elements.conversationTitle?.style.removeProperty("height");
+
+        const conversations = await loadConversations();
+        applyConversationsPayload(conversations);
+        renderConversations(getChatCallbacks().handleConversationSelect, getChatCallbacks().handleConversationDelete);
+        renderConversationHeader();
+    } catch (error) {
+        showStatus(error.message || "The chat title could not be updated.", true);
+        document.getElementById("conversation-title-input")?.focus();
+    }
 }
 
 

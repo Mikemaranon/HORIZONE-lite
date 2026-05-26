@@ -53,6 +53,11 @@ class WorkspacesAPI(BaseAPI):
             methods=["POST"],
         )
         self.app.add_url_rule(
+            "/api/workspaces/file/append",
+            view_func=self.handle_workspace_file_append_post,
+            methods=["POST"],
+        )
+        self.app.add_url_rule(
             "/api/workspaces/search",
             view_func=self.handle_workspace_search_post,
             methods=["POST"],
@@ -170,6 +175,20 @@ class WorkspacesAPI(BaseAPI):
             return self.error(str(error), 400)
 
         return self.ok(payload, 201)
+
+    def handle_workspace_file_append_post(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        try:
+            payload = self.workspace_service.append_file(self.get_request_json(request))
+        except WorkspaceResourceNotFoundError as error:
+            return self.error(str(error), 404)
+        except WorkspaceRequestError as error:
+            return self.error(str(error), 400)
+
+        return self.ok(payload)
 
     def handle_workspace_search_post(self):
         auth = self.authenticate_request(request)

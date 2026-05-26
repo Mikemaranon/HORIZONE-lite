@@ -14,6 +14,7 @@ class WorkspaceToolProvider:
         return [
             self._build_read_file_tool(workspace_id),
             self._build_search_tool(workspace_id),
+            self._build_append_file_tool(workspace_id, conversation_id),
             self._build_write_file_tool(workspace_id, conversation_id),
         ]
 
@@ -23,6 +24,15 @@ class WorkspaceToolProvider:
             "name": "workspace_read_file",
             "display_name": "workspace read file",
             "description": "Reads a UTF-8 text file from the active project workspace using a relative path.",
+            "capabilities": [
+                "read exact file contents from the connected project workspace",
+                "ground answers in local project files",
+            ],
+            "use_when": [
+                "The model needs evidence from a known file before explaining or changing code.",
+                "The user references a specific path in the connected workspace.",
+            ],
+            "risk_level": "read_only",
             "parameters": {
                 "path": {
                     "type": "string",
@@ -47,6 +57,15 @@ class WorkspaceToolProvider:
             "name": "workspace_search",
             "display_name": "workspace search",
             "description": "Searches indexed text files in the active project workspace.",
+            "capabilities": [
+                "find relevant project files",
+                "locate symbols, functions, text, errors, or filenames",
+            ],
+            "use_when": [
+                "The user asks about code that may exist in the connected workspace.",
+                "The model needs to discover relevant files before reading or editing.",
+            ],
+            "risk_level": "read_only",
             "parameters": {
                 "query": {
                     "type": "string",
@@ -78,8 +97,18 @@ class WorkspaceToolProvider:
             "display_name": "workspace write file",
             "description": (
                 "Creates or replaces a UTF-8 text file in the active project workspace. "
+                "Use this when you have the complete desired file content. "
                 "Use relative paths only. Set overwrite to true only when replacing an existing file is intended."
             ),
+            "capabilities": [
+                "create UTF-8 files in the connected project workspace",
+                "replace existing workspace files when overwrite is explicitly true",
+            ],
+            "use_when": [
+                "The user asks the assistant to create or update a workspace file.",
+                "The model has enough file content to perform a small, controlled write.",
+            ],
+            "risk_level": "writes_workspace",
             "parameters": {
                 "path": {
                     "type": "string",
@@ -114,6 +143,69 @@ class WorkspaceToolProvider:
                     "content": (arguments or {}).get("content", ""),
                     "overwrite": bool((arguments or {}).get("overwrite")),
                     "create_dirs": bool((arguments or {}).get("create_dirs")),
+                },
+                conversation_id=conversation_id,
+            ),
+        }
+
+    def _build_append_file_tool(self, workspace_id, conversation_id):
+        return {
+            "id": "runtime:workspace_append_file",
+            "name": "workspace_append_file",
+            "display_name": "workspace append file",
+            "description": (
+                "Appends UTF-8 text to an existing file in the active project workspace. "
+                "Use relative paths only. This does not replace the existing file content."
+            ),
+            "capabilities": [
+                "add text to the end of an existing workspace file",
+                "preserve existing file content while adding a phrase, line, or block",
+            ],
+            "use_when": [
+                "The user asks to add, append, or include text in an existing workspace file.",
+                "The requested change can be safely made by adding content at the end of a file.",
+            ],
+            "risk_level": "writes_workspace",
+            "parameters": {
+                "path": {
+                    "type": "string",
+                    "required": True,
+                    "description": "Relative file path inside the active workspace.",
+                },
+                "content": {
+                    "type": "string",
+                    "required": True,
+                    "description": "UTF-8 text to append to the file.",
+                },
+                "ensure_newline_before": {
+                    "type": "boolean",
+                    "required": False,
+                    "description": "Whether to insert a newline before appended text when the file does not already end with one. Defaults to true.",
+                },
+                "ensure_newline_after": {
+                    "type": "boolean",
+                    "required": False,
+                    "description": "Whether to ensure appended text ends with a newline.",
+                },
+            },
+            "filename": "runtime_workspace_tools.py",
+            "module_path": "tool_m.workspace_tools",
+            "is_builtin": True,
+            "is_active": True,
+            "is_available": True,
+            "runner": lambda arguments: self.workspace_service.append_file(
+                {
+                    "workspace_id": workspace_id,
+                    "path": (arguments or {}).get("path"),
+                    "content": (arguments or {}).get("content", ""),
+                    "ensure_newline_before": (arguments or {}).get(
+                        "ensure_newline_before",
+                        True,
+                    ),
+                    "ensure_newline_after": (arguments or {}).get(
+                        "ensure_newline_after",
+                        False,
+                    ),
                 },
                 conversation_id=conversation_id,
             ),

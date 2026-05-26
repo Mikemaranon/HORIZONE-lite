@@ -41,13 +41,13 @@ class ModelManager:
         self,
         provider_name: str,
         model: str,
-        first_user_message: str,
+        title_context,
         settings: dict | None = None,
     ) -> str:
         return self.provider_manager.generate_conversation_title(
             provider_name,
             model,
-            first_user_message,
+            title_context,
             settings or {},
         )
 

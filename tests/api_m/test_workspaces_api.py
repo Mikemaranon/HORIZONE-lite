@@ -107,6 +107,37 @@ class WorkspacesApiTests(ApiTestCase):
         self.assertTrue((workspace_root / "scripts" / "helloworld.sh").exists())
         self.assertIn("Hello, world!", (workspace_root / "scripts" / "helloworld.sh").read_text(encoding="utf-8"))
 
+    def test_workspace_file_can_be_appended_through_api(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        (workspace_root / "hello.txt").write_text("hola", encoding="utf-8")
+        project_id = self.db.projects.create("Append Project")
+        workspace_id = self.db.project_workspaces.upsert(
+            project_id,
+            str(workspace_root),
+            "Workspace",
+        )
+
+        response = self.client.post(
+            "/api/workspaces/file/append",
+            json={
+                "workspace_id": workspace_id,
+                "path": "hello.txt",
+                "content": "que tal estas?",
+                "ensure_newline_before": True,
+                "ensure_newline_after": True,
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["file"]["path"], "hello.txt")
+        self.assertEqual(
+            (workspace_root / "hello.txt").read_text(encoding="utf-8"),
+            "hola\nque tal estas?\n",
+        )
+
     def test_chat_can_create_workspace_file_with_contextual_tool(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"
         workspace_root.mkdir()
@@ -125,6 +156,22 @@ class WorkspacesApiTests(ApiTestCase):
 
         def fake_chat(provider, messages, model, settings):
             model_calls["count"] += 1
+            if model_calls["count"] == 1:
+                self.assertEqual(messages[0]["role"], "system")
+                self.assertIn("workspace_write_file", messages[0]["content"])
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"workspace_write_file","arguments":{"path":"helloworld.sh","content":"#!/usr/bin/env bash\\necho \\"Hello, world!\\"\\n","overwrite":false,"create_dirs":false},"reason":"The user asked to create a file in the connected workspace."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             self.assertIn("Tool result for workspace_write_file", messages[-1]["content"])
             return {
                 "provider": provider,
@@ -152,9 +199,134 @@ class WorkspacesApiTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(model_calls["count"], 1)
+        self.assertEqual(model_calls["count"], 2)
         self.assertTrue((workspace_root / "helloworld.sh").exists())
         self.assertIn("Hello, world!", (workspace_root / "helloworld.sh").read_text(encoding="utf-8"))
         self.assertIn("workspace_write_file", payload["response"]["raw"]["tool_events"][0]["tool_name"])
         self.assertIn("created helloworld.sh", payload["response"]["raw"]["tool_events"][0]["tool_summary"])
         self.assertIn("Created", payload["response"]["message"]["content"])
+
+    def test_chat_can_append_workspace_file_with_contextual_tool(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        (workspace_root / "hello.txt").write_text("hola", encoding="utf-8")
+        project_id = self.db.projects.create("Agent Append Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Workspace append",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            if model_calls["count"] == 1:
+                self.assertIn("workspace_append_file", messages[0]["content"])
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"workspace_append_file","arguments":{"path":"hello.txt","content":"que tal estas?","ensure_newline_before":true,"ensure_newline_after":true},"reason":"The user asked to add text to an existing file."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
+            self.assertIn("Tool result for workspace_append_file", messages[-1]["content"])
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Añadí la frase a `hello.txt`.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-workspace-append-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "necesito que añadas la frase \"que tal estas?\" a hello.txt"}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(model_calls["count"], 2)
+        self.assertEqual(
+            (workspace_root / "hello.txt").read_text(encoding="utf-8"),
+            "hola\nque tal estas?\n",
+        )
+        self.assertEqual(
+            payload["response"]["raw"]["tool_events"][0]["tool_name"],
+            "workspace_append_file",
+        )
+        self.assertIn(
+            "appended to hello.txt",
+            payload["response"]["raw"]["tool_events"][0]["tool_summary"],
+        )
+
+    def test_conversation_export_includes_contextual_workspace_tools(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        (workspace_root / "hello.txt").write_text("hello\n", encoding="utf-8")
+        project_id = self.db.projects.create("Export Workspace Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Workspace export",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="actualiza hello.txt",
+            position=0,
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="No pude actualizarlo.",
+            position=1,
+            profile_id=profile["id"],
+            profile_name=profile["name"],
+        )
+
+        response = self.client.get(
+            f"/api/conversations/export?id={conversation_id}",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()["export"]
+        available_tool_names = {
+            tool["name"]
+            for tool in payload["messages"][1]["generation"]["available_tools"]
+        }
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["workspace"]["project_id"], project_id)
+        self.assertIn("workspace_search", available_tool_names)
+        self.assertIn("workspace_read_file", available_tool_names)
+        self.assertIn("workspace_append_file", available_tool_names)
+        self.assertIn("workspace_write_file", available_tool_names)
+        self.assertIn(
+            "workspace_write_file",
+            payload["messages"][1]["generation"]["input_messages"][0]["content"],
+        )

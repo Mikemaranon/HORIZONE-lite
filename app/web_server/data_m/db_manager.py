@@ -82,7 +82,11 @@ class DBManager:
         )
 
         # Secure logging: avoid logging data_logs operations to prevent recursion
-        if op in ("INSERT", "UPDATE", "DELETE") and "data_logs" not in query.lower():
+        if (
+            op in ("INSERT", "UPDATE", "DELETE")
+            and "data_logs" not in query.lower()
+            and not self.db.in_transaction()
+        ):
             self.logger.log(
                 level="INFO",
                 source="DBManager",
@@ -91,6 +95,9 @@ class DBManager:
             )
 
         return data
+
+    def transaction(self):
+        return self.db.transaction()
 
     def _ensure_defaults(self):
         default_profile = self.profiles.get_default()

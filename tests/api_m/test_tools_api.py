@@ -191,8 +191,25 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"when did KOI, league of legends team played last time","max_results":5},"reason":"The previous answer needs external verification."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider,
                 "model": model,
@@ -275,8 +292,25 @@ def run(arguments):
 
         captured = {}
 
+        model_calls = {"count": 0}
+
         def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
             captured["messages"] = messages
+            if model_calls["count"] == 1:
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"current_date","arguments":{},"reason":"The user asks for the current date."}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
             return {
                 "provider": provider,
                 "model": model,

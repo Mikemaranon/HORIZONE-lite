@@ -12,21 +12,27 @@ class ChatPersistenceService:
 
     def prepare_conversation(self, conversation, provider, model, request_messages):
         conversation_id = conversation["id"]
-        self._ensure_conversation_title(
-            conversation,
-            request_messages,
-        )
-        self.persist_request_messages(conversation_id, request_messages)
-        self.db.conversations.touch(conversation_id)
+        with self.db.transaction():
+            self.persist_request_messages(conversation_id, request_messages)
+            self.db.conversations.touch(conversation_id)
 
     def finalize_response(self, conversation_id, response, assistant_message_meta=None):
         assistant_content = ((response.get("message") or {}).get("content") or "").strip()
         if not assistant_content:
             return
 
-        self._apply_assistant_message_meta(response, assistant_message_meta)
-        self.persist_assistant_message(conversation_id, response)
-        self.db.conversations.touch(conversation_id)
+        with self.db.transaction():
+            conversation = self.db.conversations.get(conversation_id)
+            stored_messages = self.db.messages.for_conversation(conversation_id)
+            self._apply_assistant_message_meta(response, assistant_message_meta)
+            self.persist_assistant_message(conversation_id, response)
+            self.db.conversations.touch(conversation_id)
+
+        self._ensure_generated_conversation_title(
+            conversation,
+            stored_messages,
+            response,
+        )
 
     def persist_request_messages(self, conversation_id, request_messages):
         stored_messages = self.db.messages.for_conversation(conversation_id)
@@ -69,23 +75,63 @@ class ChatPersistenceService:
         assistant_message["profile_id"] = assistant_message_meta.get("profile_id")
         assistant_message["profile_name"] = assistant_message_meta.get("profile_name", "")
 
-    def _ensure_conversation_title(self, conversation, request_messages):
-        stored_messages = self.db.messages.for_conversation(conversation["id"])
-        if stored_messages:
+    def _ensure_generated_conversation_title(self, conversation, stored_messages, response):
+        if not conversation:
             return
 
         if not self._should_replace_conversation_title(conversation):
             return
 
-        first_user_message = self._get_first_user_message_content(request_messages)
+        if any(message.get("role") == "assistant" for message in stored_messages):
+            return
+
+        first_user_message = self._get_first_user_message_content(stored_messages)
         if not first_user_message:
             return
 
-        provisional_title = self._build_provisional_title(first_user_message)
-        if not provisional_title:
+        assistant_content = ((response.get("message") or {}).get("content") or "").strip()
+        if not assistant_content:
             return
 
-        self.db.conversations.rename(conversation["id"], provisional_title)
+        provider = response.get("provider") or conversation.get("provider")
+        model = response.get("model") or conversation.get("model")
+        generated_title = self._generate_title(
+            provider,
+            model,
+            first_user_message,
+            assistant_content,
+        )
+        title = generated_title or self._build_provisional_title(first_user_message)
+        if not title:
+            return
+
+        latest_conversation = self.db.conversations.get(conversation["id"])
+        if not self._should_replace_conversation_title(latest_conversation):
+            return
+
+        self.db.conversations.rename(conversation["id"], title)
+
+    def _generate_title(self, provider, model, first_user_message, assistant_content):
+        if not provider or not model:
+            return ""
+
+        try:
+            return self.model_manager.generate_conversation_title(
+                provider,
+                model,
+                [
+                    {
+                        "role": "user",
+                        "content": first_user_message,
+                    },
+                    {
+                        "role": "assistant",
+                        "content": assistant_content,
+                    },
+                ],
+            )
+        except Exception:
+            return ""
 
     def _get_first_user_message_content(self, messages):
         for message in messages:
@@ -119,7 +165,16 @@ class ChatPersistenceService:
 
     def _should_replace_conversation_title(self, conversation):
         current_title = str((conversation or {}).get("title") or "").strip().lower()
-        return current_title in self.PLACEHOLDER_TITLES
+        if current_title in self.PLACEHOLDER_TITLES:
+            return True
+
+        project_id = (conversation or {}).get("project_id")
+        if not project_id:
+            return False
+
+        project = self.db.projects.get(project_id)
+        project_chat_title = f"{(project or {}).get('name', '')} · chat".strip().lower()
+        return bool(project_chat_title and current_title == project_chat_title)
 
     def _build_provisional_title(self, first_user_message):
         normalized = " ".join(str(first_user_message or "").split()).strip(" -–—:;,.!?")
@@ -190,6 +245,13 @@ class ChatPersistenceService:
             if path:
                 return f"{tool_name} {action} {path}."
             return f"{tool_name} wrote a file in the connected workspace."
+
+        if tool_name == "workspace_append_file":
+            file_payload = result.get("file") if isinstance(result, dict) else {}
+            path = str((file_payload or {}).get("path") or arguments.get("path") or "").strip()
+            if path:
+                return f"{tool_name} appended to {path}."
+            return f"{tool_name} appended text in the connected workspace."
 
         if tool_name == "workspace_read_file":
             file_payload = result.get("file") if isinstance(result, dict) else {}

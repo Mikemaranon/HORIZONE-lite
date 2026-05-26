@@ -56,13 +56,13 @@ class ProviderManager:
         self,
         provider_name: str,
         model: str,
-        first_user_message: str,
+        title_context,
         settings: dict | None = None,
     ) -> str:
         return self.conversation_title_service.generate_title(
             self.get_provider(provider_name),
             model,
-            first_user_message,
+            title_context,
             settings or {},
         )
 

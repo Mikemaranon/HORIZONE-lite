@@ -36,3 +36,39 @@ class FileWriter:
             "size_bytes": len(encoded_content),
             "created": not existed,
         }
+
+    def append(
+        self,
+        root_path,
+        relative_path,
+        content,
+        *,
+        ensure_newline_before=True,
+        ensure_newline_after=False,
+    ):
+        target = self.path_guard.resolve_inside(root_path, relative_path)
+        if not target.exists():
+            raise ValueError("Workspace file does not exist; use workspace_write_file to create it")
+        if not target.is_file():
+            raise ValueError("Workspace path is not a file")
+
+        existing_content = target.read_text(encoding="utf-8")
+        append_content = str(content or "")
+        if ensure_newline_before and existing_content and not existing_content.endswith("\n"):
+            append_content = "\n" + append_content
+        if ensure_newline_after and append_content and not append_content.endswith("\n"):
+            append_content = append_content + "\n"
+
+        next_content = existing_content + append_content
+        encoded_content = next_content.encode("utf-8")
+        if len(encoded_content) > self.max_bytes:
+            raise ValueError("Workspace file content is too large")
+
+        target.write_text(next_content, encoding="utf-8")
+
+        return {
+            "path": Path(relative_path).as_posix(),
+            "size_bytes": len(encoded_content),
+            "appended_bytes": len(append_content.encode("utf-8")),
+            "created": False,
+        }
