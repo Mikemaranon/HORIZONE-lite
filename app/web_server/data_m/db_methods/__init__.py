@@ -7,6 +7,7 @@ from .t_projects import ProjectsTable
 from .t_project_document_folders import ProjectDocumentFoldersTable
 from .t_project_document_chunks import ProjectDocumentChunksTable
 from .t_project_documents import ProjectDocumentsTable
+from .t_project_models import ProjectModelsTable
 from .t_profiles import ProfilesTable
 from .t_conversations import ConversationsTable
 from .t_messages import MessagesTable
@@ -28,6 +29,7 @@ __all__ = [
     "ProjectDocumentFoldersTable",
     "ProjectDocumentChunksTable",
     "ProjectDocumentsTable",
+    "ProjectModelsTable",
     "ProfilesTable",
     "ConversationsTable",
     "MessagesTable",

@@ -1,5 +1,5 @@
 import { elements } from "../dom.js";
-import { createEmptyListItem, escapeHtml } from "../html.js";
+import { createEmptyListItem, createModelAvatarMarkup, escapeHtml } from "../html.js";
 import { getActiveProject, getProjectConversations } from "../selectors.js";
 import { state } from "../state.js";
 
@@ -26,9 +26,7 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
     const projectConversations = getProjectConversations(activeProject.id);
     const totalChats = projectConversations.length;
     const totalDocuments = state.projectDocuments.length;
-    const workspaceLabel = state.projectWorkspace
-        ? `${state.projectWorkspaceFileCount} workspace file${state.projectWorkspaceFileCount === 1 ? "" : "s"}`
-        : "no workspace";
+    const workspaceLabel = state.projectWorkspace ? "connected" : "disconnected";
     elements.projectChatCount.textContent = `${totalChats} chat${totalChats === 1 ? "" : "s"} · ${totalDocuments} document${totalDocuments === 1 ? "" : "s"} · ${workspaceLabel}`;
 
     const conversationsMarkup = !projectConversations.length
@@ -70,6 +68,305 @@ export function renderProjectSpace(onConversationSelect, onConversationDelete) {
             });
         });
     }
+}
+
+
+export function renderProjectModelsManager() {
+    if (!elements.projectModelsList) {
+        return;
+    }
+
+    const projectModels = state.projectModels || [];
+    const summary = `${projectModels.length} project agent${projectModels.length === 1 ? "" : "s"}.`;
+
+    if (elements.projectModelsSummary) {
+        elements.projectModelsSummary.textContent = summary;
+    }
+
+    elements.projectModelsList.innerHTML = projectModels.length
+        ? projectModels.map((projectModel) => createProjectModelRowMarkup(projectModel)).join("")
+        : `<div class="profile-switch__empty">No project agents yet. Add one from the form.</div>`;
+
+    renderProjectModelFormOptions();
+    syncProjectModelForm();
+}
+
+
+function createProjectModelRowMarkup(projectModel) {
+    const model = projectModel.model || {};
+    const profile = projectModel.profile || {};
+    const modelLabel = model.display_name || model.name || "Model";
+    const providerLabel = model.provider_name || model.provider || "Provider";
+
+    return `
+        <article class="project-model-row${projectModel.is_default ? " is-default" : ""}">
+            ${createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar model-badge-avatar--switch")}
+            <div class="project-model-row__copy">
+                <strong>
+                    ${escapeHtml(projectModel.nickname || modelLabel)}
+                    ${projectModel.is_default ? `<span class="project-model-row__badge">Default</span>` : ""}
+                </strong>
+                <span>${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
+                <span>${escapeHtml(providerLabel)}</span>
+                ${projectModel.system_prompt ? `<span>${escapeHtml(projectModel.system_prompt)}</span>` : ""}
+            </div>
+            <div class="project-model-row__actions">
+                <button
+                    class="icon-button project-model-row__action"
+                    type="button"
+                    data-edit-project-model-id="${projectModel.id}"
+                    aria-label="Edit agent ${escapeHtml(projectModel.nickname || modelLabel)}"
+                    title="Edit"
+                >
+                    <img src="/static/assets/icons/pencil.png" alt="">
+                </button>
+                <button
+                    class="icon-button project-model-row__action project-model-row__action--danger"
+                    type="button"
+                    data-delete-project-model-id="${projectModel.id}"
+                    aria-label="Delete agent ${escapeHtml(projectModel.nickname || modelLabel)}"
+                    title="Delete"
+                >
+                    <img src="/static/assets/icons/trash.png" alt="">
+                </button>
+            </div>
+        </article>
+    `;
+}
+
+
+export function renderProjectModelFormOptions() {
+    const selectedModelId = Number(elements.projectModelSystemModelIdInput?.value || "0") || null;
+    const selectedProfileId = Number(elements.projectModelProfileIdInput?.value || "0") || null;
+
+    if (elements.projectModelSystemModelOptions) {
+        elements.projectModelSystemModelOptions.innerHTML = (state.models || [])
+            .map((model) => createProjectModelOptionMarkup({
+                id: model.id,
+                kind: "model",
+                label: model.display_name || model.name,
+                meta: `${model.name} · ${model.provider_name || model.provider || "Provider"}`,
+                isSelected: model.id === selectedModelId,
+            }))
+            .join("");
+    }
+
+    if (elements.projectModelProfileOptions) {
+        elements.projectModelProfileOptions.innerHTML = (state.profiles || [])
+            .map((profile) => createProjectModelOptionMarkup({
+                id: profile.id,
+                kind: "profile",
+                label: profile.name,
+                meta: profile.personality || profile.system_prompt || "No prompt",
+                isSelected: profile.id === selectedProfileId,
+            }))
+            .join("");
+    }
+}
+
+
+function syncProjectModelForm() {
+    const editingProjectModel = state.projectModels.find(
+        (projectModel) => projectModel.id === state.projectModelFormId
+    ) || null;
+    const isEditing = Boolean(editingProjectModel);
+    const selectedModel = editingProjectModel?.model
+        || state.models.find((model) => model.is_default)
+        || state.models[0]
+        || null;
+    const selectedProfile = editingProjectModel?.profile
+        || state.profiles.find((profile) => profile.is_default)
+        || state.profiles[0]
+        || null;
+
+    if (elements.projectModelFormTitle) {
+        elements.projectModelFormTitle.textContent = isEditing ? "Edit agent" : "Add agent";
+    }
+    if (elements.projectModelSubmitButton) {
+        elements.projectModelSubmitButton.textContent = isEditing ? "Save agent" : "Add agent";
+    }
+    if (elements.projectModelIdInput) {
+        elements.projectModelIdInput.value = isEditing ? String(editingProjectModel.id) : "";
+    }
+    if (elements.projectModelNicknameInput) {
+        elements.projectModelNicknameInput.value = editingProjectModel?.nickname || "";
+    }
+    if (elements.projectModelSystemModelInput) {
+        elements.projectModelSystemModelInput.value = selectedModel ? createModelOptionValue(selectedModel) : "";
+        elements.projectModelSystemModelInput.setAttribute("aria-expanded", "false");
+    }
+    if (elements.projectModelSystemModelIdInput) {
+        elements.projectModelSystemModelIdInput.value = selectedModel ? String(selectedModel.id) : "";
+    }
+    if (elements.projectModelProfileInput) {
+        elements.projectModelProfileInput.value = selectedProfile ? createProfileOptionValue(selectedProfile) : "";
+        elements.projectModelProfileInput.setAttribute("aria-expanded", "false");
+    }
+    if (elements.projectModelProfileIdInput) {
+        elements.projectModelProfileIdInput.value = selectedProfile ? String(selectedProfile.id) : "";
+    }
+    if (elements.projectModelSystemPromptInput) {
+        elements.projectModelSystemPromptInput.value = editingProjectModel?.system_prompt || "";
+    }
+    if (elements.projectModelDefaultInput) {
+        elements.projectModelDefaultInput.checked = editingProjectModel
+            ? Boolean(editingProjectModel.is_default)
+            : !state.projectModels.length;
+    }
+
+    syncProjectModelSearchClearButtons();
+    closeProjectModelComboboxOptions();
+}
+
+
+function createModelOptionValue(model) {
+    return model.display_name || model.name || "";
+}
+
+
+function createProfileOptionValue(profile) {
+    return profile.name || "";
+}
+
+
+function createProjectModelOptionMarkup({ id, kind, label, meta, isSelected }) {
+    return `
+        <button
+            class="app-combobox__option${isSelected ? " is-selected" : ""}"
+            type="button"
+            role="option"
+            aria-selected="${isSelected ? "true" : "false"}"
+            data-project-model-option-kind="${escapeHtml(kind)}"
+            data-project-model-option-id="${id}"
+            data-project-model-option-label="${escapeHtml(label || "")}"
+        >
+            <span class="app-combobox__option-label">${escapeHtml(label || "")}</span>
+            <span class="app-combobox__option-meta">${escapeHtml(meta || "")}</span>
+        </button>
+    `;
+}
+
+
+export function setProjectModelComboboxSelection(kind, id) {
+    const selectedId = Number(id || "0") || null;
+    const collection = kind === "model" ? state.models : state.profiles;
+    const selectedItem = collection.find((item) => item.id === selectedId) || null;
+    const input = getProjectModelComboboxInput(kind);
+    const idInput = getProjectModelComboboxIdInput(kind);
+
+    if (input) {
+        input.value = selectedItem
+            ? (kind === "model" ? createModelOptionValue(selectedItem) : createProfileOptionValue(selectedItem))
+            : "";
+    }
+    if (idInput) {
+        idInput.value = selectedItem ? String(selectedItem.id) : "";
+    }
+
+    renderProjectModelFormOptions();
+    filterProjectModelComboboxOptions(kind, "");
+    closeProjectModelComboboxOptions(kind);
+    syncProjectModelSearchClearButtons();
+}
+
+
+export function clearProjectModelCombobox(kind) {
+    const input = getProjectModelComboboxInput(kind);
+    const idInput = getProjectModelComboboxIdInput(kind);
+
+    if (input) {
+        input.value = "";
+        input.focus({ preventScroll: true });
+    }
+    if (idInput) {
+        idInput.value = "";
+    }
+
+    renderProjectModelFormOptions();
+    filterProjectModelComboboxOptions(kind, "");
+    openProjectModelComboboxOptions(kind);
+    syncProjectModelSearchClearButtons();
+}
+
+
+export function openProjectModelComboboxOptions(kind) {
+    const options = getProjectModelComboboxOptions(kind);
+    const input = getProjectModelComboboxInput(kind);
+
+    if (options) {
+        options.hidden = false;
+    }
+    if (input) {
+        input.setAttribute("aria-expanded", "true");
+    }
+}
+
+
+export function closeProjectModelComboboxOptions(kind = null) {
+    const kinds = kind ? [kind] : ["model", "profile"];
+
+    for (const item of kinds) {
+        const options = getProjectModelComboboxOptions(item);
+        const input = getProjectModelComboboxInput(item);
+        if (options) {
+            options.hidden = true;
+        }
+        if (input) {
+            input.setAttribute("aria-expanded", "false");
+        }
+    }
+}
+
+
+export function filterProjectModelComboboxOptions(kind, query) {
+    const options = getProjectModelComboboxOptions(kind);
+    if (!options) {
+        return;
+    }
+
+    const normalized = String(query || "").trim().toLowerCase();
+    let visibleCount = 0;
+
+    options.querySelectorAll("[data-project-model-option-kind]").forEach((option) => {
+        const matches = normalized ? option.textContent.toLowerCase().includes(normalized) : true;
+        option.hidden = !matches;
+        if (matches) {
+            visibleCount += 1;
+        }
+    });
+
+    options.classList.toggle("is-empty", visibleCount === 0);
+}
+
+
+export function syncProjectModelSearchClearButtons() {
+    if (elements.projectModelSystemModelClearButton) {
+        elements.projectModelSystemModelClearButton.hidden = !elements.projectModelSystemModelInput?.value;
+    }
+    if (elements.projectModelProfileClearButton) {
+        elements.projectModelProfileClearButton.hidden = !elements.projectModelProfileInput?.value;
+    }
+}
+
+
+function getProjectModelComboboxInput(kind) {
+    return kind === "model"
+        ? elements.projectModelSystemModelInput
+        : elements.projectModelProfileInput;
+}
+
+
+function getProjectModelComboboxIdInput(kind) {
+    return kind === "model"
+        ? elements.projectModelSystemModelIdInput
+        : elements.projectModelProfileIdInput;
+}
+
+
+function getProjectModelComboboxOptions(kind) {
+    return kind === "model"
+        ? elements.projectModelSystemModelOptions
+        : elements.projectModelProfileOptions;
 }
 
 

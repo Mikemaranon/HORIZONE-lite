@@ -57,6 +57,14 @@ export async function loadProjectWorkspaceData(projectId) {
 }
 
 
+export async function loadProjectModelsData(projectId) {
+    return apiRequestJson(
+        "GET",
+        `/api/projects/models?project_id=${encodeURIComponent(projectId)}`
+    );
+}
+
+
 export async function loadConversationsData(projectId) {
     const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
     return apiRequestJson("GET", `/api/conversations${query}`);
@@ -126,6 +134,21 @@ export async function updateProject(data) {
 
 export async function deleteProject(projectId) {
     return apiRequestJson("DELETE", `/api/projects?id=${encodeURIComponent(projectId)}`);
+}
+
+
+export async function createProjectModel(data) {
+    return apiRequestJson("POST", "/api/projects/models", data);
+}
+
+
+export async function updateProjectModel(data) {
+    return apiRequestJson("PATCH", "/api/projects/models", data);
+}
+
+
+export async function deleteProjectModel(projectModelId) {
+    return apiRequestJson("DELETE", `/api/projects/models?id=${encodeURIComponent(projectModelId)}`);
 }
 
 

@@ -53,6 +53,11 @@ export function getActiveProject() {
 }
 
 
+export function getProjectModels() {
+    return state.projectModels || [];
+}
+
+
 export function getProjectConversations(projectId = state.activeProjectId) {
     if (!projectId) {
         return [];

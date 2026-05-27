@@ -118,6 +118,18 @@ export function setProjectDocumentFolders(folders = []) {
 }
 
 
+export function setProjectModels(models = [], usesDefault = true) {
+    state.projectModels = models || [];
+    state.projectModelsUseDefault = Boolean(usesDefault);
+}
+
+
+export function setProjectModelFormState({ mode = "create", projectModelId = null } = {}) {
+    state.projectModelFormMode = mode;
+    state.projectModelFormId = projectModelId;
+}
+
+
 export function setProjectWorkspace(workspace = null, fileCount = 0, recentEvents = []) {
     state.projectWorkspace = workspace;
     state.projectWorkspaceFileCount = fileCount || 0;
@@ -161,6 +173,7 @@ export function applyProjectsPayload(data) {
         state.activeProjectId = null;
         state.projectDocuments = [];
         state.projectDocumentFolders = [];
+        setProjectModels();
         setProjectWorkspace(null);
         setProjectWorkspaceFiles([]);
         state.activeProjectDocumentFolderId = null;
@@ -188,6 +201,11 @@ export function applyProjectDocumentsPayload(data) {
     ) {
         state.activeProjectDocumentFolderId = null;
     }
+}
+
+
+export function applyProjectModelsPayload(data) {
+    setProjectModels(data.models || [], data.uses_default !== false);
 }
 
 
@@ -278,6 +296,7 @@ export function enterHomeWorkspace() {
     clearActiveConversation();
     state.projectDocuments = [];
     state.projectDocumentFolders = [];
+    setProjectModels();
     setProjectWorkspace(null);
     setProjectWorkspaceFiles([]);
     state.activeProjectDocumentFolderId = null;
@@ -289,6 +308,7 @@ export function enterProjectWorkspace(projectId) {
     state.workspaceMode = "project";
     state.activeProjectId = projectId || null;
     state.activeProjectDocumentFolderId = null;
+    setProjectModels();
     setProjectWorkspace(null);
     setProjectWorkspaceFiles([]);
     state.stagedDocuments = [];

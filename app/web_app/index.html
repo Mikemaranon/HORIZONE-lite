@@ -275,6 +275,9 @@
                                             <button id="add-documents-button" class="project-actions-menu__item" type="button" role="menuitem">
                                                 Add documents
                                             </button>
+                                            <button id="project-models-button" class="project-actions-menu__item" type="button" role="menuitem">
+                                                Agents
+                                            </button>
                                             <button id="customize-project-button" class="project-actions-menu__item" type="button" role="menuitem">
                                                 Customize
                                             </button>
@@ -425,8 +428,8 @@
                     <div class="chat-side-panel__header">
                         <div class="chat-side-panel__header-row">
                             <div>
-                                <h3>Chat settings</h3>
-                                <p class="chat-side-panel__subtitle">
+                                <h3 id="chat-side-panel-title">Chat settings</h3>
+                                <p id="chat-side-panel-subtitle" class="chat-side-panel__subtitle">
                                     Everything that affects the current chat, grouped into sections.
                                 </p>
                             </div>
@@ -444,6 +447,26 @@
                     </div>
 
                     <div class="chat-side-panel__body">
+                        <details
+                            class="chat-sidebar-section chat-sidebar-section--top"
+                            data-chat-sidebar-section="agents"
+                            hidden
+                        >
+                            <summary class="chat-sidebar-section__summary">
+                                <span class="chat-sidebar-section__label">Agents</span>
+                                <span class="chat-sidebar-section__meta">Default fallback for this project</span>
+                            </summary>
+                            <div class="chat-sidebar-section__content">
+                                <div class="chat-sidebar-section__content-inner">
+                                    <div id="chat-agents-list" class="chat-agents-list" aria-live="polite"></div>
+                                    <div class="settings-block__actions chat-sidebar-section__actions">
+                                        <button id="change-project-agent-button" class="ghost-button" type="button">Change</button>
+                                        <button id="edit-project-agents-button" class="ghost-button" type="button">Edit</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
                         <details
                             class="chat-sidebar-section chat-sidebar-section--top"
                             data-chat-sidebar-section="model"
@@ -521,18 +544,209 @@
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
                         <span>Search bar</span>
-                        <input
-                            id="model-switch-search"
-                            type="search"
-                            placeholder="Search by name or provider..."
-                            autocomplete="off"
-                        >
+                        <span class="search-input">
+                            <input
+                                id="model-switch-search"
+                                type="text"
+                                placeholder="Search by name or provider..."
+                                autocomplete="off"
+                            >
+                            <button
+                                id="model-switch-search-clear"
+                                class="search-input__clear"
+                                type="button"
+                                aria-label="Clear model search"
+                                title="Clear"
+                                hidden
+                            >
+                                ×
+                            </button>
+                        </span>
                     </label>
                     <div id="model-switch-results" class="profile-switch__results" aria-live="polite"></div>
                     <div id="model-switch-no-results" class="profile-switch__empty" hidden>
                         No models match the current search.
                     </div>
                 </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="project-agent-switch-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-project-agent-switch-modal="true"></div>
+        <div class="modal__panel modal__panel--narrow modal__panel--profile-switch">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Agents</p>
+                    <h3>Change default agent</h3>
+                </div>
+                <button id="close-project-agent-switch-button" class="icon-button" type="button" aria-label="Close agent picker">×</button>
+            </div>
+
+            <div class="modal__body">
+                <section class="settings-block">
+                    <h4>Project agents</h4>
+                    <p class="settings-block__copy">
+                        Choose the agent this project will use by default.
+                    </p>
+                    <label class="field field--stacked profile-switch__search-field">
+                        <span>Search bar</span>
+                        <span class="search-input">
+                            <input
+                                id="project-agent-switch-search"
+                                type="text"
+                                placeholder="Search agents..."
+                                autocomplete="off"
+                            >
+                            <button
+                                id="project-agent-switch-search-clear"
+                                class="search-input__clear"
+                                type="button"
+                                aria-label="Clear agent search"
+                                title="Clear"
+                                hidden
+                            >
+                                ×
+                            </button>
+                        </span>
+                    </label>
+                    <div id="project-agent-switch-results" class="profile-switch__results" aria-live="polite"></div>
+                    <div id="project-agent-switch-no-results" class="profile-switch__empty" hidden>
+                        No agents match the current search.
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="project-models-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-project-models-modal="true"></div>
+        <div class="modal__panel modal__panel--project-models modal__panel--profile-switch">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Project</p>
+                    <h3>Agents</h3>
+                </div>
+                <button id="close-project-models-button" class="icon-button" type="button" aria-label="Close project agents">×</button>
+            </div>
+
+            <div class="modal__body modal__body--project-models">
+                <div class="project-models-workspace">
+                    <section class="settings-block project-models-manager">
+                        <div class="settings-block__header-row">
+                            <div>
+                                <h4>Project agents</h4>
+                                <p id="project-models-summary" class="settings-block__copy">
+                                    Agents added to this project.
+                                </p>
+                            </div>
+                        </div>
+                        <div id="project-models-list" class="project-models-list" aria-live="polite"></div>
+                    </section>
+
+                    <section class="settings-block project-models-editor">
+                        <div>
+                            <h4 id="project-model-form-title">Add agent</h4>
+                            <p class="settings-block__copy">
+                                Bind a model and behavior profile to a project agent.
+                            </p>
+                        </div>
+                        <form id="project-models-form" class="project-models-form">
+                            <input id="project-model-id-input" type="hidden">
+                            <label class="field field--stacked">
+                                <span>Nickname</span>
+                                <input
+                                    id="project-model-nickname-input"
+                                    type="text"
+                                    autocomplete="off"
+                                    placeholder="tester, coder, reviewer..."
+                                >
+                            </label>
+                            <div class="field field--stacked">
+                                <span>Base model</span>
+                                <div class="app-combobox" data-project-model-combobox="model">
+                                    <span class="search-input">
+                                        <input
+                                            id="project-model-system-model-input"
+                                            type="text"
+                                            autocomplete="off"
+                                            placeholder="Search models..."
+                                            role="combobox"
+                                            aria-expanded="false"
+                                            aria-controls="project-model-system-model-options"
+                                        >
+                                        <button
+                                            id="project-model-system-model-clear"
+                                            class="search-input__clear"
+                                            type="button"
+                                            aria-label="Clear base model"
+                                            title="Clear"
+                                            hidden
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                    <input id="project-model-system-model-id-input" type="hidden">
+                                    <div
+                                        id="project-model-system-model-options"
+                                        class="app-combobox__options"
+                                        role="listbox"
+                                        hidden
+                                    ></div>
+                                </div>
+                            </div>
+                            <div class="field field--stacked">
+                                <span>Behavior profile</span>
+                                <div class="app-combobox" data-project-model-combobox="profile">
+                                    <span class="search-input">
+                                        <input
+                                            id="project-model-profile-input"
+                                            type="text"
+                                            autocomplete="off"
+                                            placeholder="Search profiles..."
+                                            role="combobox"
+                                            aria-expanded="false"
+                                            aria-controls="project-model-profile-options"
+                                        >
+                                        <button
+                                            id="project-model-profile-clear"
+                                            class="search-input__clear"
+                                            type="button"
+                                            aria-label="Clear behavior profile"
+                                            title="Clear"
+                                            hidden
+                                        >
+                                            ×
+                                        </button>
+                                    </span>
+                                    <input id="project-model-profile-id-input" type="hidden">
+                                    <div
+                                        id="project-model-profile-options"
+                                        class="app-combobox__options"
+                                        role="listbox"
+                                        hidden
+                                    ></div>
+                                </div>
+                            </div>
+                            <label class="field field--stacked field--fixed-textarea">
+                                <span>System prompt</span>
+                                <textarea
+                                    id="project-model-system-prompt-input"
+                                    rows="5"
+                                    placeholder="Instructions that only apply to this project agent..."
+                                ></textarea>
+                            </label>
+                            <label class="checkbox-field">
+                                <input id="project-model-default-input" type="checkbox">
+                                <span>Select as default project agent</span>
+                            </label>
+                            <div class="project-models-form__actions">
+                                <button id="project-model-form-reset-button" class="ghost-button" type="button">Clear</button>
+                                <button id="project-model-submit-button" class="action-button action-button--primary" type="submit">Add agent</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
             </div>
         </div>
     </div>
@@ -718,12 +932,24 @@
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
                         <span>Search bar</span>
-                        <input
-                            id="profile-switch-search"
-                            type="search"
-                            placeholder="Search by name, personality, or prompt..."
-                            autocomplete="off"
-                        >
+                        <span class="search-input">
+                            <input
+                                id="profile-switch-search"
+                                type="text"
+                                placeholder="Search by name, personality, or prompt..."
+                                autocomplete="off"
+                            >
+                            <button
+                                id="profile-switch-search-clear"
+                                class="search-input__clear"
+                                type="button"
+                                aria-label="Clear profile search"
+                                title="Clear"
+                                hidden
+                            >
+                                ×
+                            </button>
+                        </span>
                     </label>
                     <div id="profile-switch-results" class="profile-switch__results" aria-live="polite"></div>
                     <div id="profile-switch-no-results" class="profile-switch__empty" hidden>

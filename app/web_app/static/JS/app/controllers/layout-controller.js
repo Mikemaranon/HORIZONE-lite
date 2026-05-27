@@ -205,7 +205,7 @@ export function handleChatSidebarClick(event) {
 
 
 export function syncChatSidebarSections() {
-    const activeSection = document.querySelector(".chat-sidebar-section.is-open");
+    const activeSection = document.querySelector(".chat-sidebar-section.is-open:not([hidden])");
     setActiveChatSidebarSection(activeSection || null);
 }
 

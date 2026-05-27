@@ -1,8 +1,20 @@
 import { syncComposerAvailability } from "./composer-ui.js";
 import { renderChatSurface, renderConversationHeader, renderMessages } from "./render/chat-render.js";
-import { renderProjectSpace, renderDocumentsFileList } from "./render/project-render.js";
 import {
+    renderProjectModelsManager,
+    renderProjectSpace,
+    renderDocumentsFileList,
+    clearProjectModelCombobox,
+    closeProjectModelComboboxOptions,
+    filterProjectModelComboboxOptions,
+    openProjectModelComboboxOptions,
+    setProjectModelComboboxSelection,
+    syncProjectModelSearchClearButtons,
+} from "./render/project-render.js";
+import {
+    filterProjectAgentSwitchOptions,
     renderChatPanel,
+    renderProjectAgentSwitchModal,
     renderSettingsProvidersManager,
     renderSettingsModelsManager,
     renderSettingsProfilesManager,
@@ -17,6 +29,7 @@ export function renderAll({ onProjectSelect, onConversationSelect, onConversatio
     renderProjects(onProjectSelect);
     renderConversations(onConversationSelect, onConversationDelete);
     renderProjectSpace(onConversationSelect, onConversationDelete);
+    renderProjectModelsManager();
     renderSettingsSpace();
     renderSettingsProvidersManager();
     renderSettingsModelsManager();
@@ -35,6 +48,15 @@ export {
     renderDocumentsFileList,
     renderMessages,
     renderChatPanel,
+    renderProjectAgentSwitchModal,
+    filterProjectAgentSwitchOptions,
+    clearProjectModelCombobox,
+    closeProjectModelComboboxOptions,
+    filterProjectModelComboboxOptions,
+    openProjectModelComboboxOptions,
+    setProjectModelComboboxSelection,
+    syncProjectModelSearchClearButtons,
+    renderProjectModelsManager,
     renderProjectSpace,
     renderProjects,
     renderSettingsProvidersManager,

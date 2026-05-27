@@ -4,7 +4,7 @@ import { elements } from "../dom.js";
 import { createMetaChipsMarkup, escapeHtml } from "../html.js";
 import { createMessageMarkup, enableMessagesAutoScroll, scrollMessagesToBottom } from "../message-ui.js";
 import { getActualProvider, getProviderDisplayName, getSelectedModel, getSelectedModelConfig } from "../provider-helpers.js";
-import { getActiveProject, getProfileNameById, getSelectedProfileId } from "../selectors.js";
+import { getActiveProject, getProfileNameById, getProjectModels, getSelectedProfileId } from "../selectors.js";
 import { state } from "../state.js";
 
 
@@ -39,6 +39,10 @@ export function renderMessages({ preserveViewport = false } = {}) {
 
 export function renderConversationHeader() {
     const activeProject = getActiveProject();
+    elements.workspaceEyebrow.classList.toggle(
+        "workspace__eyebrow--project-models",
+        state.workspaceMode === "project" && !!activeProject,
+    );
 
     if (state.workspaceMode === "conversation" && state.activeConversation) {
         const selectedModelConfig = getSelectedModelConfig();
@@ -65,11 +69,10 @@ export function renderConversationHeader() {
 
     if (state.workspaceMode === "project" && activeProject) {
         elements.workspaceEyebrow.textContent = "Project";
-        elements.conversationTitle.textContent = activeProject.name;
-        elements.conversationSubtitle.textContent = "Manage the project prompt and its chats here, without mixing them with standalone chats.";
+        elements.conversationTitle.innerHTML = createProjectModelChipsMarkup(getProjectModels());
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
-        elements.conversationSubtitle.hidden = false;
+        elements.conversationSubtitle.hidden = true;
         elements.backToProjectButton.hidden = true;
         elements.chatSettingsButton.hidden = false;
         return;
@@ -104,6 +107,29 @@ export function renderChatSurface() {
     renderMessages();
     renderConversationHeader();
     syncComposerAvailability();
+}
+
+
+function createProjectModelChipsMarkup(models) {
+    if (!models.length) {
+        return `<span class="project-model-chip project-model-chip--empty">No agents</span>`;
+    }
+
+    return `
+        <span class="project-model-chips" aria-label="Project agents">
+            ${models.map((model) => {
+                const nickname = model.nickname || "agent";
+                const baseModel = model.model || model;
+                const modelLabel = baseModel.display_name || baseModel.name || "Model";
+                const label = `${nickname} | ${modelLabel}`;
+                return `
+                    <span class="project-model-chip" title="${escapeHtml(baseModel.name || label)}">
+                        ${escapeHtml(label)}
+                    </span>
+                `;
+            }).join("")}
+        </span>
+    `;
 }
 
 

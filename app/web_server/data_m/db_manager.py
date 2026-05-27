@@ -9,6 +9,7 @@ from .db_methods import (
     ProjectDocumentFoldersTable,
     ProjectDocumentChunksTable,
     ProjectDocumentsTable,
+    ProjectModelsTable,
     ProfilesTable,
     ProvidersTable,
     ConversationsTable,
@@ -46,6 +47,7 @@ class DBManager:
         self.project_document_folders = ProjectDocumentFoldersTable(self.db)
         self.project_document_chunks = ProjectDocumentChunksTable(self.db)
         self.project_documents = ProjectDocumentsTable(self.db)
+        self.project_models = ProjectModelsTable(self.db)
         self.profiles = ProfilesTable(self.db)
         self.providers = ProvidersTable(self.db)
         self.conversations = ConversationsTable(self.db)

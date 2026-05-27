@@ -25,4 +25,6 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
     ColumnMigration("tools", "display_name", "TEXT DEFAULT ''"),
     ColumnMigration("project_documents", "folder_id", "INTEGER"),
+    ColumnMigration("project_models", "system_prompt", "TEXT DEFAULT ''"),
+    ColumnMigration("project_models", "is_default", "INTEGER NOT NULL DEFAULT 0"),
 ]

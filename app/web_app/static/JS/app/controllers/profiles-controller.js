@@ -304,6 +304,17 @@ export function handleDocumentInput(event) {
 }
 
 
+export function handleProfileSearchClear() {
+    if (!elements.profileSwitchSearchInput) {
+        return;
+    }
+
+    elements.profileSwitchSearchInput.value = "";
+    filterProfileSwitchOptions("");
+    elements.profileSwitchSearchInput.focus({ preventScroll: true });
+}
+
+
 export function filterProfileSwitchOptions(query) {
     const normalized = String(query || "").trim().toLowerCase();
     let visibleCount = 0;
@@ -323,6 +334,9 @@ export function filterProfileSwitchOptions(query) {
     }
     if (elements.profileSwitchNoResults) {
         elements.profileSwitchNoResults.hidden = visibleCount !== 0 || totalOptions === 0;
+    }
+    if (elements.profileSwitchSearchClearButton) {
+        elements.profileSwitchSearchClearButton.hidden = !normalized;
     }
 }
 

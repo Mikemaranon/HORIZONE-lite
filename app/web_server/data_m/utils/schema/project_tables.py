@@ -58,4 +58,25 @@ PROJECT_SCHEMA_STATEMENTS = [
     CREATE INDEX IF NOT EXISTS idx_project_document_chunks_document
     ON project_document_chunks(document_id, chunk_index)
     """,
+    """
+    CREATE TABLE IF NOT EXISTS project_models (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        model_id INTEGER NOT NULL,
+        profile_id INTEGER NOT NULL,
+        nickname TEXT NOT NULL,
+        system_prompt TEXT DEFAULT '',
+        is_default INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE,
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+        UNIQUE(project_id, nickname)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_project_models_project
+    ON project_models(project_id)
+    """,
 ]

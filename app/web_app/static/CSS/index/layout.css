@@ -584,6 +584,38 @@
     cursor: default;
 }
 
+.project-model-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: min(680px, 100%);
+}
+
+.workspace__eyebrow--project-models {
+    margin-left: 10px;
+}
+
+.project-model-chip {
+    max-width: min(240px, 100%);
+    padding: 8px 11px;
+    border: 1px solid rgba(30, 31, 25, 0.1);
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.68);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-model-chip--empty {
+    color: var(--text-soft);
+}
+
 .messages-container {
     height: 100%;
     overflow-y: auto;

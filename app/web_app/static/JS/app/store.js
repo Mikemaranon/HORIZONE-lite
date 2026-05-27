@@ -6,6 +6,7 @@ import {
     loadProfilesData,
     loadProvidersData,
     loadProjectDocumentsData,
+    loadProjectModelsData,
     loadProjectWorkspaceData,
     loadProjectsData,
     loadSettingsData,
@@ -43,6 +44,15 @@ export async function loadProjectWorkspace(projectId) {
     }
 
     return loadProjectWorkspaceData(projectId);
+}
+
+
+export async function loadProjectModels(projectId) {
+    if (!projectId) {
+        return { models: [], uses_default: true };
+    }
+
+    return loadProjectModelsData(projectId);
 }
 
 

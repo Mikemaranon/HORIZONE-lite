@@ -134,6 +134,104 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(model["name"], "gpt-4.1")
         self.assertEqual(model["display_name"], "GPT-4.1 Main")
 
+    def test_project_models_endpoint_defaults_to_system_model(self):
+        project_response = self.client.post(
+            "/api/projects",
+            json={"name": "Model Project"},
+            headers=self.auth_headers,
+        )
+        project = project_response.get_json()["project"]
+        default_model = self.db.models.get_default()
+        default_profile = self.db.profiles.get_default()
+
+        response = self.client.get(
+            f"/api/projects/models?project_id={project['id']}",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["models"][0]["model_id"], default_model["id"])
+        self.assertEqual(payload["models"][0]["profile_id"], default_profile["id"])
+        self.assertEqual(payload["models"][0]["nickname"], "default")
+        self.assertTrue(payload["models"][0]["is_default"])
+
+    def test_project_models_can_be_created_updated_and_deleted(self):
+        project_id = self.db.projects.create("Model Project")
+        provider = self.db.providers.get_first_by_type("ollama")
+        profile = self.db.profiles.get_default()
+        model_id = self.db.models.create(
+            name="qwen3",
+            display_name="Qwen 3",
+            provider_config_id=provider["id"],
+        )
+
+        create_response = self.client.post(
+            "/api/projects/models",
+            json={
+                "project_id": project_id,
+                "nickname": "coder",
+                "model_id": model_id,
+                "profile_id": profile["id"],
+                "system_prompt": "Focus on implementation details.",
+            },
+            headers=self.auth_headers,
+        )
+        project_model = create_response.get_json()["model"]
+        second_model_id = self.db.models.create(
+            name="llama3",
+            display_name="Llama 3",
+            provider_config_id=provider["id"],
+        )
+        second_create_response = self.client.post(
+            "/api/projects/models",
+            json={
+                "project_id": project_id,
+                "nickname": "writer",
+                "model_id": second_model_id,
+                "profile_id": profile["id"],
+                "is_default": True,
+            },
+            headers=self.auth_headers,
+        )
+        second_project_model = second_create_response.get_json()["model"]
+
+        update_response = self.client.patch(
+            "/api/projects/models",
+            json={
+                "id": project_model["id"],
+                "nickname": "tester",
+                "model_id": model_id,
+                "profile_id": profile["id"],
+                "system_prompt": "Focus on regressions.",
+            },
+            headers=self.auth_headers,
+        )
+        delete_response = self.client.delete(
+            f"/api/projects/models?id={project_model['id']}",
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        self.assertEqual(second_create_response.status_code, 201)
+        self.assertEqual(project_model["nickname"], "coder")
+        self.assertTrue(project_model["is_default"])
+        self.assertTrue(second_project_model["is_default"])
+        self.assertEqual(project_model["system_prompt"], "Focus on implementation details.")
+        self.assertEqual(project_model["model"]["display_name"], "Qwen 3")
+        self.assertEqual(project_model["profile"]["name"], profile["name"])
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.get_json()["model"]["nickname"], "tester")
+        self.assertEqual(update_response.get_json()["model"]["system_prompt"], "Focus on regressions.")
+        project_models = self.client.get(
+            f"/api/projects/models?project_id={project_id}",
+            headers=self.auth_headers,
+        ).get_json()["models"]
+        self.assertEqual(sum(1 for item in project_models if item["is_default"]), 1)
+        self.assertEqual(project_models[0]["id"], second_project_model["id"])
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.get_json()["deleted"])
+
     def test_updating_model_refreshes_visible_message_label(self):
         provider = self.db.providers.get_first_by_type("ollama")
         profile = self.db.profiles.get_default()

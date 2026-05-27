@@ -56,6 +56,26 @@ class ProjectsAPI(BaseAPI):
             view_func=self.handle_project_document_folders_delete,
             methods=["DELETE"],
         )
+        self.app.add_url_rule(
+            "/api/projects/models",
+            view_func=self.handle_project_models_get,
+            methods=["GET"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/models",
+            view_func=self.handle_project_models_patch,
+            methods=["PATCH"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/models",
+            view_func=self.handle_project_models_post,
+            methods=["POST"],
+        )
+        self.app.add_url_rule(
+            "/api/projects/models",
+            view_func=self.handle_project_models_delete,
+            methods=["DELETE"],
+        )
 
     def handle_projects_get(self):
         auth = self.authenticate_request(request)
@@ -259,5 +279,73 @@ class ProjectsAPI(BaseAPI):
             payload = self.project_document_service.delete_folder(folder_id)
         except LookupError as error:
             return self.error(str(error), 404)
+
+        return self.ok(payload)
+
+    def handle_project_models_get(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        try:
+            project_id = self.parse_int(request.args.get("project_id"), "project_id")
+            self.require_fields({"project_id": project_id}, "project_id")
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        try:
+            payload = self.project_service.list_project_models(project_id)
+        except ProjectResourceNotFoundError as error:
+            return self.error(str(error), 404)
+
+        return self.ok(payload)
+
+    def handle_project_models_patch(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        data = self.get_request_json(request)
+        try:
+            project_model_id = self.parse_int(data.get("id"), "id")
+            self.require_fields({"id": project_model_id}, "id")
+            project_model = self.project_service.update_project_model(project_model_id, data)
+        except ProjectResourceNotFoundError as error:
+            return self.error(str(error), 404)
+        except (ProjectRequestError, ValueError) as error:
+            return self.error(str(error), 400)
+
+        return self.ok({"model": project_model})
+
+    def handle_project_models_post(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        data = self.get_request_json(request)
+        try:
+            project_id = self.parse_int(data.get("project_id"), "project_id")
+            self.require_fields({"project_id": project_id}, "project_id")
+            project_model = self.project_service.create_project_model(project_id, data)
+        except ProjectResourceNotFoundError as error:
+            return self.error(str(error), 404)
+        except (ProjectRequestError, ValueError) as error:
+            return self.error(str(error), 400)
+
+        return self.ok({"model": project_model}, 201)
+
+    def handle_project_models_delete(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        try:
+            project_model_id = self.parse_int(request.args.get("id"), "id")
+            self.require_fields({"id": project_model_id}, "id")
+            payload = self.project_service.delete_project_model(project_model_id)
+        except ProjectResourceNotFoundError as error:
+            return self.error(str(error), 404)
+        except (ProjectRequestError, ValueError) as error:
+            return self.error(str(error), 400)
 
         return self.ok(payload)

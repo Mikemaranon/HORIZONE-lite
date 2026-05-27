@@ -227,6 +227,17 @@ export function handleModelSearchInput(event) {
 }
 
 
+export function handleModelSearchClear() {
+    if (!elements.modelSwitchSearchInput) {
+        return;
+    }
+
+    elements.modelSwitchSearchInput.value = "";
+    filterModelSwitchOptions("");
+    elements.modelSwitchSearchInput.focus({ preventScroll: true });
+}
+
+
 export async function handleModelIconInputChange() {
     try {
         const iconImage = await readModelIconFromInput();
@@ -270,6 +281,9 @@ function filterModelSwitchOptions(query) {
     }
     if (elements.modelSwitchNoResults) {
         elements.modelSwitchNoResults.hidden = visibleCount !== 0 || totalOptions === 0;
+    }
+    if (elements.modelSwitchSearchClearButton) {
+        elements.modelSwitchSearchClearButton.hidden = !normalized;
     }
 }
 

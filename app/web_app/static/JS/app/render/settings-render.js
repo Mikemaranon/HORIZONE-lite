@@ -4,6 +4,7 @@ import { syncChatExportState } from "../controllers/export-controller.js";
 import { PROFILE_SETTINGS_PREVIEW_TAGS } from "../profile-helpers.js";
 import { getProviderTypeDisplayName } from "../provider-helpers.js";
 import {
+    getActiveProject,
     getDefaultProfileId,
     getSelectedModelConfigId,
     getSelectedProfileId,
@@ -255,12 +256,80 @@ export function renderSettingsToolsManager() {
 
 
 export function renderChatPanel() {
+    renderChatPanelMode();
+    renderChatAgentsList();
     renderChatToolsList();
     renderChatModelCard();
     renderModelSwitchModal();
+    renderProjectAgentSwitchModal();
     renderChatProfileCard();
     renderProfileSwitchModal();
     syncChatExportState();
+}
+
+
+function renderChatPanelMode() {
+    const isProjectContext = Boolean(getActiveProject());
+    const sectionStates = {
+        agents: isProjectContext,
+        model: !isProjectContext,
+        profile: !isProjectContext,
+        tools: true,
+    };
+
+    if (elements.chatSidePanelTitle) {
+        elements.chatSidePanelTitle.textContent = isProjectContext ? "Project settings" : "Chat settings";
+    }
+    if (elements.chatSidePanelSubtitle) {
+        elements.chatSidePanelSubtitle.textContent = isProjectContext
+            ? "Default project agent and tools for this project."
+            : "Everything that affects the current chat, grouped into sections.";
+    }
+
+    Object.entries(sectionStates).forEach(([sectionName, isVisible]) => {
+        const section = elements.chatSidePanel?.querySelector(
+            `[data-chat-sidebar-section="${sectionName}"]`
+        );
+        if (!section) {
+            return;
+        }
+
+        section.hidden = !isVisible;
+        if (!isVisible) {
+            section.classList.remove("is-open");
+            section.open = false;
+            section.toggleAttribute("data-is-active", false);
+        }
+    });
+
+    const body = elements.chatSidePanel?.querySelector(".chat-side-panel__body");
+    const activeSection = body?.querySelector(".chat-sidebar-section.is-open:not([hidden])");
+    body?.classList.toggle("has-active-section", Boolean(activeSection));
+    if (!activeSection && body) {
+        delete body.dataset.activeSection;
+    }
+}
+
+
+function renderChatAgentsList() {
+    if (!elements.chatAgentsList) {
+        return;
+    }
+
+    const activeProject = getActiveProject();
+    const projectAgents = activeProject ? (state.projectModels || []) : [];
+    const defaultAgent = getDefaultProjectAgent(projectAgents);
+
+    elements.chatAgentsList.innerHTML = projectAgents.length
+        ? createProjectAgentCardMarkup(defaultAgent)
+        : `<div class="chat-profile-card__empty">No agents are available in this project yet. Create one from the project Agents menu.</div>`;
+
+    if (elements.chatAgentsChangeButton) {
+        elements.chatAgentsChangeButton.disabled = !projectAgents.length;
+    }
+    if (elements.chatAgentsEditButton) {
+        elements.chatAgentsEditButton.disabled = !activeProject;
+    }
 }
 
 
@@ -300,6 +369,28 @@ export function renderModelSwitchModal() {
         resultsElement: elements.modelSwitchResults,
         emptyElement: elements.modelSwitchNoResults,
         optionSelector: "[data-model-switch-option]",
+        query,
+    });
+}
+
+
+export function renderProjectAgentSwitchModal() {
+    if (!elements.projectAgentSwitchResults) {
+        return;
+    }
+
+    const projectAgents = getActiveProject() ? (state.projectModels || []) : [];
+    const defaultAgent = getDefaultProjectAgent(projectAgents);
+    const query = elements.projectAgentSwitchSearchInput?.value || "";
+
+    elements.projectAgentSwitchResults.innerHTML = projectAgents.length
+        ? projectAgents.map((agent) => createProjectAgentSwitchOptionMarkup(agent, defaultAgent)).join("")
+        : `<div class="profile-switch__empty">There are no project agents yet. Create one with Edit.</div>`;
+
+    applySwitchQueryState({
+        resultsElement: elements.projectAgentSwitchResults,
+        emptyElement: elements.projectAgentSwitchNoResults,
+        optionSelector: "[data-project-agent-switch-option]",
         query,
     });
 }
@@ -349,6 +440,84 @@ function renderChatToolsList() {
     elements.chatToolsList.innerHTML = tools.length
         ? tools.map((tool) => createToolCardMarkup(tool, "data-chat-tool-toggle")).join("")
         : `<div class="chat-profile-card__empty">There are no tools ready yet. Upload one from general settings or enable one of the built-in tools.</div>`;
+}
+
+
+function createProjectAgentCardMarkup(agent) {
+    const model = agent.model || {};
+    const profile = agent.profile || {};
+    const modelLabel = model.display_name || model.name || "Model";
+    const agentLabel = agent.nickname || modelLabel;
+    const providerLabel = model.provider_name || getProviderTypeDisplayName(model.provider_type || model.provider);
+    const avatar = createModelAvatarMarkup(
+        agentLabel,
+        model.icon_image,
+        "model-badge-avatar model-badge-avatar--card",
+    );
+
+    return `
+        <article class="chat-agent-card">
+            <div class="chat-agent-card__top">
+                ${avatar}
+                <div class="chat-agent-card__heading">
+                    <strong>${escapeHtml(agentLabel)}</strong>
+                    <span>${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
+                </div>
+            </div>
+            <div class="chat-agent-card__meta">
+                <span class="chat-profile-card__tag">${escapeHtml(providerLabel)}</span>
+            </div>
+        </article>
+    `;
+}
+
+
+function createProjectAgentSwitchOptionMarkup(agent, defaultAgent) {
+    const model = agent.model || {};
+    const profile = agent.profile || {};
+    const modelLabel = model.display_name || model.name || "Model";
+    const agentLabel = agent.nickname || modelLabel;
+    const providerLabel = model.provider_name || getProviderTypeDisplayName(model.provider_type || model.provider);
+    const isSelected = agent.id === defaultAgent?.id;
+    const suffix = isSelected ? " · default" : "";
+    const avatar = createModelAvatarMarkup(
+        agentLabel,
+        model.icon_image,
+        "model-badge-avatar model-badge-avatar--switch",
+    );
+    return `
+        <button
+            class="profile-switch__option${isSelected ? " is-selected" : ""}"
+            type="button"
+            data-project-agent-switch-option="${agent.id}"
+        >
+            <span class="profile-switch__option-top">
+                ${avatar}
+                <span class="profile-switch__option-name">${escapeHtml(agentLabel)}</span>
+            </span>
+            <span class="profile-switch__option-meta">${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
+            <span class="profile-switch__option-meta">${escapeHtml(providerLabel + suffix)}</span>
+        </button>
+    `;
+}
+
+
+export function filterProjectAgentSwitchOptions(query) {
+    applySwitchQueryState({
+        resultsElement: elements.projectAgentSwitchResults,
+        emptyElement: elements.projectAgentSwitchNoResults,
+        optionSelector: "[data-project-agent-switch-option]",
+        query,
+    });
+
+    if (elements.projectAgentSwitchSearchClearButton) {
+        elements.projectAgentSwitchSearchClearButton.hidden = !String(query || "").trim();
+    }
+}
+
+
+function getDefaultProjectAgent(projectAgents) {
+    return projectAgents.find((agent) => agent.is_default) || projectAgents[0] || null;
 }
 
 

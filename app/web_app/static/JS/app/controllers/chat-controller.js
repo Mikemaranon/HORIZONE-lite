@@ -37,6 +37,7 @@ import {
     setProjectWorkspace,
     setProjectWorkspaceFiles,
     applyProjectWorkspacePayload,
+    applyProjectModelsPayload,
 } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
@@ -44,6 +45,7 @@ import {
     loadConversationDetail,
     loadConversations,
     loadProjectDocuments,
+    loadProjectModels,
     loadProjectWorkspace,
 } from "../store.js";
 
@@ -53,14 +55,17 @@ export async function handleConversationSelect(conversationId, { closeSidebarOnM
     applyConversationDetailPayload(data);
 
     if (state.activeProjectId) {
-        const [documents, workspace] = await Promise.all([
+        const [documents, workspace, projectModels] = await Promise.all([
             loadProjectDocuments(state.activeProjectId),
             loadProjectWorkspace(state.activeProjectId),
+            loadProjectModels(state.activeProjectId),
         ]);
         setProjectDocuments(documents.documents || []);
         applyProjectWorkspacePayload(workspace);
+        applyProjectModelsPayload(projectModels);
     } else {
         setProjectDocuments([]);
+        applyProjectModelsPayload({});
         setProjectWorkspace(null);
         setProjectWorkspaceFiles([]);
     }

@@ -62,6 +62,26 @@ export function closeModelSwitchModal() {
 }
 
 
+export function openProjectAgentSwitchModal() {
+    openModal(elements.projectAgentSwitchModal);
+}
+
+
+export function closeProjectAgentSwitchModal() {
+    closeModal(elements.projectAgentSwitchModal);
+}
+
+
+export function openProjectModelsModal() {
+    openModal(elements.projectModelsModal);
+}
+
+
+export function closeProjectModelsModal() {
+    closeModal(elements.projectModelsModal);
+}
+
+
 export function openProfileModal() {
     openModal(elements.profileModal);
 }

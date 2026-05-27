@@ -1,8 +1,10 @@
 import {
     connectProjectWorkspace,
+    createProjectModel,
     createProjectDocumentFolder,
     createConversation,
     createProject,
+    deleteProjectModel,
     deleteProjectWorkspace,
     deleteProjectDocumentFolder,
     deleteProject,
@@ -11,18 +13,39 @@ import {
     loadWorkspaceFiles,
     moveProjectDocument,
     updateProject,
+    updateProjectModel,
     uploadProjectDocuments,
 } from "../api.js";
 import { renderApp } from "../app-runtime.js";
 import { setLoading } from "../composer-ui.js";
 import { requestProjectDetails, requestWorkspaceDetails, confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
-import { openDocumentsModal, closeProjectCustomizeModal } from "../modal-ui.js";
-import { renderDocumentsFileList } from "../render.js";
+import {
+    closeProjectCustomizeModal,
+    openDocumentsModal,
+    closeProjectAgentSwitchModal,
+    openProjectAgentSwitchModal,
+    openProjectModelsModal,
+} from "../modal-ui.js";
+import {
+    clearProjectModelCombobox,
+    closeProjectModelComboboxOptions,
+    filterProjectAgentSwitchOptions,
+    filterProjectModelComboboxOptions,
+    openProjectModelComboboxOptions,
+    renderChatPanel,
+    renderConversationHeader,
+    renderDocumentsFileList,
+    renderProjectModelsManager,
+    renderProjectSpace,
+    setProjectModelComboboxSelection,
+    syncProjectModelSearchClearButtons,
+} from "../render.js";
 import { getActiveProject, getSelectedProfileId } from "../selectors.js";
 import {
     applyConversationsPayload,
     applyProjectDocumentsPayload,
+    applyProjectModelsPayload,
     applyProjectWorkspacePayload,
     applyWorkspaceFilesPayload,
     applyProjectsPayload,
@@ -32,13 +55,20 @@ import {
     setActiveProjectDocumentFolderId,
     setProjectDocumentFolders,
     setProjectDocuments,
+    setProjectModelFormState,
     setProjectWorkspace,
     setProjectWorkspaceFiles,
     setStagedDocuments,
 } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
-import { loadConversations, loadProjectDocuments, loadProjectWorkspace, loadProjects } from "../store.js";
+import {
+    loadConversations,
+    loadProjectDocuments,
+    loadProjectModels,
+    loadProjectWorkspace,
+    loadProjects,
+} from "../store.js";
 import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
 
 
@@ -46,16 +76,19 @@ export async function handleProjectSelect(projectId, { closeSidebarOnMobile }) {
     enterProjectWorkspace(projectId);
 
     try {
-        const [documentsData, workspaceData] = await Promise.all([
+        const [documentsData, workspaceData, projectModelsData] = await Promise.all([
             loadProjectDocuments(projectId),
             loadProjectWorkspace(projectId),
+            loadProjectModels(projectId),
         ]);
         applyProjectDocumentsPayload(documentsData);
         applyProjectWorkspacePayload(workspaceData);
+        applyProjectModelsPayload(projectModelsData);
         await refreshWorkspaceFilesIfConnected();
     } catch (error) {
         setProjectDocuments([]);
         setProjectDocumentFolders([]);
+        applyProjectModelsPayload({});
         setProjectWorkspace(null);
         setProjectWorkspaceFiles([]);
         setActiveProjectDocumentFolderId(null);
@@ -78,6 +111,7 @@ export async function handleNewProject({ closeSidebarOnMobile }) {
         const projects = await loadProjects();
         applyProjectsPayload(projects);
         enterProjectWorkspace(payload.project.id);
+        applyProjectModelsPayload(await loadProjectModels(payload.project.id));
         clearActiveConversation();
         renderApp();
         closeSidebarOnMobile();
@@ -272,6 +306,272 @@ export async function handleDocumentsOpen() {
     } catch (error) {
         showStatus(error.message || "The project documents could not be loaded.", true);
     }
+}
+
+
+export async function handleProjectModelsOpen() {
+    closeProjectActionsMenu();
+
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        showStatus("Select a project first.", true);
+        return;
+    }
+
+    try {
+        applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        setProjectModelFormState();
+        renderProjectModelsManager();
+        openProjectModelsModal();
+        elements.projectModelNicknameInput?.focus({ preventScroll: true });
+    } catch (error) {
+        showStatus(error.message || "The project agents could not be loaded.", true);
+    }
+}
+
+
+export async function handleProjectAgentChangeOpen() {
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        showStatus("Select a project first.", true);
+        return;
+    }
+
+    try {
+        applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        renderChatPanel();
+        openProjectAgentSwitchModal();
+        if (elements.projectAgentSwitchSearchInput) {
+            elements.projectAgentSwitchSearchInput.value = "";
+            filterProjectAgentSwitchOptions("");
+            elements.projectAgentSwitchSearchInput.focus({ preventScroll: true });
+            elements.projectAgentSwitchSearchInput.select();
+        }
+    } catch (error) {
+        showStatus(error.message || "The project agents could not be loaded.", true);
+    }
+}
+
+
+export async function handleProjectAgentOptionSelect(projectModelId) {
+    const activeProject = getActiveProject();
+    if (!activeProject || !projectModelId) {
+        return;
+    }
+
+    try {
+        await updateProjectModel({
+            id: projectModelId,
+            is_default: true,
+        });
+        applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        closeProjectAgentSwitchModal();
+        renderProjectModelsManager();
+        renderProjectSpace();
+        renderChatPanel();
+        renderConversationHeader();
+        showStatus("Default project agent updated.");
+    } catch (error) {
+        showStatus(error.message || "The default project agent could not be changed.", true);
+    }
+}
+
+
+export function handleProjectAgentSearchInput(event) {
+    if (event.target.id !== "project-agent-switch-search") {
+        return;
+    }
+
+    filterProjectAgentSwitchOptions(event.target.value);
+}
+
+
+export function handleProjectAgentSearchClear() {
+    if (!elements.projectAgentSwitchSearchInput) {
+        return;
+    }
+
+    elements.projectAgentSwitchSearchInput.value = "";
+    filterProjectAgentSwitchOptions("");
+    elements.projectAgentSwitchSearchInput.focus({ preventScroll: true });
+}
+
+
+export async function handleProjectModelsSubmit(event) {
+    event.preventDefault();
+
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        showStatus("Select a project first.", true);
+        return;
+    }
+
+    const projectModelId = Number(elements.projectModelIdInput?.value || "0") || null;
+    const nickname = elements.projectModelNicknameInput?.value.trim() || "";
+    const modelId = Number(elements.projectModelSystemModelIdInput?.value || "0") || null;
+    const profileId = Number(elements.projectModelProfileIdInput?.value || "0") || null;
+    const systemPrompt = elements.projectModelSystemPromptInput?.value.trim() || "";
+    const isDefault = Boolean(elements.projectModelDefaultInput?.checked);
+
+    if (!nickname) {
+        showStatus("Add a nickname for this project agent.", true);
+        return;
+    }
+    if (!modelId) {
+        showStatus("Select a base model.", true);
+        return;
+    }
+    if (!profileId) {
+        showStatus("Select a behavior profile.", true);
+        return;
+    }
+
+    try {
+        if (projectModelId) {
+            await updateProjectModel({
+                id: projectModelId,
+                nickname,
+                model_id: modelId,
+                profile_id: profileId,
+                system_prompt: systemPrompt,
+                is_default: isDefault,
+            });
+        } else {
+            await createProjectModel({
+                project_id: activeProject.id,
+                nickname,
+                model_id: modelId,
+                profile_id: profileId,
+                system_prompt: systemPrompt,
+                is_default: isDefault,
+            });
+        }
+        applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        setProjectModelFormState();
+        renderProjectModelsManager();
+        renderProjectSpace();
+        renderChatPanel();
+        renderConversationHeader();
+        showStatus(projectModelId ? "Project agent updated." : "Project agent added.");
+    } catch (error) {
+        showStatus(error.message || "The project agent could not be saved.", true);
+    }
+}
+
+
+export async function handleProjectModelListClick(event) {
+    const editButton = event.target.closest("[data-edit-project-model-id]");
+    if (editButton) {
+        setProjectModelFormState({
+            mode: "edit",
+            projectModelId: Number(editButton.dataset.editProjectModelId),
+        });
+        renderProjectModelsManager();
+        elements.projectModelNicknameInput?.focus({ preventScroll: true });
+        return;
+    }
+
+    const deleteButton = event.target.closest("[data-delete-project-model-id]");
+    if (!deleteButton) {
+        return;
+    }
+
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        showStatus("Select a project first.", true);
+        return;
+    }
+
+    try {
+        await deleteProjectModel(Number(deleteButton.dataset.deleteProjectModelId));
+        const payload = await loadProjectModels(activeProject.id);
+        applyProjectModelsPayload(payload);
+        setProjectModelFormState();
+        renderProjectModelsManager();
+        renderProjectSpace();
+        renderChatPanel();
+        renderConversationHeader();
+        showStatus("Project agent deleted.");
+    } catch (error) {
+        showStatus(error.message || "The project agent could not be deleted.", true);
+    }
+}
+
+
+export function handleProjectModelFormReset() {
+    setProjectModelFormState();
+    renderProjectModelsManager();
+    elements.projectModelNicknameInput?.focus({ preventScroll: true });
+}
+
+
+export function handleProjectModelComboboxInput(event) {
+    const kind = getProjectModelComboboxKindFromInput(event.target);
+    if (!kind) {
+        return;
+    }
+
+    const idInput = kind === "model"
+        ? elements.projectModelSystemModelIdInput
+        : elements.projectModelProfileIdInput;
+    if (idInput) {
+        idInput.value = "";
+    }
+    filterProjectModelComboboxOptions(kind, event.target.value);
+    openProjectModelComboboxOptions(kind);
+    syncProjectModelSearchClearButtons();
+}
+
+
+export function handleProjectModelComboboxFocus(event) {
+    const kind = getProjectModelComboboxKindFromInput(event.target);
+    if (!kind) {
+        return;
+    }
+
+    filterProjectModelComboboxOptions(kind, event.target.value);
+    openProjectModelComboboxOptions(kind);
+}
+
+
+export function handleProjectModelComboboxClick(event) {
+    const option = event.target.closest("[data-project-model-option-kind]");
+    if (option) {
+        setProjectModelComboboxSelection(
+            option.dataset.projectModelOptionKind,
+            option.dataset.projectModelOptionId,
+        );
+        return;
+    }
+
+    if (event.target.closest("#project-model-system-model-clear")) {
+        clearProjectModelCombobox("model");
+        return;
+    }
+
+    if (event.target.closest("#project-model-profile-clear")) {
+        clearProjectModelCombobox("profile");
+    }
+}
+
+
+export function handleProjectModelDocumentClick(event) {
+    if (event.target.closest("[data-project-model-combobox]")) {
+        return;
+    }
+
+    closeProjectModelComboboxOptions();
+}
+
+
+function getProjectModelComboboxKindFromInput(input) {
+    if (input?.id === "project-model-system-model-input") {
+        return "model";
+    }
+    if (input?.id === "project-model-profile-input") {
+        return "profile";
+    }
+    return null;
 }
 
 

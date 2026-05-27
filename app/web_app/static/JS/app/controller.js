@@ -39,6 +39,7 @@ import {
     handleActiveChatModelEdit,
     handleModelIconClear,
     handleModelIconInputChange,
+    handleModelSearchClear,
     handleModelSearchInput,
     handleModelSubmit,
     openCreateModelModal,
@@ -49,6 +50,7 @@ import {
     handleActiveChatProfileEdit,
     handleDocumentClick,
     handleDocumentInput,
+    handleProfileSearchClear,
     handleProfileSubmit,
     openCreateProfileModal,
     openProfileSwitcher,
@@ -88,9 +90,21 @@ import {
     handleDocumentsSelected,
     handleNewProject,
     handleNewProjectChat,
+    handleProjectModelComboboxClick,
+    handleProjectModelComboboxFocus,
+    handleProjectModelComboboxInput,
+    handleProjectModelDocumentClick,
     handleProjectCustomizeSubmit,
     handleProjectDelete,
     handleProjectDocumentDelete,
+    handleProjectAgentChangeOpen,
+    handleProjectAgentOptionSelect,
+    handleProjectAgentSearchClear,
+    handleProjectAgentSearchInput,
+    handleProjectModelFormReset,
+    handleProjectModelListClick,
+    handleProjectModelsOpen,
+    handleProjectModelsSubmit,
     handleProjectSelect,
     handleWorkspaceSettingsOpen,
     closeProjectActionsMenu,
@@ -108,6 +122,8 @@ import {
     closeDocumentsModal,
     closeModelModal,
     closeModelSwitchModal,
+    closeProjectAgentSwitchModal,
+    closeProjectModelsModal,
     closeProfileModal,
     closeProfileSwitchModal,
     closeProjectCustomizeModal,
@@ -212,6 +228,7 @@ export function bindUI() {
         toggleProjectActionsMenu();
     });
     elements.addDocumentsButton?.addEventListener("click", handleDocumentsOpen);
+    elements.projectModelsButton?.addEventListener("click", handleProjectModelsOpen);
     elements.customizeProjectButton?.addEventListener("click", () => {
         closeProjectActionsMenu();
         openProjectCustomizeModal();
@@ -220,6 +237,8 @@ export function bindUI() {
     elements.workspaceSettingsButton?.addEventListener("click", () => handleWorkspaceSettingsOpen({ closeSidebarOnMobile }));
     elements.chatSettingsButton?.addEventListener("click", toggleChatPanel);
     elements.chatPanelBackdrop?.addEventListener("click", closeChatPanel);
+    elements.chatAgentsChangeButton?.addEventListener("click", handleProjectAgentChangeOpen);
+    elements.chatAgentsEditButton?.addEventListener("click", handleProjectModelsOpen);
     elements.chatExportButton?.addEventListener("click", openChatExportDialog);
     elements.chatExportJsonButton?.addEventListener("click", () => handleChatExportDownload("json"));
     elements.chatExportHtmlButton?.addEventListener("click", () => handleChatExportDownload("html"));
@@ -244,6 +263,8 @@ export function bindUI() {
     elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
     elements.closeModelSwitchButton?.addEventListener("click", closeModelSwitchModal);
+    elements.closeProjectAgentSwitchButton?.addEventListener("click", closeProjectAgentSwitchModal);
+    elements.closeProjectModelsButton?.addEventListener("click", closeProjectModelsModal);
     elements.closeChatExportButton?.addEventListener("click", closeChatExportModal);
     elements.closeModelButton?.addEventListener("click", closeModelModal);
     elements.closeProviderButton?.addEventListener("click", closeProviderModal);
@@ -257,6 +278,13 @@ export function bindUI() {
     elements.providerForm?.addEventListener("submit", handleProviderSubmit);
     elements.profileForm.addEventListener("submit", handleProfileSubmit);
     elements.projectCustomizeForm?.addEventListener("submit", handleProjectCustomizeSubmit);
+    elements.projectModelsForm?.addEventListener("submit", handleProjectModelsSubmit);
+    elements.projectModelsForm?.addEventListener("input", handleProjectModelComboboxInput);
+    elements.projectModelSystemModelInput?.addEventListener("focus", handleProjectModelComboboxFocus);
+    elements.projectModelProfileInput?.addEventListener("focus", handleProjectModelComboboxFocus);
+    elements.projectModelsList?.addEventListener("click", handleProjectModelListClick);
+    elements.projectModelsModal?.addEventListener("click", handleProjectModelComboboxClick);
+    elements.projectModelFormResetButton?.addEventListener("click", handleProjectModelFormReset);
     elements.deleteProjectButton?.addEventListener("click", handleProjectDelete);
     elements.settingsNewProfileButton?.addEventListener("click", () => openCreateProfileModal("settings"));
     elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);
@@ -286,6 +314,8 @@ export function bindUI() {
     }), { passive: true });
     elements.logoutButton.addEventListener("click", handleLogout);
     elements.modelSwitchModal?.addEventListener("click", handleModelSwitchModalClick);
+    elements.projectAgentSwitchModal?.addEventListener("click", handleProjectAgentSwitchModalClick);
+    elements.projectModelsModal?.addEventListener("click", handleProjectModelsModalClick);
     elements.modelModal?.addEventListener("click", handleModelModalClick);
     elements.providerModal?.addEventListener("click", handleProviderModalClick);
     elements.profileSwitchModal?.addEventListener("click", handleProfileSwitchModalClick);
@@ -297,6 +327,10 @@ export function bindUI() {
     elements.toolUploadModal?.addEventListener("click", handleToolUploadModalClick);
     elements.toolTraceModal?.addEventListener("click", handleToolTraceModalClick);
     elements.modelSwitchSearchInput?.addEventListener("input", handleModelSearchInput);
+    elements.modelSwitchSearchClearButton?.addEventListener("click", handleModelSearchClear);
+    elements.projectAgentSwitchSearchInput?.addEventListener("input", handleProjectAgentSearchInput);
+    elements.projectAgentSwitchSearchClearButton?.addEventListener("click", handleProjectAgentSearchClear);
+    elements.profileSwitchSearchClearButton?.addEventListener("click", handleProfileSearchClear);
     document.addEventListener("keydown", handleDocumentKeyDown);
     document.querySelectorAll("[data-prompt]").forEach((element) => {
         element.addEventListener("click", () => {
@@ -307,6 +341,7 @@ export function bindUI() {
     });
     document.addEventListener("click", (event) => handleDocumentClick(event, { handleProjectDocumentDelete }));
     document.addEventListener("click", handleProjectActionsDocumentClick);
+    document.addEventListener("click", handleProjectModelDocumentClick);
     document.addEventListener("click", handleDocumentToolClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();
@@ -322,6 +357,26 @@ export { ensureAuthenticated };
 function handleModelSwitchModalClick(event) {
     if (event.target.dataset.closeModelSwitchModal === "true") {
         closeModelSwitchModal();
+    }
+}
+
+
+function handleProjectAgentSwitchModalClick(event) {
+    if (event.target.dataset.closeProjectAgentSwitchModal === "true") {
+        closeProjectAgentSwitchModal();
+        return;
+    }
+
+    const option = event.target.closest("[data-project-agent-switch-option]");
+    if (option) {
+        handleProjectAgentOptionSelect(Number(option.dataset.projectAgentSwitchOption));
+    }
+}
+
+
+function handleProjectModelsModalClick(event) {
+    if (event.target.dataset.closeProjectModelsModal === "true") {
+        closeProjectModelsModal();
     }
 }
 
