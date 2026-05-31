@@ -46,9 +46,14 @@ class ChatContextBuilder:
 
         return default_profile
 
-    def build_input_messages(self, project, profile, messages):
+    def build_input_messages(self, project, profile, messages, project_model=None):
         normalized_messages = []
-        system_message_content = self._build_system_message_content(project, profile, messages)
+        system_message_content = self._build_system_message_content(
+            project,
+            profile,
+            messages,
+            project_model=project_model,
+        )
         if system_message_content:
             normalized_messages.append(
                 {
@@ -91,8 +96,22 @@ class ChatContextBuilder:
 
         return "\n\n".join(part for part in parts if part)
 
-    def _build_system_message_content(self, project, profile, messages):
+    def _build_project_agent_instruction(self, project_model):
+        if not project_model:
+            return ""
+
+        parts = [f"Active project agent: {project_model.get('nickname') or 'Agent'}"]
+        agent_prompt = (project_model.get("system_prompt") or "").strip()
+        if agent_prompt:
+            parts.append(agent_prompt)
+
+        return "\n\n".join(part for part in parts if part)
+
+    def _build_system_message_content(self, project, profile, messages, project_model=None):
         parts = [self._build_profile_instruction(profile)]
+        project_agent_instruction = self._build_project_agent_instruction(project_model)
+        if project_agent_instruction:
+            parts.append(project_agent_instruction)
 
         latest_user_message = self._get_last_user_message(messages)
         latest_user_content = latest_user_message["content"] if latest_user_message else ""

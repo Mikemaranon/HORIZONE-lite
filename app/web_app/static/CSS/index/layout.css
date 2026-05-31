@@ -580,6 +580,10 @@
     color: var(--meta-chip-profile);
 }
 
+.selection-chip[data-group="agent"] .selection-chip__group {
+    color: var(--meta-chip-agent);
+}
+
 .selection-chip--static {
     cursor: default;
 }

@@ -232,6 +232,128 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(delete_response.status_code, 200)
         self.assertTrue(delete_response.get_json()["deleted"])
 
+    def test_project_chat_agent_can_change_without_changing_project_default(self):
+        project_id = self.db.projects.create("Agent Project")
+        provider = self.db.providers.get_first_by_type("ollama")
+        profile = self.db.profiles.get_default()
+        coder_model_id = self.db.models.create(
+            name="coder-model",
+            display_name="Coder Model",
+            provider_config_id=provider["id"],
+        )
+        default_model_id = self.db.models.create(
+            name="default-model",
+            display_name="Default Model",
+            provider_config_id=provider["id"],
+        )
+        coder_agent_id = self.db.project_models.create(
+            project_id,
+            coder_model_id,
+            profile["id"],
+            "coder",
+            is_default=True,
+        )
+        default_agent_id = self.db.project_models.create(
+            project_id,
+            default_model_id,
+            profile["id"],
+            "default",
+            is_default=False,
+        )
+        conversation_id = self.db.conversations.create(
+            title="Project chat",
+            project_id=project_id,
+            project_model_id=coder_agent_id,
+            profile_id=profile["id"],
+            model_config_id=coder_model_id,
+            provider="ollama",
+            model="coder-model",
+        )
+
+        response = self.client.patch(
+            "/api/conversations",
+            json={
+                "id": conversation_id,
+                "project_model_id": default_agent_id,
+            },
+            headers=self.auth_headers,
+        )
+        conversation = self.db.conversations.get(conversation_id)
+        project_models = self.db.project_models.list_models(project_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(conversation["project_model_id"], default_agent_id)
+        self.assertEqual(conversation["model_config_id"], default_model_id)
+        self.assertEqual(conversation["model"], "default-model")
+        self.assertEqual(conversation["profile_id"], profile["id"])
+        self.assertEqual(
+            [item["id"] for item in project_models if item["is_default"]],
+            [coder_agent_id],
+        )
+
+    def test_project_agent_prompt_is_applied_and_message_metadata_is_persisted(self):
+        project_id = self.db.projects.create("Agent Context")
+        provider = self.db.providers.get_first_by_type("ollama")
+        profile = self.db.profiles.get_default()
+        model_id = self.db.models.create(
+            name="agent-model",
+            display_name="Agent Model",
+            provider_config_id=provider["id"],
+        )
+        agent_id = self.db.project_models.create(
+            project_id,
+            model_id,
+            profile["id"],
+            "default",
+            system_prompt="Use the project agent instructions.",
+            is_default=True,
+        )
+        conversation_id = self.db.conversations.create(
+            title="Project chat",
+            project_id=project_id,
+            project_model_id=agent_id,
+            profile_id=profile["id"],
+            model_config_id=model_id,
+            provider="ollama",
+            model="agent-model",
+        )
+        captured = {}
+
+        def fake_chat(provider_name, messages, model_name, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model_name,
+                "message": {
+                    "role": "assistant",
+                    "content": "Agent response",
+                },
+                "message_id": "agent-response",
+                "usage": {},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "Use the agent"}],
+            },
+            headers=self.auth_headers,
+        )
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Active project agent: default", captured["messages"][0]["content"])
+        self.assertIn("Use the project agent instructions.", captured["messages"][0]["content"])
+        self.assertEqual(response.get_json()["response"]["message"]["project_model_id"], agent_id)
+        self.assertEqual(response.get_json()["response"]["message"]["project_model_name"], "default")
+        self.assertEqual(stored_messages[1]["project_model_id"], agent_id)
+        self.assertEqual(stored_messages[1]["project_model_name"], "default")
+
     def test_updating_model_refreshes_visible_message_label(self):
         provider = self.db.providers.get_first_by_type("ollama")
         profile = self.db.profiles.get_default()

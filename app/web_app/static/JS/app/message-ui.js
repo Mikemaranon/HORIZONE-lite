@@ -5,6 +5,8 @@ import { closeToolTraceModal, openToolTraceModal } from "./modal-ui.js";
 import {
     getModelConfigById,
     getModelDisplayNameById,
+    getProjectAgentNameForMessage,
+    getSelectedProjectAgent,
     getProfileNameById,
     getSelectedModelConfigId,
     getSelectedProfileId,
@@ -200,10 +202,13 @@ export function handleToolTraceModalClick(event) {
 export function createPendingAssistantMessage() {
     const selectedModel = getModelConfigById(getSelectedModelConfigId()) || null;
     const selectedProfileId = getSelectedProfileId();
+    const selectedProjectAgent = getSelectedProjectAgent();
 
     return {
         role: "assistant",
         content: "",
+        project_model_id: selectedProjectAgent?.id || state.activeConversation?.project_model_id || null,
+        project_model_name: selectedProjectAgent?.nickname || "",
         model_config_id: selectedModel?.id || state.activeConversation?.model_config_id || null,
         model_name: selectedModel?.display_name || selectedModel?.name || state.activeConversation?.model || "Assistant",
         profile_id: selectedProfileId,
@@ -238,6 +243,13 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
 function createMessageMetaMarkup(message, userLabel = "You") {
     if (message.role === "user") {
         return escapeHtml(userLabel);
+    }
+
+    const projectAgentName = getProjectAgentNameForMessage(message);
+    if (projectAgentName) {
+        return `
+            <span class="message__meta-model">${escapeHtml(projectAgentName)}</span>
+        `;
     }
 
     return `

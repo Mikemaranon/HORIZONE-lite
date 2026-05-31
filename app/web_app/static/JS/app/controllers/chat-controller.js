@@ -18,7 +18,12 @@ import {
 } from "../message-ui.js";
 import { renderConversationHeader, renderConversations, renderMessages } from "../render.js";
 import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
-import { buildConversationTitle, getSelectedModelConfigId, getSelectedProfileId } from "../selectors.js";
+import {
+    buildConversationTitle,
+    getSelectedModelConfigId,
+    getSelectedProfileId,
+    getSelectedProjectAgent,
+} from "../selectors.js";
 import {
     applyConversationDetailPayload,
     applyConversationsPayload,
@@ -114,6 +119,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
             messages: requestMessages,
             provider: getActualProvider(),
             model: getSelectedModel(),
+            project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
             model_config_id: getSelectedModelConfigId(),
             profile_id: getSelectedProfileId(),
             request_id: requestId,
@@ -173,6 +179,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         const nextConversationFields = {
             ...(state.activeConversation || {}),
             id: conversationId,
+            project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
             model_config_id: getSelectedModelConfigId(),
             provider: getActualProvider(),
             model: getSelectedModel(),
@@ -181,6 +188,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         setActiveConversation(nextConversationFields);
         await updateConversation({
             id: conversationId,
+            project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
             model_config_id: getSelectedModelConfigId(),
             profile_id: getSelectedProfileId(),
         });
@@ -286,6 +294,7 @@ export async function ensureActiveConversation({ handleConversationSelect, close
     const conversationId = await createConversationRecord({
         title: buildConversationTitle(),
         project_id: state.activeProjectId,
+        project_model_id: getSelectedProjectAgent()?.id || null,
         profile_id: getSelectedProfileId(),
         model_config_id: getSelectedModelConfigId(),
     });

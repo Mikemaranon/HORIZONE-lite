@@ -44,6 +44,8 @@ class ChatPersistenceService:
                 role=message.get("role"),
                 content=message.get("content", ""),
                 position=next_position + offset,
+                project_model_id=message.get("project_model_id"),
+                project_model_name=message.get("project_model_name", ""),
             )
 
     def persist_assistant_message(self, conversation_id, response):
@@ -57,6 +59,8 @@ class ChatPersistenceService:
             conversation_id=conversation_id,
             role=assistant_message.get("role", "assistant"),
             content=assistant_message.get("content", ""),
+            project_model_id=assistant_message.get("project_model_id"),
+            project_model_name=assistant_message.get("project_model_name", ""),
             model_config_id=assistant_message.get("model_config_id"),
             model_name=assistant_message.get("model_name", ""),
             profile_id=assistant_message.get("profile_id"),
@@ -70,6 +74,8 @@ class ChatPersistenceService:
             return
 
         assistant_message = response.setdefault("message", {})
+        assistant_message["project_model_id"] = assistant_message_meta.get("project_model_id")
+        assistant_message["project_model_name"] = assistant_message_meta.get("project_model_name", "")
         assistant_message["model_config_id"] = assistant_message_meta.get("model_config_id")
         assistant_message["model_name"] = assistant_message_meta.get("model_name", "")
         assistant_message["profile_id"] = assistant_message_meta.get("profile_id")

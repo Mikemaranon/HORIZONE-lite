@@ -4,7 +4,13 @@ import { elements } from "../dom.js";
 import { createMetaChipsMarkup, escapeHtml } from "../html.js";
 import { createMessageMarkup, enableMessagesAutoScroll, scrollMessagesToBottom } from "../message-ui.js";
 import { getActualProvider, getProviderDisplayName, getSelectedModel, getSelectedModelConfig } from "../provider-helpers.js";
-import { getActiveProject, getProfileNameById, getProjectModels, getSelectedProfileId } from "../selectors.js";
+import {
+    getActiveProject,
+    getProfileNameById,
+    getProjectAgentNameForConversation,
+    getProjectModels,
+    getSelectedProfileId,
+} from "../selectors.js";
 import { state } from "../state.js";
 
 
@@ -50,16 +56,25 @@ export function renderConversationHeader() {
             || getProviderDisplayName(state.activeConversation?.provider || getActualProvider());
         const model = state.activeConversation?.model || getSelectedModel() || "pending model";
         const profileName = getProfileNameById(state.activeConversation?.profile_id || getSelectedProfileId());
+        const isProjectConversation = Boolean(activeProject);
 
         elements.workspaceEyebrow.textContent = activeProject ? "Project chat" : "Chat";
         elements.conversationTitle.innerHTML = createConversationTitleMarkup(
             state.activeConversation.title || "New conversation",
         );
-        elements.conversationMeta.innerHTML = createMetaChipsMarkup([
-            { group: "provider", label: "Provider", value: provider },
-            { group: "model", label: "Model", value: model },
-            { group: "profile", label: "Profile", value: profileName },
-        ]);
+        elements.conversationMeta.innerHTML = isProjectConversation
+            ? createMetaChipsMarkup([
+                {
+                    group: "agent",
+                    label: "Agent",
+                    value: getProjectAgentNameForConversation(state.activeConversation),
+                },
+            ])
+            : createMetaChipsMarkup([
+                { group: "provider", label: "Provider", value: provider },
+                { group: "model", label: "Model", value: model },
+                { group: "profile", label: "Profile", value: profileName },
+            ]);
         elements.conversationMeta.hidden = false;
         elements.conversationSubtitle.hidden = true;
         elements.backToProjectButton.hidden = !activeProject;

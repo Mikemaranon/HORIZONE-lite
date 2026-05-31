@@ -72,6 +72,7 @@
 .modal__panel--project-models {
     width: min(1020px, 100%);
     height: auto;
+    max-height: calc(100dvh - 36px);
 }
 
 .workspace-connect-dialog__panel {
@@ -495,7 +496,15 @@
 }
 
 .modal__body--project-models {
-    overflow: hidden;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.modal__body--project-models::after {
+    content: "";
+    display: block;
+    height: 8px;
 }
 
 .project-models-workspace {
@@ -504,18 +513,19 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr);
     gap: 14px;
+    align-items: start;
 }
 
 .project-models-manager,
 .project-models-editor {
     min-height: 0;
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
     gap: 12px;
 }
 
 .project-models-editor {
-    grid-template-rows: auto minmax(0, auto);
+    grid-template-rows: auto auto;
 }
 
 .project-models-manager h4,
@@ -524,14 +534,24 @@
     margin: 0;
 }
 
+.project-models-manager .settings-block__header-row {
+    align-items: center;
+}
+
+.project-models-manager .settings-block__header-row .action-button {
+    flex: none;
+}
+
 .project-models-form {
     min-height: 0;
     display: grid;
+    align-content: start;
     gap: 12px;
 }
 
 .project-models-list {
     min-height: 0;
+    max-height: 246px;
     overflow-y: auto;
     display: grid;
     align-content: start;
@@ -542,13 +562,14 @@
 .project-model-row {
     min-width: 0;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 11px;
     padding: 12px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.62);
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
 
 .project-model-row:hover {
@@ -556,9 +577,49 @@
     background: rgba(255, 255, 255, 0.82);
 }
 
+.project-model-row:has(.project-model-row__edit:focus-visible) {
+    border-color: rgba(199, 103, 46, 0.45);
+    box-shadow: 0 0 0 4px rgba(199, 103, 46, 0.12);
+}
+
 .project-model-row.is-default {
     border-color: rgba(28, 139, 89, 0.28);
     background: rgba(255, 255, 255, 0.86);
+}
+
+.project-model-row.is-editing {
+    border-color: rgba(28, 139, 89, 0.5);
+    background: linear-gradient(180deg, rgba(236, 253, 245, 0.92), rgba(255, 255, 255, 0.9));
+    box-shadow: 0 10px 26px rgba(16, 24, 40, 0.08);
+}
+
+.project-model-row.is-editing:hover {
+    border-color: rgba(28, 139, 89, 0.58);
+    background: linear-gradient(180deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 0.95));
+}
+
+.project-model-row__edit {
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 11px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.project-model-row__edit:focus {
+    outline: none;
+}
+
+.project-model-row__edit:focus-visible {
+    border-radius: 6px;
+    outline: 2px solid rgba(199, 103, 46, 0.45);
+    outline-offset: 3px;
 }
 
 .project-model-row__copy {
@@ -597,6 +658,11 @@
     font-weight: 650;
 }
 
+.project-model-row__badge--editing {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+
 .project-model-row__actions {
     display: flex;
     align-items: center;
@@ -630,6 +696,15 @@
 }
 
 @media (max-width: 760px) {
+    #project-models-modal.modal {
+        padding: 6px 8.5px;
+    }
+
+    .modal__panel--project-models {
+        height: auto;
+        max-height: calc(100dvh - 28px);
+    }
+
     .project-models-workspace {
         grid-template-columns: 1fr;
     }

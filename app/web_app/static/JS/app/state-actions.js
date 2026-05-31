@@ -68,6 +68,11 @@ export function setPendingModelConfigId(modelConfigId) {
 }
 
 
+export function setPendingProjectModelId(projectModelId) {
+    state.pendingProjectModelId = projectModelId || null;
+}
+
+
 export function setSelectedSettingsProviderId(providerId) {
     state.selectedSettingsProviderId = providerId || null;
 }
@@ -206,6 +211,12 @@ export function applyProjectDocumentsPayload(data) {
 
 export function applyProjectModelsPayload(data) {
     setProjectModels(data.models || [], data.uses_default !== false);
+    if (
+        state.pendingProjectModelId
+        && !state.projectModels.some((agent) => agent.id === Number(state.pendingProjectModelId))
+    ) {
+        state.pendingProjectModelId = null;
+    }
 }
 
 
@@ -257,6 +268,7 @@ export function applyConversationDetailPayload(data) {
     state.activeConversationId = conversation.id;
     state.activeMessages = data.messages || [];
     state.activeProjectId = conversation.project_id || null;
+    state.pendingProjectModelId = null;
     state.pendingModelConfigId = null;
     state.isEditingConversationTitle = false;
     state.conversationTitleDraft = "";
@@ -294,6 +306,7 @@ export function enterHomeWorkspace() {
     state.workspaceMode = "home";
     state.activeProjectId = null;
     clearActiveConversation();
+    state.pendingProjectModelId = null;
     state.projectDocuments = [];
     state.projectDocumentFolders = [];
     setProjectModels();
@@ -307,6 +320,7 @@ export function enterHomeWorkspace() {
 export function enterProjectWorkspace(projectId) {
     state.workspaceMode = "project";
     state.activeProjectId = projectId || null;
+    state.pendingProjectModelId = null;
     state.activeProjectDocumentFolderId = null;
     setProjectModels();
     setProjectWorkspace(null);

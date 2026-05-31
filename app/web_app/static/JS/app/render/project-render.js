@@ -97,29 +97,35 @@ function createProjectModelRowMarkup(projectModel) {
     const profile = projectModel.profile || {};
     const modelLabel = model.display_name || model.name || "Model";
     const providerLabel = model.provider_name || model.provider || "Provider";
+    const isEditing = projectModel.id === state.projectModelFormId;
+    const rowClasses = [
+        "project-model-row",
+        projectModel.is_default ? "is-default" : "",
+        isEditing ? "is-editing" : "",
+    ].filter(Boolean).join(" ");
 
     return `
-        <article class="project-model-row${projectModel.is_default ? " is-default" : ""}">
-            ${createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar model-badge-avatar--switch")}
-            <div class="project-model-row__copy">
-                <strong>
-                    ${escapeHtml(projectModel.nickname || modelLabel)}
-                    ${projectModel.is_default ? `<span class="project-model-row__badge">Default</span>` : ""}
-                </strong>
-                <span>${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
-                <span>${escapeHtml(providerLabel)}</span>
-                ${projectModel.system_prompt ? `<span>${escapeHtml(projectModel.system_prompt)}</span>` : ""}
-            </div>
+        <article class="${rowClasses}"${isEditing ? ' aria-current="true"' : ""}>
+            <button
+                class="project-model-row__edit"
+                type="button"
+                data-edit-project-model-id="${projectModel.id}"
+                aria-label="Edit agent ${escapeHtml(projectModel.nickname || modelLabel)}"
+                title="Edit agent"
+            >
+                ${createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar model-badge-avatar--switch")}
+                <span class="project-model-row__copy">
+                    <strong>
+                        ${escapeHtml(projectModel.nickname || modelLabel)}
+                        ${isEditing ? `<span class="project-model-row__badge project-model-row__badge--editing">Editing</span>` : ""}
+                        ${projectModel.is_default ? `<span class="project-model-row__badge">Default</span>` : ""}
+                    </strong>
+                    <span>${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
+                    <span>${escapeHtml(providerLabel)}</span>
+                    ${projectModel.system_prompt ? `<span>${escapeHtml(projectModel.system_prompt)}</span>` : ""}
+                </span>
+            </button>
             <div class="project-model-row__actions">
-                <button
-                    class="icon-button project-model-row__action"
-                    type="button"
-                    data-edit-project-model-id="${projectModel.id}"
-                    aria-label="Edit agent ${escapeHtml(projectModel.nickname || modelLabel)}"
-                    title="Edit"
-                >
-                    <img src="/static/assets/icons/pencil.png" alt="">
-                </button>
                 <button
                     class="icon-button project-model-row__action project-model-row__action--danger"
                     type="button"

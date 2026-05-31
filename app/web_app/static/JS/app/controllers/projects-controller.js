@@ -14,6 +14,7 @@ import {
     moveProjectDocument,
     updateProject,
     updateProjectModel,
+    updateConversation,
     uploadProjectDocuments,
 } from "../api.js";
 import { renderApp } from "../app-runtime.js";
@@ -41,7 +42,12 @@ import {
     setProjectModelComboboxSelection,
     syncProjectModelSearchClearButtons,
 } from "../render.js";
-import { getActiveProject, getSelectedProfileId } from "../selectors.js";
+import {
+    getActiveProject,
+    getDefaultProjectAgent,
+    getProjectAgentById,
+    getSelectedProjectAgent,
+} from "../selectors.js";
 import {
     applyConversationsPayload,
     applyProjectDocumentsPayload,
@@ -52,7 +58,9 @@ import {
     clearActiveConversation,
     enterHomeWorkspace,
     enterProjectWorkspace,
+    patchActiveConversation,
     setActiveProjectDocumentFolderId,
+    setPendingProjectModelId,
     setProjectDocumentFolders,
     setProjectDocuments,
     setProjectModelFormState,
@@ -69,7 +77,6 @@ import {
     loadProjectWorkspace,
     loadProjects,
 } from "../store.js";
-import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
 
 
 export async function handleProjectSelect(projectId, { closeSidebarOnMobile }) {
@@ -127,7 +134,8 @@ export async function handleNewProjectChat({ handleConversationSelect, closeSide
         showStatus("Select a project first.", true);
         return;
     }
-    if (!getSelectedModel()) {
+    const selectedAgent = getSelectedProjectAgent() || getDefaultProjectAgent();
+    if (!selectedAgent || !selectedAgent.model) {
         showStatus("Select an available model before creating the project chat.", true);
         return;
     }
@@ -136,9 +144,7 @@ export async function handleNewProjectChat({ handleConversationSelect, closeSide
         const payload = await createConversation({
             title: `${activeProject.name} · chat`,
             project_id: activeProject.id,
-            profile_id: getSelectedProfileId(),
-            provider: getActualProvider(),
-            model: getSelectedModel(),
+            project_model_id: selectedAgent.id,
         });
 
         const conversations = await loadConversations();
@@ -309,7 +315,7 @@ export async function handleDocumentsOpen() {
 }
 
 
-export async function handleProjectModelsOpen() {
+export async function handleProjectModelsOpen({ editSelectedAgent = false } = {}) {
     closeProjectActionsMenu();
 
     const activeProject = getActiveProject();
@@ -320,7 +326,11 @@ export async function handleProjectModelsOpen() {
 
     try {
         applyProjectModelsPayload(await loadProjectModels(activeProject.id));
-        setProjectModelFormState();
+        const selectedAgent = editSelectedAgent ? getSelectedProjectAgent() : null;
+        setProjectModelFormState(selectedAgent
+            ? { mode: "edit", projectModelId: selectedAgent.id }
+            : undefined
+        );
         renderProjectModelsManager();
         openProjectModelsModal();
         elements.projectModelNicknameInput?.focus({ preventScroll: true });
@@ -360,17 +370,38 @@ export async function handleProjectAgentOptionSelect(projectModelId) {
     }
 
     try {
-        await updateProjectModel({
-            id: projectModelId,
-            is_default: true,
-        });
-        applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        if (state.activeConversationId && state.activeConversation?.project_id) {
+            const agent = getProjectAgentById(projectModelId);
+            if (!agent) {
+                showStatus("The selected project agent was not found.", true);
+                return;
+            }
+
+            const payload = await updateConversation({
+                id: state.activeConversationId,
+                project_model_id: projectModelId,
+            });
+            patchActiveConversation(payload.conversation || {
+                project_model_id: projectModelId,
+                profile_id: agent.profile_id,
+                model_config_id: agent.model_id,
+                provider: agent.model?.provider,
+                model: agent.model?.name,
+            });
+            applyConversationsPayload(await loadConversations());
+            closeProjectAgentSwitchModal();
+            renderChatPanel();
+            renderConversationHeader();
+            showStatus("Chat agent updated.");
+            return;
+        }
+
+        setPendingProjectModelId(projectModelId);
         closeProjectAgentSwitchModal();
-        renderProjectModelsManager();
         renderProjectSpace();
         renderChatPanel();
         renderConversationHeader();
-        showStatus("Default project agent updated.");
+        showStatus("Agent selected for the next project chat.");
     } catch (error) {
         showStatus(error.message || "The default project agent could not be changed.", true);
     }
@@ -460,6 +491,45 @@ export async function handleProjectModelsSubmit(event) {
 
 
 export async function handleProjectModelListClick(event) {
+    const deleteButton = event.target.closest("[data-delete-project-model-id]");
+    if (deleteButton) {
+        const activeProject = getActiveProject();
+        if (!activeProject) {
+            showStatus("Select a project first.", true);
+            return;
+        }
+
+        const projectModelId = Number(deleteButton.dataset.deleteProjectModelId);
+        const projectAgent = getProjectAgentById(projectModelId);
+        const agentName = projectAgent?.nickname || projectAgent?.model?.display_name || projectAgent?.model?.name || "this agent";
+        const confirmed = await confirmAction({
+            eyebrow: "Project agent",
+            title: `Delete "${agentName}"`,
+            message: "This project agent will be removed from the project. Existing chats will keep their conversation history.",
+            confirmLabel: "Delete agent",
+            confirmVariant: "danger",
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await deleteProjectModel(projectModelId);
+            const payload = await loadProjectModels(activeProject.id);
+            applyProjectModelsPayload(payload);
+            setProjectModelFormState();
+            renderProjectModelsManager();
+            renderProjectSpace();
+            renderChatPanel();
+            renderConversationHeader();
+            showStatus("Project agent deleted.");
+        } catch (error) {
+            showStatus(error.message || "The project agent could not be deleted.", true);
+        }
+        return;
+    }
+
     const editButton = event.target.closest("[data-edit-project-model-id]");
     if (editButton) {
         setProjectModelFormState({
@@ -470,35 +540,10 @@ export async function handleProjectModelListClick(event) {
         elements.projectModelNicknameInput?.focus({ preventScroll: true });
         return;
     }
-
-    const deleteButton = event.target.closest("[data-delete-project-model-id]");
-    if (!deleteButton) {
-        return;
-    }
-
-    const activeProject = getActiveProject();
-    if (!activeProject) {
-        showStatus("Select a project first.", true);
-        return;
-    }
-
-    try {
-        await deleteProjectModel(Number(deleteButton.dataset.deleteProjectModelId));
-        const payload = await loadProjectModels(activeProject.id);
-        applyProjectModelsPayload(payload);
-        setProjectModelFormState();
-        renderProjectModelsManager();
-        renderProjectSpace();
-        renderChatPanel();
-        renderConversationHeader();
-        showStatus("Project agent deleted.");
-    } catch (error) {
-        showStatus(error.message || "The project agent could not be deleted.", true);
-    }
 }
 
 
-export function handleProjectModelFormReset() {
+export function handleProjectModelCreate() {
     setProjectModelFormState();
     renderProjectModelsManager();
     elements.projectModelNicknameInput?.focus({ preventScroll: true });

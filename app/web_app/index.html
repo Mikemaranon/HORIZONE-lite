@@ -578,7 +578,7 @@
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Agents</p>
-                    <h3>Change default agent</h3>
+                    <h3>Change agent</h3>
                 </div>
                 <button id="close-project-agent-switch-button" class="icon-button" type="button" aria-label="Close agent picker">×</button>
             </div>
@@ -587,7 +587,7 @@
                 <section class="settings-block">
                     <h4>Project agents</h4>
                     <p class="settings-block__copy">
-                        Choose the agent this project will use by default.
+                        Choose the agent for this chat, or for the next project chat if none is open.
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
                         <span>Search bar</span>
@@ -621,7 +621,7 @@
 
     <div id="project-models-modal" class="modal" hidden>
         <div class="modal__backdrop" data-close-project-models-modal="true"></div>
-        <div class="modal__panel modal__panel--project-models modal__panel--profile-switch">
+        <div class="modal__panel modal__panel--project-models">
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Project</p>
@@ -640,6 +640,7 @@
                                     Agents added to this project.
                                 </p>
                             </div>
+                            <button id="project-model-create-button" class="action-button" type="button">Create</button>
                         </div>
                         <div id="project-models-list" class="project-models-list" aria-live="polite"></div>
                     </section>
@@ -741,7 +742,6 @@
                                 <span>Select as default project agent</span>
                             </label>
                             <div class="project-models-form__actions">
-                                <button id="project-model-form-reset-button" class="ghost-button" type="button">Clear</button>
                                 <button id="project-model-submit-button" class="action-button action-button--primary" type="submit">Add agent</button>
                             </div>
                         </form>

@@ -17,6 +17,7 @@ class PreparedChatRequest:
     conversation_id: int | None
     conversation: dict | None
     project: dict | None
+    project_model: dict | None
     model_config_id: int | None
     provider: str
     model: str
@@ -122,8 +123,20 @@ class ChatService:
             conversation,
             default_profile,
         )
+        project_model_id = self._parse_optional_int(
+            data.get("project_model_id", conversation["project_model_id"] if conversation else None),
+            "project_model_id",
+            parse_int,
+        )
+        project_model = self._resolve_project_model(project_model_id, project)
+        if project_model:
+            profile = self.db.profiles.get(project_model["profile_id"])
+
         model_config_id = self._parse_optional_int(
-            data.get("model_config_id", conversation["model_config_id"] if conversation else None),
+            project_model["model_id"] if project_model else data.get(
+                "model_config_id",
+                conversation["model_config_id"] if conversation else None,
+            ),
             "model_config_id",
             parse_int,
         )
@@ -132,7 +145,10 @@ class ChatService:
         provider = data.get("provider") or (conversation["provider"] if conversation else None)
         model = data.get("model") or (conversation["model"] if conversation else None)
 
-        if model_config:
+        if project_model and model_config:
+            provider = model_config["provider"]
+            model = model_config["name"]
+        elif model_config:
             provider = provider or model_config["provider"]
             model = model or model_config["name"]
 
@@ -157,6 +173,7 @@ class ChatService:
             conversation_id=conversation_id,
             conversation=conversation,
             project=project,
+            project_model=project_model,
             model_config_id=model_config_id,
             provider=provider,
             model=model,
@@ -164,6 +181,7 @@ class ChatService:
                 project,
                 profile,
                 request_messages,
+                project_model=project_model,
             ),
             generation_settings=generation_settings,
             request_messages=request_messages,
@@ -174,6 +192,7 @@ class ChatService:
                 profile,
                 provider,
                 model,
+                project_model=project_model,
             ),
         )
 
@@ -243,6 +262,22 @@ class ChatService:
             raise ChatResourceNotFoundError("Conversation not found")
         return conversation
 
+    def _resolve_project_model(self, project_model_id, project):
+        if not project_model_id:
+            return None
+
+        project_model = self.db.project_models.get(project_model_id)
+        if not project_model:
+            raise ChatResourceNotFoundError("Project agent not found")
+
+        if project and project_model.get("project_id") != project.get("id"):
+            raise ChatRequestError("Project agent does not belong to this project")
+
+        if not project:
+            raise ChatRequestError("Project agent requires a project chat")
+
+        return project_model
+
     def _build_server_side_request_messages(self, conversation, incoming_messages):
         normalized_incoming_messages = [
             self._normalize_request_message(message)
@@ -267,6 +302,8 @@ class ChatService:
         return {
             "role": message.get("role"),
             "content": message.get("content", ""),
+            "project_model_id": message.get("project_model_id"),
+            "project_model_name": message.get("project_model_name", ""),
             "model_config_id": message.get("model_config_id"),
             "model_name": message.get("model_name", ""),
             "profile_id": message.get("profile_id"),
@@ -368,8 +405,10 @@ class ChatService:
 
         return bool(raw_value)
 
-    def _build_assistant_message_meta(self, model_config, profile, provider, model):
+    def _build_assistant_message_meta(self, model_config, profile, provider, model, project_model=None):
         return {
+            "project_model_id": project_model["id"] if project_model else None,
+            "project_model_name": project_model["nickname"] if project_model else "",
             "model_config_id": model_config["id"] if model_config else None,
             "model_name": model_config["display_name"] if model_config else model,
             "profile_id": profile["id"] if profile else None,

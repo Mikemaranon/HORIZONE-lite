@@ -58,6 +58,97 @@ export function getProjectModels() {
 }
 
 
+export function getDefaultProjectAgent() {
+    const projectAgents = getProjectModels();
+    return projectAgents.find((agent) => agent.is_default) || projectAgents[0] || null;
+}
+
+
+export function getProjectAgentById(projectModelId) {
+    if (!projectModelId) {
+        return null;
+    }
+
+    return getProjectModels().find((agent) => agent.id === Number(projectModelId)) || null;
+}
+
+
+export function getProjectAgentDisplayName(agent) {
+    if (!agent) {
+        return "custom";
+    }
+
+    const model = agent.model || {};
+    return agent.nickname || model.display_name || model.name || "default";
+}
+
+
+export function getProjectAgentForConversation(conversation = state.activeConversation) {
+    if (!conversation?.project_id) {
+        return null;
+    }
+
+    const explicitAgent = getProjectAgentById(conversation.project_model_id);
+    if (explicitAgent) {
+        return explicitAgent;
+    }
+
+    return getProjectAgentForModelProfile(
+        conversation.model_config_id,
+        conversation.profile_id,
+    ) || null;
+}
+
+
+export function getSelectedProjectAgent() {
+    if (state.activeConversation?.project_id) {
+        return getProjectAgentForConversation(state.activeConversation);
+    }
+
+    if (!state.activeProjectId) {
+        return null;
+    }
+
+    const pendingAgent = getProjectAgentById(state.pendingProjectModelId);
+    if (pendingAgent) {
+        return pendingAgent;
+    }
+
+    return getDefaultProjectAgent();
+}
+
+
+export function getProjectAgentNameForConversation(conversation = state.activeConversation) {
+    return getProjectAgentDisplayName(
+        getProjectAgentForConversation(conversation)
+        || getSelectedProjectAgent()
+    );
+}
+
+
+export function getProjectAgentNameForMessage(message) {
+    if (!state.activeConversation?.project_id) {
+        return "";
+    }
+
+    if (message?.project_model_name) {
+        return message.project_model_name;
+    }
+
+    const messageAgent = getProjectAgentById(message?.project_model_id);
+    if (messageAgent) {
+        return getProjectAgentDisplayName(messageAgent);
+    }
+
+    return getProjectAgentDisplayName(
+        getProjectAgentForModelProfile(
+            message?.model_config_id || state.activeConversation.model_config_id,
+            message?.profile_id || state.activeConversation.profile_id,
+        ) || getProjectAgentForConversation(state.activeConversation)
+    );
+}
+
+
 export function getProjectConversations(projectId = state.activeProjectId) {
     if (!projectId) {
         return [];
@@ -77,8 +168,17 @@ export function getSelectedProfileId() {
         return Number(state.activeConversation.profile_id);
     }
 
+    const selectedProjectAgent = getSelectedProjectAgent();
+    if (state.activeProjectId && selectedProjectAgent?.profile_id) {
+        return Number(selectedProjectAgent.profile_id);
+    }
+
     if (state.pendingProfileId) {
         return Number(state.pendingProfileId);
+    }
+
+    if (selectedProjectAgent?.profile_id) {
+        return Number(selectedProjectAgent.profile_id);
     }
 
     return getDefaultProfileId();
@@ -90,8 +190,17 @@ export function getSelectedModelConfigId() {
         return Number(state.activeConversation.model_config_id);
     }
 
+    const selectedProjectAgent = getSelectedProjectAgent();
+    if (state.activeProjectId && selectedProjectAgent?.model_id) {
+        return Number(selectedProjectAgent.model_id);
+    }
+
     if (state.pendingModelConfigId) {
         return Number(state.pendingModelConfigId);
+    }
+
+    if (selectedProjectAgent?.model_id) {
+        return Number(selectedProjectAgent.model_id);
     }
 
     return getDefaultModelConfigId();
@@ -105,4 +214,26 @@ export function buildConversationTitle() {
     }
 
     return "New conversation";
+}
+
+
+function getProjectAgentForModelProfile(modelConfigId, profileId) {
+    const normalizedModelId = Number(modelConfigId || "0") || null;
+    const normalizedProfileId = Number(profileId || "0") || null;
+    if (!normalizedModelId) {
+        return null;
+    }
+
+    const projectAgents = getProjectModels();
+    if (normalizedProfileId) {
+        const exactMatch = projectAgents.find((agent) => (
+            Number(agent.model_id) === normalizedModelId
+            && Number(agent.profile_id) === normalizedProfileId
+        ));
+        if (exactMatch) {
+            return exactMatch;
+        }
+    }
+
+    return projectAgents.find((agent) => Number(agent.model_id) === normalizedModelId) || null;
 }

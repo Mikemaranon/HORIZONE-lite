@@ -98,6 +98,20 @@
         align-items: stretch;
     }
 
+    .project-models-manager .settings-block__header-row {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .project-models-manager .settings-block__header-row > div {
+        min-width: 0;
+    }
+
+    .project-models-manager .settings-block__header-row .action-button {
+        flex: none;
+        margin-left: auto;
+    }
+
     .project-space__actions {
         width: 100%;
         justify-content: flex-end;
@@ -198,7 +212,7 @@
     }
 
     .modal {
-        padding: 12px;
+        padding: 12px 14.5px;
     }
 
     .modal__header,

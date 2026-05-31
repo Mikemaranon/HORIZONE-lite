@@ -156,7 +156,7 @@ export const elements = {
     projectModelProfileOptions: document.getElementById("project-model-profile-options"),
     projectModelSystemPromptInput: document.getElementById("project-model-system-prompt-input"),
     projectModelDefaultInput: document.getElementById("project-model-default-input"),
-    projectModelFormResetButton: document.getElementById("project-model-form-reset-button"),
+    projectModelCreateButton: document.getElementById("project-model-create-button"),
     projectModelSubmitButton: document.getElementById("project-model-submit-button"),
     profileSwitchSearchInput: document.getElementById("profile-switch-search"),
     profileSwitchSearchClearButton: document.getElementById("profile-switch-search-clear"),

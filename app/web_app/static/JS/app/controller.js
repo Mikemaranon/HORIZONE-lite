@@ -101,7 +101,7 @@ import {
     handleProjectAgentOptionSelect,
     handleProjectAgentSearchClear,
     handleProjectAgentSearchInput,
-    handleProjectModelFormReset,
+    handleProjectModelCreate,
     handleProjectModelListClick,
     handleProjectModelsOpen,
     handleProjectModelsSubmit,
@@ -238,7 +238,7 @@ export function bindUI() {
     elements.chatSettingsButton?.addEventListener("click", toggleChatPanel);
     elements.chatPanelBackdrop?.addEventListener("click", closeChatPanel);
     elements.chatAgentsChangeButton?.addEventListener("click", handleProjectAgentChangeOpen);
-    elements.chatAgentsEditButton?.addEventListener("click", handleProjectModelsOpen);
+    elements.chatAgentsEditButton?.addEventListener("click", () => handleProjectModelsOpen({ editSelectedAgent: true }));
     elements.chatExportButton?.addEventListener("click", openChatExportDialog);
     elements.chatExportJsonButton?.addEventListener("click", () => handleChatExportDownload("json"));
     elements.chatExportHtmlButton?.addEventListener("click", () => handleChatExportDownload("html"));
@@ -284,7 +284,7 @@ export function bindUI() {
     elements.projectModelProfileInput?.addEventListener("focus", handleProjectModelComboboxFocus);
     elements.projectModelsList?.addEventListener("click", handleProjectModelListClick);
     elements.projectModelsModal?.addEventListener("click", handleProjectModelComboboxClick);
-    elements.projectModelFormResetButton?.addEventListener("click", handleProjectModelFormReset);
+    elements.projectModelCreateButton?.addEventListener("click", handleProjectModelCreate);
     elements.deleteProjectButton?.addEventListener("click", handleProjectDelete);
     elements.settingsNewProfileButton?.addEventListener("click", () => openCreateProfileModal("settings"));
     elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);

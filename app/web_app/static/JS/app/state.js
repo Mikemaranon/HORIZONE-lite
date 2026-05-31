@@ -13,6 +13,7 @@ export const state = {
     activeConversation: null,
     pendingProfileId: null,
     pendingModelConfigId: null,
+    pendingProjectModelId: null,
     selectedSettingsProviderId: null,
     selectedSettingsProfileId: null,
     selectedSettingsModelId: null,

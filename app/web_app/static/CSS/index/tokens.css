@@ -21,6 +21,7 @@
     --meta-chip-provider: #3f7b54;
     --meta-chip-model: #8f612b;
     --meta-chip-profile: #2b7249;
+    --meta-chip-agent: #265f87;
     --form-select-bg: #fcfcf8;
     --form-select-hover-bg: #f7f5ee;
     --form-select-border: #cfd4c8;
@@ -30,8 +31,8 @@
     --radius-md: 16px;
     --radius-sm: 12px;
     --radius-pill: 999px;
-    --sidebar-width: 308px;
-    --chat-sidebar-width: 356px;
+    --sidebar-width: 332px;
+    --chat-sidebar-width: 332px;
     --content-width: 880px;
     --font-ui: "SF Pro Display", "Segoe UI Variable", "Avenir Next", sans-serif;
     --font-display: "SF Pro Display", "Segoe UI Variable", "Avenir Next", sans-serif;

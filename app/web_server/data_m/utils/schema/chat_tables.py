@@ -19,6 +19,7 @@ CHAT_SCHEMA_STATEMENTS = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL DEFAULT 'New Chat',
         project_id INTEGER,
+        project_model_id INTEGER,
         profile_id INTEGER,
         model_config_id INTEGER,
         provider TEXT NOT NULL,
@@ -26,6 +27,7 @@ CHAT_SCHEMA_STATEMENTS = [
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+        FOREIGN KEY (project_model_id) REFERENCES project_models(id) ON DELETE SET NULL,
         FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL,
         FOREIGN KEY (model_config_id) REFERENCES models(id) ON DELETE SET NULL
     )
@@ -37,6 +39,8 @@ CHAT_SCHEMA_STATEMENTS = [
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         position INTEGER NOT NULL,
+        project_model_id INTEGER,
+        project_model_name TEXT DEFAULT '',
         model_config_id INTEGER,
         model_name TEXT DEFAULT '',
         profile_id INTEGER,
@@ -45,6 +49,7 @@ CHAT_SCHEMA_STATEMENTS = [
         provider_message_id TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_model_id) REFERENCES project_models(id) ON DELETE SET NULL,
         FOREIGN KEY (model_config_id) REFERENCES models(id) ON DELETE SET NULL,
         FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE SET NULL
     )

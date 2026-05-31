@@ -102,25 +102,47 @@ class ConversationsAPI(BaseAPI):
 
         try:
             project_id = self.parse_int(data.get("project_id"), "project_id")
-            profile_id = self.parse_int(
-                data.get("profile_id", default_profile["id"] if default_profile else None),
-                "profile_id",
-            )
-            model_config_id = self.parse_int(
-                data.get("model_config_id", default_model["id"] if default_model else None),
-                "model_config_id",
-            )
+            project_model_id = self.parse_int(data.get("project_model_id"), "project_model_id")
         except ValueError as error:
             return self.error(str(error), 400)
 
+        try:
+            project_model = self._resolve_project_model(project_model_id, project_id)
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        if project_model:
+            project_id = project_model["project_id"]
+            profile_id = project_model["profile_id"]
+            model_config_id = project_model["model_id"]
+        else:
+            try:
+                profile_id = self.parse_int(
+                    data.get("profile_id", default_profile["id"] if default_profile else None),
+                    "profile_id",
+                )
+                model_config_id = self.parse_int(
+                    data.get("model_config_id", default_model["id"] if default_model else None),
+                    "model_config_id",
+                )
+            except ValueError as error:
+                return self.error(str(error), 400)
+
         configured_model = self.db.models.get(model_config_id) if model_config_id else default_model
-        provider = data.get("provider", configured_model["provider"] if configured_model else self.config_manager.providers.default_provider)
-        model = data.get("model", configured_model["name"] if configured_model else "")
+        provider = configured_model["provider"] if project_model and configured_model else data.get(
+            "provider",
+            configured_model["provider"] if configured_model else self.config_manager.providers.default_provider,
+        )
+        model = configured_model["name"] if project_model and configured_model else data.get(
+            "model",
+            configured_model["name"] if configured_model else "",
+        )
         title = data.get("title", "New Chat")
 
         conversation_id = self.db.conversations.create(
             title=title,
             project_id=project_id,
+            project_model_id=project_model_id,
             profile_id=profile_id,
             model_config_id=model_config_id,
             provider=provider,
@@ -147,25 +169,65 @@ class ConversationsAPI(BaseAPI):
 
         try:
             project_id = self.parse_int(data.get("project_id", conversation["project_id"]), "project_id")
-            profile_id = self.parse_int(data.get("profile_id", conversation["profile_id"]), "profile_id")
-            model_config_id = self.parse_int(
-                data.get("model_config_id", conversation.get("model_config_id")),
-                "model_config_id",
+            raw_project_model_id = (
+                data.get("project_model_id")
+                if "project_model_id" in data
+                else conversation.get("project_model_id")
             )
+            project_model_id = self.parse_int(raw_project_model_id, "project_model_id")
         except ValueError as error:
             return self.error(str(error), 400)
+
+        try:
+            project_model = self._resolve_project_model(project_model_id, project_id)
+        except ValueError as error:
+            return self.error(str(error), 400)
+
+        if project_model:
+            project_id = project_model["project_id"]
+            profile_id = project_model["profile_id"]
+            model_config_id = project_model["model_id"]
+        else:
+            try:
+                profile_id = self.parse_int(data.get("profile_id", conversation["profile_id"]), "profile_id")
+                model_config_id = self.parse_int(
+                    data.get("model_config_id", conversation.get("model_config_id")),
+                    "model_config_id",
+                )
+            except ValueError as error:
+                return self.error(str(error), 400)
 
         configured_model = self.db.models.get(model_config_id) if model_config_id else None
         self.db.conversations.update(
             conversation_id=conversation_id,
             title=data.get("title", conversation["title"]),
             project_id=project_id,
+            project_model_id=project_model_id,
             profile_id=profile_id,
             model_config_id=model_config_id,
-            provider=data.get("provider", configured_model["provider"] if configured_model else conversation["provider"]),
-            model=data.get("model", configured_model["name"] if configured_model else conversation["model"]),
+            provider=configured_model["provider"] if project_model and configured_model else data.get(
+                "provider",
+                configured_model["provider"] if configured_model else conversation["provider"],
+            ),
+            model=configured_model["name"] if project_model and configured_model else data.get(
+                "model",
+                configured_model["name"] if configured_model else conversation["model"],
+            ),
         )
         return self.ok({"conversation": self.db.conversations.get(conversation_id)})
+
+    def _resolve_project_model(self, project_model_id, project_id):
+        if not project_model_id:
+            return None
+
+        project_model = self.db.project_models.get(project_model_id)
+        if not project_model:
+            raise ValueError("Project agent not found")
+
+        if project_id and project_model["project_id"] != project_id:
+            raise ValueError("Project agent does not belong to this project")
+
+        return project_model
 
     def handle_conversations_delete(self):
         auth = self.authenticate_request(request)

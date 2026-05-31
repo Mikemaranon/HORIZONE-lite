@@ -6,6 +6,7 @@ import { getProviderTypeDisplayName } from "../provider-helpers.js";
 import {
     getActiveProject,
     getDefaultProfileId,
+    getSelectedProjectAgent,
     getSelectedModelConfigId,
     getSelectedProfileId,
 } from "../selectors.js";
@@ -278,11 +279,15 @@ function renderChatPanelMode() {
     };
 
     if (elements.chatSidePanelTitle) {
-        elements.chatSidePanelTitle.textContent = isProjectContext ? "Project settings" : "Chat settings";
+        elements.chatSidePanelTitle.textContent = isProjectContext && !state.activeConversation
+            ? "Project settings"
+            : "Chat settings";
     }
     if (elements.chatSidePanelSubtitle) {
         elements.chatSidePanelSubtitle.textContent = isProjectContext
-            ? "Default project agent and tools for this project."
+            ? (state.activeConversation
+                ? "Agent and tools for this chat."
+                : "Agent for the next project chat, plus project tools.")
             : "Everything that affects the current chat, grouped into sections.";
     }
 
@@ -318,10 +323,10 @@ function renderChatAgentsList() {
 
     const activeProject = getActiveProject();
     const projectAgents = activeProject ? (state.projectModels || []) : [];
-    const defaultAgent = getDefaultProjectAgent(projectAgents);
+    const selectedAgent = getSelectedProjectAgent() || getDefaultProjectAgent(projectAgents);
 
     elements.chatAgentsList.innerHTML = projectAgents.length
-        ? createProjectAgentCardMarkup(defaultAgent)
+        ? createProjectAgentCardMarkup(selectedAgent)
         : `<div class="chat-profile-card__empty">No agents are available in this project yet. Create one from the project Agents menu.</div>`;
 
     if (elements.chatAgentsChangeButton) {
@@ -380,11 +385,11 @@ export function renderProjectAgentSwitchModal() {
     }
 
     const projectAgents = getActiveProject() ? (state.projectModels || []) : [];
-    const defaultAgent = getDefaultProjectAgent(projectAgents);
+    const selectedAgent = getSelectedProjectAgent() || getDefaultProjectAgent(projectAgents);
     const query = elements.projectAgentSwitchSearchInput?.value || "";
 
     elements.projectAgentSwitchResults.innerHTML = projectAgents.length
-        ? projectAgents.map((agent) => createProjectAgentSwitchOptionMarkup(agent, defaultAgent)).join("")
+        ? projectAgents.map((agent) => createProjectAgentSwitchOptionMarkup(agent, selectedAgent)).join("")
         : `<div class="profile-switch__empty">There are no project agents yet. Create one with Edit.</div>`;
 
     applySwitchQueryState({
@@ -472,14 +477,14 @@ function createProjectAgentCardMarkup(agent) {
 }
 
 
-function createProjectAgentSwitchOptionMarkup(agent, defaultAgent) {
+function createProjectAgentSwitchOptionMarkup(agent, selectedAgent) {
     const model = agent.model || {};
     const profile = agent.profile || {};
     const modelLabel = model.display_name || model.name || "Model";
     const agentLabel = agent.nickname || modelLabel;
     const providerLabel = model.provider_name || getProviderTypeDisplayName(model.provider_type || model.provider);
-    const isSelected = agent.id === defaultAgent?.id;
-    const suffix = isSelected ? " · default" : "";
+    const isSelected = agent.id === selectedAgent?.id;
+    const suffix = isSelected ? (state.activeConversation?.project_id ? " · selected" : " · default") : "";
     const avatar = createModelAvatarMarkup(
         agentLabel,
         model.icon_image,

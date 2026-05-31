@@ -11,6 +11,8 @@ class MessagesTable:
         role,
         content,
         position=None,
+        project_model_id=None,
+        project_model_name="",
         model_config_id=None,
         model_name="",
         profile_id=None,
@@ -25,16 +27,18 @@ class MessagesTable:
         _, message_id = self.db.execute(
             """
             INSERT INTO messages (
-                conversation_id, role, content, position, model_config_id, model_name,
-                profile_id, profile_name, tool_events, provider_message_id
+                conversation_id, role, content, position, project_model_id, project_model_name,
+                model_config_id, model_name, profile_id, profile_name, tool_events, provider_message_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 conversation_id,
                 role,
                 content,
                 position,
+                project_model_id,
+                project_model_name,
                 model_config_id,
                 model_name,
                 profile_id,
@@ -50,6 +54,7 @@ class MessagesTable:
         _, row = self.db.execute(
             """
             SELECT id, conversation_id, role, content, position,
+                   project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
                    tool_events, provider_message_id, created_at
             FROM messages
@@ -64,6 +69,7 @@ class MessagesTable:
         _, rows = self.db.execute(
             """
             SELECT id, conversation_id, role, content, position,
+                   project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
                    tool_events, provider_message_id, created_at
             FROM messages
@@ -133,13 +139,15 @@ class MessagesTable:
             "role": row[2],
             "content": row[3],
             "position": row[4],
-            "model_config_id": row[5],
-            "model_name": row[6] or "",
-            "profile_id": row[7],
-            "profile_name": row[8] or "",
-            "tool_events": self._parse_tool_events(row[9]),
-            "provider_message_id": row[10],
-            "created_at": row[11],
+            "project_model_id": row[5],
+            "project_model_name": row[6] or "",
+            "model_config_id": row[7],
+            "model_name": row[8] or "",
+            "profile_id": row[9],
+            "profile_name": row[10] or "",
+            "tool_events": self._parse_tool_events(row[11]),
+            "provider_message_id": row[12],
+            "created_at": row[13],
         }
 
     def _serialize_tool_events(self, tool_events):
