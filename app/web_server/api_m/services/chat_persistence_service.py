@@ -6,9 +6,10 @@ class ChatPersistenceService:
         "nueva conversacion",
     }
 
-    def __init__(self, db_manager, model_manager):
+    def __init__(self, db_manager, model_manager, generate_titles=True):
         self.db = db_manager
         self.model_manager = model_manager
+        self.generate_titles = generate_titles
 
     def prepare_conversation(self, conversation, provider, model, request_messages):
         conversation_id = conversation["id"]
@@ -75,6 +76,9 @@ class ChatPersistenceService:
         assistant_message["profile_name"] = assistant_message_meta.get("profile_name", "")
 
     def _ensure_generated_conversation_title(self, conversation, stored_messages, response):
+        if not self.generate_titles:
+            return
+
         if not conversation:
             return
 

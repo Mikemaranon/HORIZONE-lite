@@ -11,6 +11,7 @@ from .chat_request_preparer import (
 from .chat_service import (
     ChatService,
 )
+from .chat_sse_presenter import ChatSSEPresenter
 from .chat_stream_service import ChatStreamService
 from .conversation_service import (
     ConversationRequestError,
@@ -54,6 +55,7 @@ __all__ = [
     "ChatRequestPreparer",
     "ChatResourceNotFoundError",
     "ChatService",
+    "ChatSSEPresenter",
     "ChatStreamService",
     "PreparedChatRequest",
     "ConversationRequestError",

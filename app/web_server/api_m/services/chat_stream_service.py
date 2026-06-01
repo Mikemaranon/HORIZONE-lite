@@ -1,13 +1,11 @@
-import json
 import re
 import threading
 import time
 import uuid
 
-from flask import Response, stream_with_context
-
 from model_m import ProviderError
 from .chat_executor import ChatExecutor
+from .chat_sse_presenter import ChatSSEPresenter
 
 
 class ChatStreamService:
@@ -26,6 +24,7 @@ class ChatStreamService:
         persistence_service,
         tool_manager=None,
         executor=None,
+        presenter=None,
         display_delta_delay_seconds=None,
     ):
         self.db = db_manager
@@ -33,6 +32,7 @@ class ChatStreamService:
         self.persistence_service = persistence_service
         self.tool_manager = tool_manager
         self.executor = executor or ChatExecutor(model_manager, tool_manager=tool_manager)
+        self.presenter = presenter or ChatSSEPresenter()
         self.display_delta_delay_seconds = (
             self.DISPLAY_DELTA_DELAY_SECONDS
             if display_delta_delay_seconds is None
@@ -69,146 +69,34 @@ class ChatStreamService:
         assistant_message_meta,
         tool_context=None,
     ):
-        cancel_event = self._register_stream(request_id)
-
-        @stream_with_context
-        def generate():
-            try:
-                yield self._format_sse(
-                    "start",
-                    {
-                        "conversation_id": conversation_id,
-                        "provider": provider,
-                        "model": model,
-                        "request_id": request_id,
-                        "message_meta": assistant_message_meta,
-                    },
-                )
-
-                final_response = None
-                streamed_text_parts = []
-
-                event_stream = self.executor.stream_chat(
-                    provider,
-                    input_messages,
-                    model,
-                    generation_settings,
-                    should_stop=cancel_event.is_set,
-                    tool_context=tool_context,
-                )
-
-                for event in event_stream:
-                    event_type = event.get("type")
-
-                    if event_type == "delta":
-                        delta = event.get("delta") or ""
-                        if delta:
-                            for display_delta in self._iter_display_deltas(delta):
-                                streamed_text_parts.append(display_delta)
-                                yield self._format_sse("delta", {"delta": display_delta})
-                        continue
-
-                    if event_type == "tool_start":
-                        yield self._format_sse(
-                            "tool_start",
-                            {
-                                "tool_name": event.get("tool_name", ""),
-                                "display_name": event.get("display_name", ""),
-                                "arguments": event.get("arguments") or {},
-                            },
-                        )
-                        continue
-
-                    if event_type == "tool_result":
-                        yield self._format_sse(
-                            "tool_result",
-                            {
-                                "tool_name": event.get("tool_name", ""),
-                                "display_name": event.get("display_name", ""),
-                                "ok": bool(event.get("ok")),
-                            },
-                        )
-                        continue
-
-                    if event_type == "response":
-                        final_response = event.get("response")
-
-                was_cancelled = cancel_event.is_set()
-                if not final_response:
-                    final_response = {
-                        "provider": provider,
-                        "model": model,
-                        "message": {
-                            "role": "assistant",
-                            "content": "".join(streamed_text_parts),
-                        },
-                        "usage": {},
-                        "finish_reason": "cancelled" if was_cancelled else None,
-                        "message_id": None,
-                        "raw": {
-                            "streamed": True,
-                            "reconstructed": True,
-                            "cancelled": was_cancelled,
-                        },
-                    }
-                elif was_cancelled:
-                    final_response["finish_reason"] = "cancelled"
-                    raw_response = final_response.get("raw") or {}
-                    raw_response["cancelled"] = True
-                    final_response["raw"] = raw_response
-
-                if conversation_id:
-                    self.persistence_service.finalize_response(
-                        conversation_id,
-                        final_response,
-                        assistant_message_meta,
-                    )
-
-                payload = {
-                    "response": final_response,
-                    "cancelled": was_cancelled,
-                    "request_id": request_id,
-                    "message_meta": assistant_message_meta,
-                }
-                if conversation_id:
-                    payload["conversation"] = self.db.conversations.get(conversation_id)
-
-                yield self._format_sse("end", payload)
-            except GeneratorExit:
-                cancel_event.set()
-                raise
-            except ProviderError as error:
-                yield self._format_sse("error", {"error": error.to_dict()})
-            except Exception:
-                yield self._format_sse(
-                    "error",
-                    {"error": dict(self.INTERNAL_ERROR_PAYLOAD)},
-                )
-            finally:
-                self._release_stream(request_id)
-
-        return Response(
-            generate(),
-            mimetype="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-            },
+        return self.presenter.response_from_events(
+            self.iter_stream_events(
+                conversation_id,
+                provider,
+                input_messages,
+                model,
+                generation_settings,
+                request_id,
+                assistant_message_meta,
+                tool_context=tool_context,
+            )
         )
 
-    def build_static_stream_response(
+    def iter_stream_events(
         self,
         conversation_id,
         provider,
+        input_messages,
         model,
+        generation_settings,
         request_id,
         assistant_message_meta,
-        response,
+        tool_context=None,
     ):
-        @stream_with_context
-        def generate():
-            yield self._format_sse(
+        cancel_event = self._register_stream(request_id)
+
+        try:
+            yield self._event(
                 "start",
                 {
                     "conversation_id": conversation_id,
@@ -219,38 +107,185 @@ class ChatStreamService:
                 },
             )
 
-            content = ((response.get("message") or {}).get("content") or "")
-            if content:
-                for display_delta in self._iter_display_deltas(content):
-                    yield self._format_sse("delta", {"delta": display_delta})
+            final_response = None
+            streamed_text_parts = []
+
+            event_stream = self.executor.stream_chat(
+                provider,
+                input_messages,
+                model,
+                generation_settings,
+                should_stop=cancel_event.is_set,
+                tool_context=tool_context,
+            )
+
+            for event in event_stream:
+                event_type = event.get("type")
+
+                if event_type == "delta":
+                    delta = event.get("delta") or ""
+                    if delta:
+                        for display_delta in self._iter_display_deltas(delta):
+                            streamed_text_parts.append(display_delta)
+                            yield self._event("delta", {"delta": display_delta})
+                    continue
+
+                if event_type == "tool_start":
+                    yield self._event(
+                        "tool_start",
+                        {
+                            "tool_name": event.get("tool_name", ""),
+                            "display_name": event.get("display_name", ""),
+                            "arguments": event.get("arguments") or {},
+                        },
+                    )
+                    continue
+
+                if event_type == "tool_result":
+                    yield self._event(
+                        "tool_result",
+                        {
+                            "tool_name": event.get("tool_name", ""),
+                            "display_name": event.get("display_name", ""),
+                            "ok": bool(event.get("ok")),
+                        },
+                    )
+                    continue
+
+                if event_type == "response":
+                    final_response = event.get("response")
+
+            was_cancelled = cancel_event.is_set()
+            final_response = self._resolve_final_response(
+                final_response,
+                streamed_text_parts,
+                provider,
+                model,
+                was_cancelled,
+            )
 
             if conversation_id:
                 self.persistence_service.finalize_response(
                     conversation_id,
-                    response,
+                    final_response,
                     assistant_message_meta,
                 )
 
             payload = {
-                "response": response,
-                "cancelled": False,
+                "response": final_response,
+                "cancelled": was_cancelled,
                 "request_id": request_id,
                 "message_meta": assistant_message_meta,
             }
             if conversation_id:
                 payload["conversation"] = self.db.conversations.get(conversation_id)
 
-            yield self._format_sse("end", payload)
+            yield self._event("end", payload)
+        except GeneratorExit:
+            cancel_event.set()
+            raise
+        except ProviderError as error:
+            yield self._event("error", {"error": error.to_dict()})
+        except Exception:
+            yield self._event(
+                "error",
+                {"error": dict(self.INTERNAL_ERROR_PAYLOAD)},
+            )
+        finally:
+            self._release_stream(request_id)
 
-        return Response(
-            generate(),
-            mimetype="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
+    def build_static_stream_response(
+        self,
+        conversation_id,
+        provider,
+        model,
+        request_id,
+        assistant_message_meta,
+        response,
+    ):
+        return self.presenter.response_from_events(
+            self.iter_static_stream_events(
+                conversation_id,
+                provider,
+                model,
+                request_id,
+                assistant_message_meta,
+                response,
+            )
+        )
+
+    def iter_static_stream_events(
+        self,
+        conversation_id,
+        provider,
+        model,
+        request_id,
+        assistant_message_meta,
+        response,
+    ):
+        yield self._event(
+            "start",
+            {
+                "conversation_id": conversation_id,
+                "provider": provider,
+                "model": model,
+                "request_id": request_id,
+                "message_meta": assistant_message_meta,
             },
         )
+
+        content = ((response.get("message") or {}).get("content") or "")
+        if content:
+            for display_delta in self._iter_display_deltas(content):
+                yield self._event("delta", {"delta": display_delta})
+
+        if conversation_id:
+            self.persistence_service.finalize_response(
+                conversation_id,
+                response,
+                assistant_message_meta,
+            )
+
+        payload = {
+            "response": response,
+            "cancelled": False,
+            "request_id": request_id,
+            "message_meta": assistant_message_meta,
+        }
+        if conversation_id:
+            payload["conversation"] = self.db.conversations.get(conversation_id)
+
+        yield self._event("end", payload)
+
+    def _resolve_final_response(self, final_response, streamed_text_parts, provider, model, was_cancelled):
+        if not final_response:
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "".join(streamed_text_parts),
+                },
+                "usage": {},
+                "finish_reason": "cancelled" if was_cancelled else None,
+                "message_id": None,
+                "raw": {
+                    "streamed": True,
+                    "reconstructed": True,
+                    "cancelled": was_cancelled,
+                },
+            }
+
+        if was_cancelled:
+            final_response["finish_reason"] = "cancelled"
+            raw_response = final_response.get("raw") or {}
+            raw_response["cancelled"] = True
+            final_response["raw"] = raw_response
+
+        return final_response
+
+    def _event(self, event_name, payload):
+        return {"event": event_name, "data": payload}
 
     def _register_stream(self, request_id):
         cancel_event = threading.Event()
@@ -261,10 +296,6 @@ class ChatStreamService:
     def _release_stream(self, request_id):
         with self._active_streams_lock:
             self._active_streams.pop(request_id, None)
-
-    def _format_sse(self, event_name, payload):
-        serialized = json.dumps(payload, ensure_ascii=False)
-        return f"event: {event_name}\ndata: {serialized}\n\n"
 
     def _iter_display_deltas(self, delta):
         if len(delta) <= self.DISPLAY_DELTA_SPLIT_THRESHOLD:
