@@ -73,6 +73,30 @@ export function getProjectAgentById(projectModelId) {
 }
 
 
+export function getQuickProjectAgentsForConversation(conversation = state.activeConversation) {
+    if (!conversation?.project_id) {
+        return [];
+    }
+
+    const quickAgentIds = Array.isArray(conversation.quick_project_model_ids)
+        ? conversation.quick_project_model_ids
+        : [];
+
+    return quickAgentIds
+        .map((projectModelId) => getProjectAgentById(projectModelId))
+        .filter(Boolean);
+}
+
+
+export function getMentionableProjectAgents(conversation = state.activeConversation) {
+    if (!conversation?.project_id) {
+        return [];
+    }
+
+    return getProjectModels();
+}
+
+
 export function getProjectAgentDisplayName(agent) {
     if (!agent) {
         return "custom";

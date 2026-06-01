@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HORIZONE lite</title>
+    <link rel="stylesheet" href="/static/vendor/highlight/github-dark.min.css">
     <link rel="stylesheet" href="/static/CSS/index.css">
+    <script src="/static/vendor/highlight/highlight.min.js"></script>
     <script type="module" src="/static/JS/app/main.js"></script>
 </head>
 <body class="app-body">
@@ -400,6 +402,13 @@
                                     rows="1"
                                     placeholder="Ask anything..."
                                 ></textarea>
+                                <div
+                                    id="composer-mention-menu"
+                                    class="composer-mention-menu"
+                                    role="listbox"
+                                    aria-label="Mention an agent"
+                                    hidden
+                                ></div>
                                 <div class="composer__actions">
                                     <div id="composer-hint" class="composer__hint">
                                         `Shift + Enter` for a new line
@@ -578,7 +587,7 @@
             <div class="modal__header">
                 <div>
                     <p class="modal__eyebrow">Agents</p>
-                    <h3>Change agent</h3>
+                    <h3 id="project-agent-switch-title">Change agent</h3>
                 </div>
                 <button id="close-project-agent-switch-button" class="icon-button" type="button" aria-label="Close agent picker">×</button>
             </div>
@@ -586,7 +595,7 @@
             <div class="modal__body">
                 <section class="settings-block">
                     <h4>Project agents</h4>
-                    <p class="settings-block__copy">
+                    <p id="project-agent-switch-copy" class="settings-block__copy">
                         Choose the agent for this chat, or for the next project chat if none is open.
                     </p>
                     <label class="field field--stacked profile-switch__search-field">
@@ -656,12 +665,20 @@
                             <input id="project-model-id-input" type="hidden">
                             <label class="field field--stacked">
                                 <span>Nickname</span>
-                                <input
-                                    id="project-model-nickname-input"
-                                    type="text"
-                                    autocomplete="off"
-                                    placeholder="tester, coder, reviewer..."
-                                >
+                                <span class="agent-name-color-row">
+                                    <input
+                                        id="project-model-nickname-input"
+                                        type="text"
+                                        autocomplete="off"
+                                        placeholder="tester, coder, reviewer..."
+                                    >
+                                    <input
+                                        id="project-model-color-input"
+                                        type="color"
+                                        value="#1c8b59"
+                                        aria-label="Agent color"
+                                    >
+                                </span>
                             </label>
                             <div class="field field--stacked">
                                 <span>Base model</span>

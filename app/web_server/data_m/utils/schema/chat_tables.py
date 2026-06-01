@@ -20,6 +20,7 @@ CHAT_SCHEMA_STATEMENTS = [
         title TEXT NOT NULL DEFAULT 'New Chat',
         project_id INTEGER,
         project_model_id INTEGER,
+        quick_project_model_ids TEXT DEFAULT '',
         profile_id INTEGER,
         model_config_id INTEGER,
         provider TEXT NOT NULL,

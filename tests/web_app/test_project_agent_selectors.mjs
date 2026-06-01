@@ -5,6 +5,7 @@ const selectorsModuleUrl = new URL("../../app/web_app/static/JS/app/selectors.js
 
 const { state } = await import(stateModuleUrl);
 const {
+    getMentionableProjectAgents,
     getProjectAgentNameForConversation,
     getProjectAgentNameForMessage,
     getSelectedModelConfigId,
@@ -94,6 +95,12 @@ assert.equal(
     getProjectAgentNameForMessage({ role: "assistant", model_config_id: 2, profile_id: 20 }),
     "Coder",
     "assistant message metadata should resolve the agent nickname"
+);
+
+assert.deepEqual(
+    getMentionableProjectAgents(state.activeConversation).map((agent) => agent.id),
+    [100, 101],
+    "project chats should expose every project agent for mentions"
 );
 
 state.activeConversation = {

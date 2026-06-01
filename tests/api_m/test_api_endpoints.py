@@ -174,6 +174,7 @@ class ApiEndpointTests(ApiTestCase):
                 "model_id": model_id,
                 "profile_id": profile["id"],
                 "system_prompt": "Focus on implementation details.",
+                "color": "#2563eb",
             },
             headers=self.auth_headers,
         )
@@ -204,6 +205,7 @@ class ApiEndpointTests(ApiTestCase):
                 "model_id": model_id,
                 "profile_id": profile["id"],
                 "system_prompt": "Focus on regressions.",
+                "color": "#dc2626",
             },
             headers=self.auth_headers,
         )
@@ -218,11 +220,13 @@ class ApiEndpointTests(ApiTestCase):
         self.assertTrue(project_model["is_default"])
         self.assertTrue(second_project_model["is_default"])
         self.assertEqual(project_model["system_prompt"], "Focus on implementation details.")
+        self.assertEqual(project_model["color"], "#2563eb")
         self.assertEqual(project_model["model"]["display_name"], "Qwen 3")
         self.assertEqual(project_model["profile"]["name"], profile["name"])
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(update_response.get_json()["model"]["nickname"], "tester")
         self.assertEqual(update_response.get_json()["model"]["system_prompt"], "Focus on regressions.")
+        self.assertEqual(update_response.get_json()["model"]["color"], "#dc2626")
         project_models = self.client.get(
             f"/api/projects/models?project_id={project_id}",
             headers=self.auth_headers,
@@ -290,6 +294,58 @@ class ApiEndpointTests(ApiTestCase):
             [item["id"] for item in project_models if item["is_default"]],
             [coder_agent_id],
         )
+
+    def test_project_chat_can_store_quick_agents_without_changing_active_agent(self):
+        project_id = self.db.projects.create("Quick Agent Project")
+        provider = self.db.providers.get_first_by_type("ollama")
+        profile = self.db.profiles.get_default()
+        main_model_id = self.db.models.create(
+            name="main-model",
+            display_name="Main Model",
+            provider_config_id=provider["id"],
+        )
+        review_model_id = self.db.models.create(
+            name="review-model",
+            display_name="Review Model",
+            provider_config_id=provider["id"],
+        )
+        main_agent_id = self.db.project_models.create(
+            project_id,
+            main_model_id,
+            profile["id"],
+            "main",
+            is_default=True,
+        )
+        review_agent_id = self.db.project_models.create(
+            project_id,
+            review_model_id,
+            profile["id"],
+            "reviewer",
+        )
+        conversation_id = self.db.conversations.create(
+            title="Project chat",
+            project_id=project_id,
+            project_model_id=main_agent_id,
+            profile_id=profile["id"],
+            model_config_id=main_model_id,
+            provider="ollama",
+            model="main-model",
+        )
+
+        response = self.client.patch(
+            "/api/conversations",
+            json={
+                "id": conversation_id,
+                "quick_project_model_ids": [review_agent_id],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()["conversation"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["project_model_id"], main_agent_id)
+        self.assertEqual(payload["model_config_id"], main_model_id)
+        self.assertEqual(payload["quick_project_model_ids"], [review_agent_id])
 
     def test_project_agent_prompt_is_applied_and_message_metadata_is_persisted(self):
         project_id = self.db.projects.create("Agent Context")

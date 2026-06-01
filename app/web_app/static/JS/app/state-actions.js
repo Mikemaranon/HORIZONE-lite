@@ -135,6 +135,11 @@ export function setProjectModelFormState({ mode = "create", projectModelId = nul
 }
 
 
+export function setProjectAgentSwitchMode(mode = "change") {
+    state.projectAgentSwitchMode = mode;
+}
+
+
 export function setProjectWorkspace(workspace = null, fileCount = 0, recentEvents = []) {
     state.projectWorkspace = workspace;
     state.projectWorkspaceFileCount = fileCount || 0;
@@ -345,8 +350,15 @@ function enrichConversationModelConfig(conversation) {
         return conversation;
     }
 
+    const normalizedConversation = {
+        ...conversation,
+        quick_project_model_ids: Array.isArray(conversation.quick_project_model_ids)
+            ? conversation.quick_project_model_ids.map(Number).filter(Boolean)
+            : [],
+    };
+
     if (conversation.model_config_id) {
-        return conversation;
+        return normalizedConversation;
     }
 
     const matchedModel = state.models.find((model) => (
@@ -355,7 +367,7 @@ function enrichConversationModelConfig(conversation) {
     ));
 
     return {
-        ...conversation,
+        ...normalizedConversation,
         model_config_id: matchedModel?.id || null,
     };
 }

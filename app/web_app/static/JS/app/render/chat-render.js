@@ -2,16 +2,22 @@ import { syncComposerAvailability } from "../composer-ui.js";
 import { syncChatExportState } from "../controllers/export-controller.js";
 import { elements } from "../dom.js";
 import { createMetaChipsMarkup, escapeHtml } from "../html.js";
-import { createMessageMarkup, enableMessagesAutoScroll, scrollMessagesToBottom } from "../message-ui.js";
+import {
+    createMessageMarkup,
+    enableMessagesAutoScroll,
+    highlightMessageCodeBlocks,
+    scrollMessagesToBottom,
+} from "../message-ui.js";
 import { getActualProvider, getProviderDisplayName, getSelectedModel, getSelectedModelConfig } from "../provider-helpers.js";
 import {
     getActiveProject,
     getProfileNameById,
-    getProjectAgentNameForConversation,
     getProjectModels,
     getSelectedProfileId,
 } from "../selectors.js";
 import { state } from "../state.js";
+
+const DEFAULT_AGENT_COLOR = "#1c8b59";
 
 
 export function renderMessages({ preserveViewport = false } = {}) {
@@ -33,6 +39,7 @@ export function renderMessages({ preserveViewport = false } = {}) {
     elements.messagesContainer.innerHTML = state.activeMessages
         .map((message) => createMessageMarkup(message))
         .join("");
+    highlightMessageCodeBlocks(elements.messagesContainer);
 
     if (preserveViewport) {
         return;
@@ -49,6 +56,10 @@ export function renderConversationHeader() {
         "workspace__eyebrow--project-models",
         state.workspaceMode === "project" && !!activeProject,
     );
+    elements.conversationTitle.classList.toggle(
+        "workspace__title--project",
+        state.workspaceMode === "project" && !!activeProject,
+    );
 
     if (state.workspaceMode === "conversation" && state.activeConversation) {
         const selectedModelConfig = getSelectedModelConfig();
@@ -63,13 +74,7 @@ export function renderConversationHeader() {
             state.activeConversation.title || "New conversation",
         );
         elements.conversationMeta.innerHTML = isProjectConversation
-            ? createMetaChipsMarkup([
-                {
-                    group: "agent",
-                    label: "Agent",
-                    value: getProjectAgentNameForConversation(state.activeConversation),
-                },
-            ])
+            ? createProjectAgentChipsMarkup(getProjectModels())
             : createMetaChipsMarkup([
                 { group: "provider", label: "Provider", value: provider },
                 { group: "model", label: "Model", value: model },
@@ -83,10 +88,11 @@ export function renderConversationHeader() {
     }
 
     if (state.workspaceMode === "project" && activeProject) {
+        const workspaceName = state.projectWorkspace?.display_name || activeProject.name || "Project";
         elements.workspaceEyebrow.textContent = "Project";
-        elements.conversationTitle.innerHTML = createProjectModelChipsMarkup(getProjectModels());
-        elements.conversationMeta.innerHTML = "";
-        elements.conversationMeta.hidden = true;
+        elements.conversationTitle.textContent = `Active workspace: ${workspaceName}`;
+        elements.conversationMeta.innerHTML = createProjectAgentChipsMarkup(getProjectModels());
+        elements.conversationMeta.hidden = false;
         elements.conversationSubtitle.hidden = true;
         elements.backToProjectButton.hidden = true;
         elements.chatSettingsButton.hidden = false;
@@ -125,26 +131,56 @@ export function renderChatSurface() {
 }
 
 
-function createProjectModelChipsMarkup(models) {
-    if (!models.length) {
+function createProjectAgentChipsMarkup(agents) {
+    const sortedAgents = getDefaultFirstProjectAgents(agents);
+    if (!sortedAgents.length) {
         return `<span class="project-model-chip project-model-chip--empty">No agents</span>`;
     }
 
     return `
         <span class="project-model-chips" aria-label="Project agents">
-            ${models.map((model) => {
-                const nickname = model.nickname || "agent";
-                const baseModel = model.model || model;
-                const modelLabel = baseModel.display_name || baseModel.name || "Model";
-                const label = `${nickname} | ${modelLabel}`;
-                return `
-                    <span class="project-model-chip" title="${escapeHtml(baseModel.name || label)}">
-                        ${escapeHtml(label)}
-                    </span>
-                `;
-            }).join("")}
+            ${sortedAgents.map((agent, index) => createProjectAgentChipMarkup(agent, index)).join("")}
         </span>
     `;
+}
+
+
+function createProjectAgentChipMarkup(agent, index) {
+    const baseModel = agent.model || agent;
+    const nickname = agent.nickname || baseModel.display_name || baseModel.name || "agent";
+    const modelLabel = baseModel.display_name || baseModel.name || "Model";
+    const title = `${nickname} | ${modelLabel}`;
+    const color = normalizeAgentColor(agent.color);
+    const leadingSeparator = index === 1 ? `<span class="project-agent-chip-separator" aria-hidden="true">|</span>` : "";
+
+    return `
+        ${leadingSeparator}
+        <span
+            class="selection-chip selection-chip--static selection-chip--agent"
+            data-group="project-agent"
+            style="--project-agent-color: ${escapeHtml(color)}"
+            title="${escapeHtml(baseModel.name || title)}"
+        >
+            <span class="selection-chip__value project-agent-chip__name">${escapeHtml(nickname)}</span>
+            <span class="selection-chip__model">${escapeHtml(modelLabel)}</span>
+        </span>
+    `;
+}
+
+
+function getDefaultFirstProjectAgents(agents) {
+    return [...(agents || [])].sort((left, right) => {
+        if (Boolean(left.is_default) !== Boolean(right.is_default)) {
+            return left.is_default ? -1 : 1;
+        }
+        return 0;
+    });
+}
+
+
+function normalizeAgentColor(color) {
+    const normalized = String(color || DEFAULT_AGENT_COLOR).trim();
+    return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toLowerCase() : DEFAULT_AGENT_COLOR;
 }
 
 

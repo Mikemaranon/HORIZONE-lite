@@ -1,5 +1,7 @@
 import { cancelChatStream, createConversation, deleteConversation, sendChatStream, updateConversation } from "../api.js";
 import { renderApp } from "../app-runtime.js";
+import { closeComposerMentionMenu } from "../agent-mentions.js";
+import { extractMentionedAgents } from "../agent-mention-utils.js";
 import { setLoading, syncComposerAvailability } from "../composer-ui.js";
 import { confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
@@ -21,6 +23,7 @@ import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
 import {
     buildConversationTitle,
     getSelectedModelConfigId,
+    getMentionableProjectAgents,
     getSelectedProfileId,
     getSelectedProjectAgent,
 } from "../selectors.js";
@@ -104,76 +107,28 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         const requestId = createRequestId();
         setActiveGenerationRequestId(requestId);
         const requestMessages = [...state.activeMessages, { role: "user", content }];
+        const mentionedAgents = extractMentionedAgents(content, getMentionableProjectAgents());
+        const responderAgents = mentionedAgents.length ? mentionedAgents : [null];
 
         setActiveMessages(requestMessages);
         enableMessagesAutoScroll();
         renderMessages();
         elements.composerInput.value = "";
+        closeComposerMentionMenu();
         autoResizeComposerHeight();
-        let assistantMessageMeta = createPendingAssistantMessage();
-        appendTypingMessage(assistantMessageMeta);
 
-        let streamingAssistantMessage = null;
-        const payload = await sendChatStream({
-            conversation_id: conversationId,
-            messages: requestMessages,
-            provider: getActualProvider(),
-            model: getSelectedModel(),
-            project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
-            model_config_id: getSelectedModelConfigId(),
-            profile_id: getSelectedProfileId(),
-            request_id: requestId,
-        }, {
-            onStart(payloadData) {
-                if (payloadData?.request_id) {
-                    setActiveGenerationRequestId(payloadData.request_id);
-                }
-                if (payloadData?.message_meta) {
-                    assistantMessageMeta = {
-                        ...assistantMessageMeta,
-                        ...payloadData.message_meta,
-                    };
-                }
-            },
-            onDelta(delta) {
-                if (!streamingAssistantMessage) {
-                    removeTypingMessage();
-                    streamingAssistantMessage = {
-                        ...assistantMessageMeta,
-                        role: "assistant",
-                        content: "",
-                    };
-                    state.activeMessages.push(streamingAssistantMessage);
-                    appendStreamingAssistantMessage(streamingAssistantMessage);
-                }
+        let payload = null;
+        for (const responderAgent of responderAgents) {
+            payload = await sendChatTurn({
+                conversationId,
+                requestId: responderAgents.length === 1 ? requestId : createRequestId(),
+                responderAgent,
+            });
 
-                streamingAssistantMessage.content += delta;
-                updateStreamingAssistantMessage(streamingAssistantMessage.content);
-            },
-            onToolStart(toolPayload) {
-                showToolStatusMessage(
-                    toolPayload?.display_name || toolPayload?.tool_name || "tool",
-                    assistantMessageMeta,
-                );
-            },
-        });
-        payload.message.tool_events = payload.raw?.tool_events || [];
-
-        removeTypingMessage();
-        if (streamingAssistantMessage) {
-            Object.assign(streamingAssistantMessage, payload.message);
-            streamingAssistantMessage.content = payload.message.content;
-            if (payload.message.content) {
-                finalizeStreamingAssistantMessage(payload.message.content);
-                renderMessages({ preserveViewport: true });
-            } else {
-                state.activeMessages.pop();
-                removeStreamingAssistantMessage();
-                renderMessages({ preserveViewport: true });
+            if (payload.finish_reason === "cancelled") {
+                showStatus("Response stopped.", false);
+                return;
             }
-        } else if (payload.message.content) {
-            state.activeMessages.push(payload.message);
-            renderMessages();
         }
 
         const nextConversationFields = {
@@ -198,11 +153,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         renderConversations(getChatCallbacks().handleConversationSelect, getChatCallbacks().handleConversationDelete);
         renderConversationHeader();
 
-        if (payload.finish_reason === "cancelled") {
-            showStatus("Response stopped.", false);
-            return;
-        }
-        if (["length", "max_tokens"].includes(payload.finish_reason)) {
+        if (payload && ["length", "max_tokens"].includes(payload.finish_reason)) {
             showStatus("The response stopped due to the provider or model token limit.", true);
         }
     } catch (error) {
@@ -232,6 +183,101 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         setGenerationStopRequested(false);
         setLoading(false);
     }
+}
+
+
+async function sendChatTurn({ conversationId, requestId, responderAgent = null }) {
+    setActiveGenerationRequestId(requestId);
+    let assistantMessageMeta = createPendingAssistantMessage(responderAgent);
+    appendTypingMessage(assistantMessageMeta);
+
+    let streamingAssistantMessage = null;
+    const payload = await sendChatStream(buildChatPayload({
+        conversationId,
+        requestId,
+        responderAgent,
+    }), {
+        onStart(payloadData) {
+            if (payloadData?.request_id) {
+                setActiveGenerationRequestId(payloadData.request_id);
+            }
+            if (payloadData?.message_meta) {
+                assistantMessageMeta = {
+                    ...assistantMessageMeta,
+                    ...payloadData.message_meta,
+                };
+            }
+        },
+        onDelta(delta) {
+            if (!streamingAssistantMessage) {
+                removeTypingMessage();
+                streamingAssistantMessage = {
+                    ...assistantMessageMeta,
+                    role: "assistant",
+                    content: "",
+                };
+                state.activeMessages.push(streamingAssistantMessage);
+                appendStreamingAssistantMessage(streamingAssistantMessage);
+            }
+
+            streamingAssistantMessage.content += delta;
+            updateStreamingAssistantMessage(streamingAssistantMessage.content);
+        },
+        onToolStart(toolPayload) {
+            showToolStatusMessage(
+                toolPayload?.display_name || toolPayload?.tool_name || "tool",
+                assistantMessageMeta,
+            );
+        },
+    });
+    payload.message.tool_events = payload.raw?.tool_events || [];
+
+    removeTypingMessage();
+    if (streamingAssistantMessage) {
+        Object.assign(streamingAssistantMessage, payload.message);
+        streamingAssistantMessage.content = payload.message.content;
+        if (payload.message.content) {
+            finalizeStreamingAssistantMessage(payload.message.content);
+            renderMessages({ preserveViewport: true });
+        } else {
+            state.activeMessages.pop();
+            removeStreamingAssistantMessage();
+            renderMessages({ preserveViewport: true });
+        }
+    } else if (payload.message.content) {
+        state.activeMessages.push(payload.message);
+        renderMessages();
+    }
+
+    return payload;
+}
+
+
+function buildChatPayload({ conversationId, requestId, responderAgent = null }) {
+    if (!responderAgent) {
+        return {
+            conversation_id: conversationId,
+            messages: [...state.activeMessages],
+            provider: getActualProvider(),
+            model: getSelectedModel(),
+            project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
+            model_config_id: getSelectedModelConfigId(),
+            profile_id: getSelectedProfileId(),
+            request_id: requestId,
+        };
+    }
+
+    const model = responderAgent.model || {};
+    return {
+        conversation_id: conversationId,
+        messages: [...state.activeMessages],
+        provider: model.provider || getActualProvider(),
+        model: model.name || getSelectedModel(),
+        project_model_id: responderAgent.id,
+        model_config_id: responderAgent.model_id || model.id || getSelectedModelConfigId(),
+        profile_id: responderAgent.profile_id || getSelectedProfileId(),
+        request_id: requestId,
+    };
 }
 
 

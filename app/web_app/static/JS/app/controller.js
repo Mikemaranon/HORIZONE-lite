@@ -1,4 +1,11 @@
 import { configureAppCallbacks, renderApp } from "./app-runtime.js";
+import {
+    closeComposerMentionMenu,
+    handleComposerMentionDocumentClick,
+    handleComposerMentionInput,
+    handleComposerMentionKeyDown,
+    handleComposerMentionMenuClick,
+} from "./agent-mentions.js";
 import { autoResizeComposer } from "./composer-ui.js";
 import { handleToolTraceMessageClick } from "./message-ui.js";
 import {
@@ -101,6 +108,7 @@ import {
     handleProjectAgentOptionSelect,
     handleProjectAgentSearchClear,
     handleProjectAgentSearchInput,
+    handleConversationAgentChipsClick,
     handleProjectModelCreate,
     handleProjectModelListClick,
     handleProjectModelsOpen,
@@ -210,11 +218,20 @@ export function bindUI() {
         ensureActiveConversation: ensureConversation,
     }));
     elements.sendButton?.addEventListener("click", handleSendButtonClick);
-    elements.composerInput.addEventListener("keydown", handleComposerKeyDown);
-    elements.composerInput.addEventListener("input", autoResizeComposer);
+    elements.composerInput.addEventListener("keydown", (event) => {
+        if (!handleComposerMentionKeyDown(event)) {
+            handleComposerKeyDown(event);
+        }
+    });
+    elements.composerInput.addEventListener("input", () => {
+        autoResizeComposer();
+        handleComposerMentionInput();
+    });
+    elements.composerMentionMenu?.addEventListener("click", handleComposerMentionMenuClick);
     elements.conversationTitle?.addEventListener("click", handleConversationTitleClick);
     elements.conversationTitle?.addEventListener("input", handleConversationTitleInput);
     elements.conversationTitle?.addEventListener("keydown", handleConversationTitleKeyDown);
+    elements.conversationMeta?.addEventListener("click", handleConversationAgentChipsClick);
     elements.newChatButton.addEventListener("click", () => openNewConversationWorkspace({
         closeSidebarOnMobile,
     }));
@@ -336,6 +353,7 @@ export function bindUI() {
         element.addEventListener("click", () => {
             elements.composerInput.value = element.dataset.prompt || "";
             autoResizeComposer();
+            closeComposerMentionMenu();
             elements.composerInput.focus();
         });
     });
@@ -343,6 +361,7 @@ export function bindUI() {
     document.addEventListener("click", handleProjectActionsDocumentClick);
     document.addEventListener("click", handleProjectModelDocumentClick);
     document.addEventListener("click", handleDocumentToolClick);
+    document.addEventListener("click", handleComposerMentionDocumentClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();
     syncChatSidebarSections();

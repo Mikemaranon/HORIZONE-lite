@@ -6,6 +6,9 @@ class ProjectResourceNotFoundError(LookupError):
     pass
 
 
+DEFAULT_PROJECT_AGENT_COLOR = "#1c8b59"
+
+
 class ProjectService:
     def __init__(self, db_manager):
         self.db = db_manager
@@ -100,7 +103,7 @@ class ProjectService:
         if not self.db.projects.get(project_id):
             raise ProjectResourceNotFoundError("Project not found")
 
-        model_id, profile_id, nickname, system_prompt, is_default = self._parse_project_model_payload(
+        model_id, profile_id, nickname, system_prompt, is_default, color = self._parse_project_model_payload(
             project_id,
             data,
         )
@@ -111,6 +114,7 @@ class ProjectService:
             nickname=nickname,
             system_prompt=system_prompt,
             is_default=is_default,
+            color=color,
         )
         return self.db.project_models.get(project_model_id)
 
@@ -119,7 +123,7 @@ class ProjectService:
         if not existing:
             raise ProjectResourceNotFoundError("Project model not found")
 
-        model_id, profile_id, nickname, system_prompt, is_default = self._parse_project_model_payload(
+        model_id, profile_id, nickname, system_prompt, is_default, color = self._parse_project_model_payload(
             existing["project_id"],
             data,
             existing=existing,
@@ -131,6 +135,7 @@ class ProjectService:
             nickname,
             system_prompt,
             is_default=is_default,
+            color=color,
         )
         return self.db.project_models.get(project_model_id)
 
@@ -179,7 +184,11 @@ class ProjectService:
             data.get("is_default", existing.get("is_default") if existing else False)
         )
 
-        return model_id, profile_id, nickname, system_prompt, is_default
+        color = self._parse_color(
+            data.get("color", existing.get("color") if existing else DEFAULT_PROJECT_AGENT_COLOR)
+        )
+
+        return model_id, profile_id, nickname, system_prompt, is_default, color
 
     def _parse_positive_int(self, value, field_name):
         try:
@@ -198,3 +207,15 @@ class ProjectService:
         if isinstance(value, str):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return False
+
+    def _parse_color(self, value):
+        color = str(value or DEFAULT_PROJECT_AGENT_COLOR).strip()
+        if len(color) != 7 or not color.startswith("#"):
+            raise ProjectRequestError("Agent color must be a hex color")
+
+        try:
+            int(color[1:], 16)
+        except ValueError:
+            raise ProjectRequestError("Agent color must be a hex color")
+
+        return color.lower()

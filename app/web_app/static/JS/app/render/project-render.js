@@ -3,6 +3,8 @@ import { createEmptyListItem, createModelAvatarMarkup, escapeHtml } from "../htm
 import { getActiveProject, getProjectConversations } from "../selectors.js";
 import { state } from "../state.js";
 
+const DEFAULT_AGENT_COLOR = "#1c8b59";
+
 
 export function renderProjectSpace(onConversationSelect, onConversationDelete) {
     const activeProject = getActiveProject();
@@ -122,7 +124,6 @@ function createProjectModelRowMarkup(projectModel) {
                     </strong>
                     <span>${escapeHtml(modelLabel)} · ${escapeHtml(profile.name || "Profile")}</span>
                     <span>${escapeHtml(providerLabel)}</span>
-                    ${projectModel.system_prompt ? `<span>${escapeHtml(projectModel.system_prompt)}</span>` : ""}
                 </span>
             </button>
             <div class="project-model-row__actions">
@@ -197,6 +198,9 @@ function syncProjectModelForm() {
     if (elements.projectModelNicknameInput) {
         elements.projectModelNicknameInput.value = editingProjectModel?.nickname || "";
     }
+    if (elements.projectModelColorInput) {
+        elements.projectModelColorInput.value = normalizeAgentColor(editingProjectModel?.color);
+    }
     if (elements.projectModelSystemModelInput) {
         elements.projectModelSystemModelInput.value = selectedModel ? createModelOptionValue(selectedModel) : "";
         elements.projectModelSystemModelInput.setAttribute("aria-expanded", "false");
@@ -222,6 +226,12 @@ function syncProjectModelForm() {
 
     syncProjectModelSearchClearButtons();
     closeProjectModelComboboxOptions();
+}
+
+
+function normalizeAgentColor(color) {
+    const normalized = String(color || DEFAULT_AGENT_COLOR).trim();
+    return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toLowerCase() : DEFAULT_AGENT_COLOR;
 }
 
 

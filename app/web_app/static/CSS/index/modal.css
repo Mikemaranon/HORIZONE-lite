@@ -70,8 +70,8 @@
 }
 
 .modal__panel--project-models {
-    width: min(1020px, 100%);
-    height: auto;
+    width: min(1120px, calc(100vw - 48px));
+    height: min(760px, calc(100dvh - 36px));
     max-height: calc(100dvh - 36px);
 }
 
@@ -496,36 +496,38 @@
 }
 
 .modal__body--project-models {
+    height: 100%;
     min-height: 0;
-    overflow-y: auto;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
     overscroll-behavior: contain;
 }
 
 .modal__body--project-models::after {
-    content: "";
-    display: block;
-    height: 8px;
+    content: none;
 }
 
 .project-models-workspace {
-    height: auto;
+    height: 100%;
     min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.92fr);
+    grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
     gap: 14px;
-    align-items: start;
+    align-items: stretch;
 }
 
 .project-models-manager,
 .project-models-editor {
+    height: 100%;
     min-height: 0;
     display: grid;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 12px;
+    overflow: hidden;
 }
 
 .project-models-editor {
-    grid-template-rows: auto auto;
+    grid-template-rows: auto minmax(0, 1fr);
 }
 
 .project-models-manager h4,
@@ -545,13 +547,53 @@
 .project-models-form {
     min-height: 0;
     display: grid;
-    align-content: start;
+    grid-template-rows: auto auto auto minmax(150px, 1fr) auto auto;
     gap: 12px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.agent-name-color-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+}
+
+.field .agent-name-color-row input[type="text"] {
+    min-width: 0;
+}
+
+.field .agent-name-color-row input[type="color"] {
+    width: 56px;
+    height: 48px;
+    padding: 3px;
+    border: 1px solid var(--form-select-border);
+    border-radius: var(--radius-sm);
+    background: var(--form-select-bg);
+    cursor: pointer;
+}
+
+.project-models-form .field--fixed-textarea {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(150px, 1fr);
+}
+
+.project-models-form .field--fixed-textarea textarea {
+    height: 100%;
+    min-height: 150px;
+    box-sizing: border-box;
+}
+
+.project-models-form .checkbox-field {
+    align-self: start;
+    min-height: 28px;
 }
 
 .project-models-list {
     min-height: 0;
-    max-height: 246px;
     overflow-y: auto;
     display: grid;
     align-content: start;
@@ -695,18 +737,48 @@
     flex-wrap: wrap;
 }
 
-@media (max-width: 760px) {
-    #project-models-modal.modal {
-        padding: 6px 8.5px;
-    }
-
+@media (max-width: 980px) {
     .modal__panel--project-models {
+        width: min(720px, 100%);
         height: auto;
         max-height: calc(100dvh - 28px);
     }
 
+    .modal__body--project-models {
+        height: auto;
+        grid-template-rows: none;
+        overflow-y: auto;
+    }
+
     .project-models-workspace {
+        height: auto;
+        min-height: 0;
         grid-template-columns: 1fr;
+        align-items: start;
+    }
+
+    .project-models-manager,
+    .project-models-editor {
+        height: auto;
+        grid-template-rows: auto auto;
+        overflow: visible;
+    }
+
+    .project-models-form {
+        align-content: start;
+        grid-template-rows: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+
+    .project-models-list {
+        max-height: 246px;
+    }
+}
+
+@media (max-width: 760px) {
+    #project-models-modal.modal {
+        padding: 6px 8.5px;
     }
 }
 

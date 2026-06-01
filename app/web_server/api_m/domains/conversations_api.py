@@ -103,11 +103,16 @@ class ConversationsAPI(BaseAPI):
         try:
             project_id = self.parse_int(data.get("project_id"), "project_id")
             project_model_id = self.parse_int(data.get("project_model_id"), "project_model_id")
+            quick_project_model_ids = self._parse_quick_project_model_ids(
+                data.get("quick_project_model_ids", []),
+            )
         except ValueError as error:
             return self.error(str(error), 400)
 
         try:
             project_model = self._resolve_project_model(project_model_id, project_id)
+            effective_project_id = project_model["project_id"] if project_model else project_id
+            self._validate_quick_project_model_ids(quick_project_model_ids, effective_project_id)
         except ValueError as error:
             return self.error(str(error), 400)
 
@@ -143,6 +148,7 @@ class ConversationsAPI(BaseAPI):
             title=title,
             project_id=project_id,
             project_model_id=project_model_id,
+            quick_project_model_ids=quick_project_model_ids,
             profile_id=profile_id,
             model_config_id=model_config_id,
             provider=provider,
@@ -175,11 +181,19 @@ class ConversationsAPI(BaseAPI):
                 else conversation.get("project_model_id")
             )
             project_model_id = self.parse_int(raw_project_model_id, "project_model_id")
+            quick_project_model_ids = self._parse_quick_project_model_ids(
+                data.get(
+                    "quick_project_model_ids",
+                    conversation.get("quick_project_model_ids", []),
+                ),
+            )
         except ValueError as error:
             return self.error(str(error), 400)
 
         try:
             project_model = self._resolve_project_model(project_model_id, project_id)
+            effective_project_id = project_model["project_id"] if project_model else project_id
+            self._validate_quick_project_model_ids(quick_project_model_ids, effective_project_id)
         except ValueError as error:
             return self.error(str(error), 400)
 
@@ -203,6 +217,7 @@ class ConversationsAPI(BaseAPI):
             title=data.get("title", conversation["title"]),
             project_id=project_id,
             project_model_id=project_model_id,
+            quick_project_model_ids=quick_project_model_ids,
             profile_id=profile_id,
             model_config_id=model_config_id,
             provider=configured_model["provider"] if project_model and configured_model else data.get(
@@ -228,6 +243,31 @@ class ConversationsAPI(BaseAPI):
             raise ValueError("Project agent does not belong to this project")
 
         return project_model
+
+    def _parse_quick_project_model_ids(self, raw_value):
+        if raw_value in (None, ""):
+            return []
+
+        if not isinstance(raw_value, list):
+            raise ValueError("quick_project_model_ids must be a list")
+
+        parsed_ids = []
+        for raw_id in raw_value:
+            project_model_id = self.parse_int(raw_id, "quick_project_model_ids")
+            if project_model_id and project_model_id not in parsed_ids:
+                parsed_ids.append(project_model_id)
+
+        return parsed_ids
+
+    def _validate_quick_project_model_ids(self, project_model_ids, project_id):
+        if not project_model_ids:
+            return
+
+        if not project_id:
+            raise ValueError("Quick agents require a project chat")
+
+        for project_model_id in project_model_ids:
+            self._resolve_project_model(project_model_id, project_id)
 
     def handle_conversations_delete(self):
         auth = self.authenticate_request(request)

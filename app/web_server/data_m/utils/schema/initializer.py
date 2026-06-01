@@ -66,6 +66,7 @@ class DatabaseSchemaInitializer:
                 model_id INTEGER NOT NULL,
                 profile_id INTEGER NOT NULL,
                 nickname TEXT NOT NULL,
+                color TEXT DEFAULT '#1c8b59',
                 system_prompt TEXT DEFAULT '',
                 is_default INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -80,7 +81,7 @@ class DatabaseSchemaInitializer:
         database.execute(
             """
             INSERT OR IGNORE INTO project_models (
-                project_id, model_id, profile_id, nickname, system_prompt, is_default, created_at, updated_at
+                project_id, model_id, profile_id, nickname, color, system_prompt, is_default, created_at, updated_at
             )
             SELECT
                 legacy.project_id,
@@ -90,6 +91,7 @@ class DatabaseSchemaInitializer:
                     (SELECT id FROM profiles ORDER BY id ASC LIMIT 1)
                 ) AS profile_id,
                 COALESCE(NULLIF(models.display_name, ''), models.name, 'model') AS nickname,
+                '#1c8b59',
                 '',
                 0,
                 legacy.created_at,

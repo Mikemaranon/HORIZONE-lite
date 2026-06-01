@@ -65,6 +65,7 @@ PROJECT_SCHEMA_STATEMENTS = [
         model_id INTEGER NOT NULL,
         profile_id INTEGER NOT NULL,
         nickname TEXT NOT NULL,
+        color TEXT DEFAULT '#1c8b59',
         system_prompt TEXT DEFAULT '',
         is_default INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,

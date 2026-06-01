@@ -2,6 +2,7 @@ import { elements } from "./dom.js";
 import { createModelAvatarMarkup, escapeHtml } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
 import { closeToolTraceModal, openToolTraceModal } from "./modal-ui.js";
+import { applySyntaxHighlighting } from "./syntax-highlight.js";
 import {
     getModelConfigById,
     getModelDisplayNameById,
@@ -55,6 +56,11 @@ export function scrollMessagesToBottom() {
     }
 
     elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+}
+
+
+export function highlightMessageCodeBlocks(rootElement = elements.messagesContainer) {
+    applySyntaxHighlighting(rootElement);
 }
 
 
@@ -151,6 +157,7 @@ export function updateStreamingAssistantMessage(content) {
     }
 
     contentNode.innerHTML = renderMarkdown(content || "");
+    highlightMessageCodeBlocks(contentNode);
     keepMessagesPinnedToBottomIfNeeded();
 }
 
@@ -199,10 +206,10 @@ export function handleToolTraceModalClick(event) {
 }
 
 
-export function createPendingAssistantMessage() {
-    const selectedModel = getModelConfigById(getSelectedModelConfigId()) || null;
-    const selectedProfileId = getSelectedProfileId();
-    const selectedProjectAgent = getSelectedProjectAgent();
+export function createPendingAssistantMessage(projectAgent = null) {
+    const selectedModel = projectAgent?.model || getModelConfigById(getSelectedModelConfigId()) || null;
+    const selectedProfileId = projectAgent?.profile_id || getSelectedProfileId();
+    const selectedProjectAgent = projectAgent || getSelectedProjectAgent();
 
     return {
         role: "assistant",

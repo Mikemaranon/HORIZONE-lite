@@ -61,6 +61,7 @@ import {
     patchActiveConversation,
     setActiveProjectDocumentFolderId,
     setPendingProjectModelId,
+    setProjectAgentSwitchMode,
     setProjectDocumentFolders,
     setProjectDocuments,
     setProjectModelFormState,
@@ -83,22 +84,9 @@ export async function handleProjectSelect(projectId, { closeSidebarOnMobile }) {
     enterProjectWorkspace(projectId);
 
     try {
-        const [documentsData, workspaceData, projectModelsData] = await Promise.all([
-            loadProjectDocuments(projectId),
-            loadProjectWorkspace(projectId),
-            loadProjectModels(projectId),
-        ]);
-        applyProjectDocumentsPayload(documentsData);
-        applyProjectWorkspacePayload(workspaceData);
-        applyProjectModelsPayload(projectModelsData);
-        await refreshWorkspaceFilesIfConnected();
+        await refreshProjectWorkspaceState(projectId);
     } catch (error) {
-        setProjectDocuments([]);
-        setProjectDocumentFolders([]);
-        applyProjectModelsPayload({});
-        setProjectWorkspace(null);
-        setProjectWorkspaceFiles([]);
-        setActiveProjectDocumentFolderId(null);
+        clearProjectWorkspaceState();
         showStatus(error.message || "The project documents could not be loaded.", true);
     }
 
@@ -218,12 +206,21 @@ export async function handleProjectConnectWorkspace() {
 }
 
 
-export function handleBackToProject() {
-    if (!state.activeProjectId) {
+export async function handleBackToProject() {
+    const projectId = state.activeProjectId;
+    if (!projectId) {
         return;
     }
 
-    enterProjectWorkspace(state.activeProjectId);
+    enterProjectWorkspace(projectId);
+
+    try {
+        await refreshProjectWorkspaceState(projectId);
+    } catch (error) {
+        clearProjectWorkspaceState();
+        showStatus(error.message || "The project workspace could not be loaded.", true);
+    }
+
     renderApp();
 }
 
@@ -340,15 +337,22 @@ export async function handleProjectModelsOpen({ editSelectedAgent = false } = {}
 }
 
 
-export async function handleProjectAgentChangeOpen() {
+export async function handleProjectAgentChangeOpen({ mode = "change" } = {}) {
     const activeProject = getActiveProject();
     if (!activeProject) {
         showStatus("Select a project first.", true);
         return;
     }
 
+    if (mode === "quick-add" && (!state.activeConversationId || !state.activeConversation?.project_id)) {
+        showStatus("Open a project chat before adding quick agents.", true);
+        return;
+    }
+
     try {
+        setProjectAgentSwitchMode(mode);
         applyProjectModelsPayload(await loadProjectModels(activeProject.id));
+        syncProjectAgentSwitchCopy(mode);
         renderChatPanel();
         openProjectAgentSwitchModal();
         if (elements.projectAgentSwitchSearchInput) {
@@ -370,6 +374,11 @@ export async function handleProjectAgentOptionSelect(projectModelId) {
     }
 
     try {
+        if (state.projectAgentSwitchMode === "quick-add") {
+            await addQuickProjectAgent(projectModelId);
+            return;
+        }
+
         if (state.activeConversationId && state.activeConversation?.project_id) {
             const agent = getProjectAgentById(projectModelId);
             if (!agent) {
@@ -408,6 +417,19 @@ export async function handleProjectAgentOptionSelect(projectModelId) {
 }
 
 
+export async function handleConversationAgentChipsClick(event) {
+    if (event.target.closest("[data-add-quick-project-agent]")) {
+        await handleProjectAgentChangeOpen({ mode: "quick-add" });
+        return;
+    }
+
+    const removeButton = event.target.closest("[data-remove-quick-project-agent-id]");
+    if (removeButton) {
+        await removeQuickProjectAgent(Number(removeButton.dataset.removeQuickProjectAgentId));
+    }
+}
+
+
 export function handleProjectAgentSearchInput(event) {
     if (event.target.id !== "project-agent-switch-search") {
         return;
@@ -428,6 +450,77 @@ export function handleProjectAgentSearchClear() {
 }
 
 
+async function addQuickProjectAgent(projectModelId) {
+    const agent = getProjectAgentById(projectModelId);
+    if (!agent) {
+        showStatus("The selected project agent was not found.", true);
+        return;
+    }
+
+    if (state.activeConversation?.project_model_id === projectModelId) {
+        closeProjectAgentSwitchModal();
+        renderConversationHeader();
+        showStatus("The active chat agent is already available for @ mentions.");
+        return;
+    }
+
+    const currentIds = getActiveQuickProjectAgentIds();
+    if (currentIds.includes(projectModelId)) {
+        closeProjectAgentSwitchModal();
+        renderConversationHeader();
+        showStatus("Agent is already ready for @ mentions.");
+        return;
+    }
+
+    const nextIds = [...currentIds, projectModelId];
+    const payload = await updateConversation({
+        id: state.activeConversationId,
+        quick_project_model_ids: nextIds,
+    });
+    patchActiveConversation(payload.conversation || { quick_project_model_ids: nextIds });
+    applyConversationsPayload(await loadConversations());
+    closeProjectAgentSwitchModal();
+    renderConversationHeader();
+    showStatus(`${agent.nickname || "Agent"} added for @ mentions.`);
+}
+
+
+async function removeQuickProjectAgent(projectModelId) {
+    if (!state.activeConversationId || !state.activeConversation?.project_id || !projectModelId) {
+        return;
+    }
+
+    const nextIds = getActiveQuickProjectAgentIds().filter((agentId) => agentId !== projectModelId);
+    const payload = await updateConversation({
+        id: state.activeConversationId,
+        quick_project_model_ids: nextIds,
+    });
+    patchActiveConversation(payload.conversation || { quick_project_model_ids: nextIds });
+    applyConversationsPayload(await loadConversations());
+    renderConversationHeader();
+}
+
+
+function getActiveQuickProjectAgentIds() {
+    return Array.isArray(state.activeConversation?.quick_project_model_ids)
+        ? state.activeConversation.quick_project_model_ids.map(Number).filter(Boolean)
+        : [];
+}
+
+
+function syncProjectAgentSwitchCopy(mode) {
+    const isQuickAdd = mode === "quick-add";
+    if (elements.projectAgentSwitchTitle) {
+        elements.projectAgentSwitchTitle.textContent = isQuickAdd ? "Add quick agent" : "Change agent";
+    }
+    if (elements.projectAgentSwitchCopy) {
+        elements.projectAgentSwitchCopy.textContent = isQuickAdd
+            ? "Choose an agent to keep ready for @ mentions in this chat."
+            : "Choose the agent for this chat, or for the next project chat if none is open.";
+    }
+}
+
+
 export async function handleProjectModelsSubmit(event) {
     event.preventDefault();
 
@@ -443,6 +536,7 @@ export async function handleProjectModelsSubmit(event) {
     const profileId = Number(elements.projectModelProfileIdInput?.value || "0") || null;
     const systemPrompt = elements.projectModelSystemPromptInput?.value.trim() || "";
     const isDefault = Boolean(elements.projectModelDefaultInput?.checked);
+    const color = elements.projectModelColorInput?.value || "#1c8b59";
 
     if (!nickname) {
         showStatus("Add a nickname for this project agent.", true);
@@ -466,6 +560,7 @@ export async function handleProjectModelsSubmit(event) {
                 profile_id: profileId,
                 system_prompt: systemPrompt,
                 is_default: isDefault,
+                color,
             });
         } else {
             await createProjectModel({
@@ -475,6 +570,7 @@ export async function handleProjectModelsSubmit(event) {
                 profile_id: profileId,
                 system_prompt: systemPrompt,
                 is_default: isDefault,
+                color,
             });
         }
         applyProjectModelsPayload(await loadProjectModels(activeProject.id));
@@ -884,6 +980,29 @@ async function moveDocumentToFolder(documentId, folderId) {
 async function refreshProjectDocuments(projectId) {
     const data = await loadProjectDocuments(projectId);
     applyProjectDocumentsPayload(data);
+}
+
+
+async function refreshProjectWorkspaceState(projectId) {
+    const [documentsData, workspaceData, projectModelsData] = await Promise.all([
+        loadProjectDocuments(projectId),
+        loadProjectWorkspace(projectId),
+        loadProjectModels(projectId),
+    ]);
+    applyProjectDocumentsPayload(documentsData);
+    applyProjectWorkspacePayload(workspaceData);
+    applyProjectModelsPayload(projectModelsData);
+    await refreshWorkspaceFilesIfConnected();
+}
+
+
+function clearProjectWorkspaceState() {
+    setProjectDocuments([]);
+    setProjectDocumentFolders([]);
+    applyProjectModelsPayload({});
+    setProjectWorkspace(null);
+    setProjectWorkspaceFiles([]);
+    setActiveProjectDocumentFolderId(null);
 }
 
 

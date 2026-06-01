@@ -1,8 +1,20 @@
+DEFAULT_PROJECT_AGENT_COLOR = "#1c8b59"
+
+
 class ProjectModelsTable:
     def __init__(self, db):
         self.db = db
 
-    def create(self, project_id, model_id, profile_id, nickname, system_prompt="", is_default=False):
+    def create(
+        self,
+        project_id,
+        model_id,
+        profile_id,
+        nickname,
+        system_prompt="",
+        is_default=False,
+        color=DEFAULT_PROJECT_AGENT_COLOR,
+    ):
         with self.db.transaction():
             should_be_default = bool(is_default) or not self.has_default(project_id)
             if should_be_default:
@@ -11,11 +23,19 @@ class ProjectModelsTable:
             _, project_model_id = self.db.execute(
                 """
                 INSERT INTO project_models (
-                    project_id, model_id, profile_id, nickname, system_prompt, is_default
+                    project_id, model_id, profile_id, nickname, color, system_prompt, is_default
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (project_id, model_id, profile_id, nickname, system_prompt, int(should_be_default)),
+                (
+                    project_id,
+                    model_id,
+                    profile_id,
+                    nickname,
+                    color or DEFAULT_PROJECT_AGENT_COLOR,
+                    system_prompt,
+                    int(should_be_default),
+                ),
                 lastrowid=True,
             )
         return project_model_id
@@ -39,7 +59,16 @@ class ProjectModelsTable:
         )
         return [self._serialize(row) for row in rows]
 
-    def update(self, project_model_id, model_id, profile_id, nickname, system_prompt="", is_default=False):
+    def update(
+        self,
+        project_model_id,
+        model_id,
+        profile_id,
+        nickname,
+        system_prompt="",
+        is_default=False,
+        color=DEFAULT_PROJECT_AGENT_COLOR,
+    ):
         existing = self.get(project_model_id)
         if not existing:
             return
@@ -54,12 +83,21 @@ class ProjectModelsTable:
                 SET model_id = ?,
                     profile_id = ?,
                     nickname = ?,
+                    color = ?,
                     system_prompt = ?,
                     is_default = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (model_id, profile_id, nickname, system_prompt, int(bool(is_default)), project_model_id),
+                (
+                    model_id,
+                    profile_id,
+                    nickname,
+                    color or DEFAULT_PROJECT_AGENT_COLOR,
+                    system_prompt,
+                    int(bool(is_default)),
+                    project_model_id,
+                ),
             )
             self.ensure_project_default(existing["project_id"])
 
@@ -164,6 +202,7 @@ class ProjectModelsTable:
                 pm.model_id,
                 pm.profile_id,
                 pm.nickname,
+                pm.color,
                 pm.system_prompt,
                 pm.is_default,
                 pm.created_at,
@@ -195,9 +234,9 @@ class ProjectModelsTable:
         if not row:
             return None
 
-        model_label = row[10] or row[9]
-        provider_name = row[16] or row[12]
-        provider_type = row[17] or row[12]
+        model_label = row[11] or row[10]
+        provider_name = row[17] or row[13]
+        provider_type = row[18] or row[13]
 
         return {
             "id": row[0],
@@ -205,28 +244,29 @@ class ProjectModelsTable:
             "model_id": row[2],
             "profile_id": row[3],
             "nickname": row[4],
-            "system_prompt": row[5] or "",
-            "is_default": bool(row[6]),
-            "created_at": row[7],
-            "updated_at": row[8],
+            "color": row[5] or DEFAULT_PROJECT_AGENT_COLOR,
+            "system_prompt": row[6] or "",
+            "is_default": bool(row[7]),
+            "created_at": row[8],
+            "updated_at": row[9],
             "model": {
                 "id": row[2],
-                "name": row[9],
+                "name": row[10],
                 "display_name": model_label,
-                "provider_id": row[11],
-                "provider_config_id": row[11],
-                "provider": row[12],
-                "icon_image": row[13] or "",
-                "is_default": bool(row[14]),
-                "is_builtin": bool(row[15]),
+                "provider_id": row[12],
+                "provider_config_id": row[12],
+                "provider": row[13],
+                "icon_image": row[14] or "",
+                "is_default": bool(row[15]),
+                "is_builtin": bool(row[16]),
                 "provider_name": provider_name,
                 "provider_type": provider_type,
-                "provider_is_builtin": bool(row[18]) if row[18] is not None else False,
+                "provider_is_builtin": bool(row[19]) if row[19] is not None else False,
             },
             "profile": {
                 "id": row[3],
-                "name": row[19],
-                "personality": row[20] or "",
-                "is_default": bool(row[21]),
+                "name": row[20],
+                "personality": row[21] or "",
+                "is_default": bool(row[22]),
             },
         }

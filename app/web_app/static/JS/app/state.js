@@ -32,6 +32,7 @@ export const state = {
     projectModelsUseDefault: true,
     projectModelFormMode: "create",
     projectModelFormId: null,
+    projectAgentSwitchMode: "change",
     projectWorkspace: null,
     projectWorkspaceFileCount: 0,
     projectWorkspaceEvents: [],

@@ -207,6 +207,12 @@
     tab-size: 4;
 }
 
+.message-code-block__code.hljs {
+    overflow-x: visible;
+    padding: 0;
+    background: transparent;
+}
+
 .message-code-block {
     margin-bottom: 14px;
 }
