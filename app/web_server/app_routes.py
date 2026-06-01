@@ -5,10 +5,11 @@ from user_m import UserManager
 from data_m import DBManager
 
 class AppRoutes:
-    def __init__(self, app, user_manager: UserManager, DBManager: DBManager):
+    def __init__(self, app, user_manager: UserManager, DBManager: DBManager, config_manager=None):
         self.app = app
         self.user_manager = user_manager
         self.DBManager = DBManager
+        self.config_manager = config_manager
         self._register_routes()
     
     # ==================================================================================
@@ -35,9 +36,13 @@ class AppRoutes:
     # ================================================================================== 
     
     def get_index(self):
+        if not self.user_manager.check_user(request):
+            return redirect(url_for("login"))
         return render_template("index.html")
 
     def get_settings(self):
+        if not self.user_manager.check_user(request):
+            return redirect(url_for("login"))
         return render_template("settings.html")
     
     def get_home(self):
@@ -56,7 +61,18 @@ class AppRoutes:
 
             token = self.user_manager.login(username, password)
             if token:
-                response = jsonify({"token": token})
+                payload = {"ok": True}
+                if self._should_return_token_in_body():
+                    payload["token"] = token
+                response = jsonify(payload)
+                response.set_cookie(
+                    "token",
+                    token,
+                    httponly=True,
+                    secure=request.is_secure,
+                    samesite="Lax",
+                    max_age=60 * 60,
+                )
                 return response
             
             error_message = "incorrect user data, try again"
@@ -65,12 +81,20 @@ class AppRoutes:
 
     def get_logout(self):
         
-        token = self.user_manager.get_request_token(request)
+        token = self.user_manager.get_token_from_cookie(request)
+        if not token:
+            token = self.user_manager.get_request_token(request)
         
-        self.user_manager.logout(token)
+        if token:
+            self.user_manager.logout(token)
         response = redirect(url_for("login"))
+        response.delete_cookie("token", samesite="Lax")
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
         return response
+
+    def _should_return_token_in_body(self):
+        runtime = getattr(self.config_manager, "runtime", None)
+        return bool(getattr(runtime, "return_token_in_login_response", False))
     

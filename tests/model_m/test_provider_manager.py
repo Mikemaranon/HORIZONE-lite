@@ -4,7 +4,13 @@ from pathlib import Path
 
 from config_m import ConfigManager
 from data_m import DBManager
-from model_m import ModelOperationError, ProviderUnavailableError, UnsupportedProviderError
+from model_m import (
+    LEGACY_DIRECT_PROVIDER_NAMES,
+    ModelOperationError,
+    ProviderUnavailableError,
+    REGISTERED_PROVIDER_NAMES,
+    UnsupportedProviderError,
+)
 from model_m.provider_manager import ProviderManager
 from model_m.providers.mlx_provider import MLXProvider
 from tests.test_support import IsolatedDatabaseTestCase
@@ -108,8 +114,9 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
 
         self.assertEqual(
             manager.get_registered_providers(),
-            ["mlx", "ollama", "cloud"],
+            list(REGISTERED_PROVIDER_NAMES),
         )
+        self.assertEqual(LEGACY_DIRECT_PROVIDER_NAMES, ("openai", "anthropic", "google"))
 
     def test_raises_for_unsupported_provider(self):
         manager = ProviderManager(ConfigManager())
@@ -137,6 +144,40 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
             "https://api.openai.com/v1",
         )
         self.assertEqual(google_resolution["resolved_adapter"], "google")
+
+    def test_cloud_provider_save_resolution_does_not_probe_unknown_endpoint(self):
+        manager = ProviderManager(ConfigManager())
+        provider = manager.get_provider("cloud")
+        fake_http = FakeHttpClient(get_response={"data": [{"id": "remote-model"}]})
+        provider.detector.http_client = fake_http
+
+        resolution = manager.resolve_provider_configuration(
+            "cloud",
+            "https://custom.example/v1",
+            "sk-test",
+            allow_probe=False,
+        )
+
+        self.assertEqual(resolution["resolved_adapter"], "openai_compatible")
+        self.assertEqual(resolution["resolved_metadata"]["detected_from"], "default")
+        self.assertEqual(fake_http.calls, [])
+
+    def test_cloud_provider_explicit_connection_test_can_probe_unknown_endpoint(self):
+        manager = ProviderManager(ConfigManager())
+        provider = manager.get_provider("cloud")
+        fake_http = FakeHttpClient(get_response={"data": [{"id": "remote-model"}]})
+        provider.detector.http_client = fake_http
+
+        resolution = manager.resolve_provider_configuration(
+            "cloud",
+            "https://custom.example/v1",
+            "sk-test",
+            allow_probe=True,
+        )
+
+        self.assertEqual(resolution["resolved_adapter"], "openai_compatible")
+        self.assertEqual(resolution["resolved_metadata"]["detected_from"], "probe")
+        self.assertEqual(fake_http.calls[0]["method"], "GET")
 
     def test_generate_conversation_title_sanitizes_provider_response(self):
         manager = ProviderManager(ConfigManager())
@@ -650,6 +691,27 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(response["message"]["content"], "Respuesta")
         self.assertEqual(response["finish_reason"], "length")
         self.assertEqual(response["usage"]["completion_tokens"], 1)
+
+    def test_mlx_provider_limits_loaded_model_cache(self):
+        loaded_models = []
+
+        class FakeTokenizer:
+            def apply_chat_template(self, messages, add_generation_prompt=True, tokenize=False):
+                return "PROMPT"
+
+        def fake_load(model_name):
+            loaded_models.append(model_name)
+            return f"MODEL:{model_name}", FakeTokenizer()
+
+        provider = MLXProvider(ConfigManager().get_provider_config(), max_loaded_models=1)
+
+        provider._get_or_load_model(fake_load, "model-a")
+        provider._get_or_load_model(fake_load, "model-b")
+
+        self.assertEqual(loaded_models, ["model-a", "model-b"])
+        self.assertEqual(list(provider._loaded_models.keys()), ["model-b"])
+        provider.clear_cache()
+        self.assertEqual(provider._loaded_models, {})
 
     def test_mlx_provider_stream_chat_yields_incremental_deltas(self):
         class FakeTokenizer:

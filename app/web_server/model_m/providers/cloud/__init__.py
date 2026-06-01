@@ -1,13 +1,12 @@
-# Compatibility shim: CloudProvider now lives in providers/cloud/provider.py.
-from .cloud import (
+from .adapters import (
     AnthropicCloudAdapter,
     CloudAdapterBase,
-    CloudAdapterDetector,
-    CloudProvider,
     GoogleCloudAdapter,
     MicrosoftFoundryCloudAdapter,
     OpenAICompatibleCloudAdapter,
 )
+from .detector import CloudAdapterDetector
+from .provider import CloudProvider
 
 __all__ = [
     "AnthropicCloudAdapter",

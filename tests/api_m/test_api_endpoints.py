@@ -1,13 +1,53 @@
 import io
 import threading
+from http.cookies import SimpleCookie
 
 from tests.test_support import ApiTestCase
 from model_m import ProviderUnavailableError
 from api_m.domains.chat_api import ChatAPI
+from app_routes import AppRoutes
 
 
 class ApiEndpointTests(ApiTestCase):
     MODEL_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0XcAAAAASUVORK5CYII="
+
+    def test_login_sets_http_only_cookie_without_returning_token_by_default(self):
+        AppRoutes(self.app, self.user_manager, self.db, self.config_manager)
+
+        response = self.client.post(
+            "/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        payload = response.get_json()
+        cookie_header = response.headers.get("Set-Cookie", "")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload, {"ok": True})
+        self.assertIn("token=", cookie_header)
+        self.assertIn("HttpOnly", cookie_header)
+        self.assertIn("SameSite=Lax", cookie_header)
+
+    def test_private_pages_redirect_without_session(self):
+        AppRoutes(self.app, self.user_manager, self.db, self.config_manager)
+
+        response = self.client.get("/index")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.headers["Location"])
+
+    def test_logout_clears_cookie_session(self):
+        AppRoutes(self.app, self.user_manager, self.db, self.config_manager)
+        login_response = self.client.post(
+            "/login",
+            json={"username": "admin", "password": "admin"},
+        )
+        token = SimpleCookie(login_response.headers.get("Set-Cookie", ""))["token"].value
+
+        response = self.client.post("/logout")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(self.user_manager.validate_token(token))
+        self.assertIn("token=;", response.headers.get("Set-Cookie", ""))
 
     def test_current_user_endpoint_returns_authenticated_user(self):
         response = self.client.get("/api/users/me", headers=self.auth_headers)
@@ -29,14 +69,17 @@ class ApiEndpointTests(ApiTestCase):
             headers=self.auth_headers,
         )
         payload = response.get_json()
+        cookie = SimpleCookie(response.headers.get("Set-Cookie", ""))
+        refreshed_token = cookie["token"].value
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["user"]["username"], "polar-admin")
-        self.assertNotEqual(payload["token"], self.token)
+        self.assertNotIn("token", payload)
+        self.assertNotEqual(refreshed_token, self.token)
         self.assertIsNone(self.db.users.get("admin"))
         self.assertIsNotNone(self.db.users.get("polar-admin"))
         self.assertFalse(self.user_manager.validate_token(self.token))
-        self.assertTrue(self.user_manager.validate_token(payload["token"]))
+        self.assertTrue(self.user_manager.validate_token(refreshed_token))
         self.assertTrue(self.user_manager.authenticate("polar-admin", "new-secret"))
 
     def test_current_user_update_requires_valid_current_password(self):
@@ -96,6 +139,8 @@ class ApiEndpointTests(ApiTestCase):
         provider = provider_response.get_json()["provider"]
         project = project_response.get_json()["project"]
         profile = profile_response.get_json()["profile"]
+        self.assertNotIn("api_key", provider)
+        self.assertTrue(provider["has_api_key"])
         model_response = self.client.post(
             "/api/models",
             json={
@@ -133,6 +178,22 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(model["icon_image"], self.MODEL_ICON_DATA_URL)
         self.assertEqual(model["name"], "gpt-4.1")
         self.assertEqual(model["display_name"], "GPT-4.1 Main")
+
+    def test_provider_connection_test_endpoint_resolves_without_saving(self):
+        response = self.client.post(
+            "/api/providers/test",
+            json={
+                "provider_type": "cloud",
+                "endpoint": "https://api.openai.com/v1",
+                "api_key": "sk-test",
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["resolved_adapter"], "openai_compatible")
 
     def test_project_models_endpoint_defaults_to_system_model(self):
         project_response = self.client.post(
@@ -1364,6 +1425,103 @@ class ApiEndpointTests(ApiTestCase):
             ],
         )
 
+    def test_chat_endpoint_appends_after_non_contiguous_message_positions(self):
+        conversation_id = self.db.conversations.create(
+            title="Sparse positions",
+            provider="openai",
+            model="gpt-4.1",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="user",
+            content="First saved message.",
+            position=0,
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="First saved response.",
+            position=2,
+        )
+
+        def fake_chat(provider, messages, model, settings):
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "Fresh response.",
+                },
+                "message_id": None,
+                "usage": {},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "Fresh question."}],
+            },
+            headers=self.auth_headers,
+        )
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [(message["role"], message["content"], message["position"]) for message in stored_messages],
+            [
+                ("user", "First saved message.", 0),
+                ("assistant", "First saved response.", 2),
+                ("user", "Fresh question.", 3),
+                ("assistant", "Fresh response.", 4),
+            ],
+        )
+
+    def test_chat_endpoint_rejects_unsupported_message_role(self):
+        conversation_id = self.db.conversations.create(
+            title="Invalid role",
+            provider="openai",
+            model="gpt-4.1",
+        )
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "developer", "content": "Hidden instruction"}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("role is not supported", payload["error"])
+
+    def test_chat_endpoint_rejects_oversized_message_content(self):
+        conversation_id = self.db.conversations.create(
+            title="Oversized",
+            provider="openai",
+            model="gpt-4.1",
+        )
+        max_chars = self.api_manager.services.chat_service.MAX_MESSAGE_CONTENT_CHARS
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "x" * (max_chars + 1)}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("content must be at most", payload["error"])
+
     def test_chat_endpoint_streams_and_persists_assistant_message(self):
         conversation_id = self.db.conversations.create(
             title="Streaming",
@@ -1634,7 +1792,8 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("event: error", payload)
-        self.assertIn("Tokenizer template exploded", payload)
+        self.assertIn("Streaming failed unexpectedly.", payload)
+        self.assertNotIn("Tokenizer template exploded", payload)
 
     def test_chat_sources_follow_up_reports_no_external_sources_when_previous_answer_had_no_tools(self):
         profile = self.db.profiles.get_default()
@@ -1755,7 +1914,7 @@ class ApiEndpointTests(ApiTestCase):
             "web_search",
         )
 
-    def test_settings_endpoint_persists_api_key(self):
+    def test_settings_endpoint_masks_api_key(self):
         write_response = self.client.post(
             "/api/settings",
             json={"key": "openai_api_key", "value": "sk-test"},
@@ -1768,7 +1927,10 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(write_response.status_code, 201)
         self.assertEqual(read_response.status_code, 200)
-        self.assertEqual(read_response.get_json()["setting"]["value"], "sk-test")
+        setting = read_response.get_json()["setting"]
+        self.assertEqual(setting["value"], "")
+        self.assertTrue(setting["has_value"])
+        self.assertEqual(self.db.settings.get("openai_api_key")["value"], "sk-test")
 
     def test_profile_can_be_updated(self):
         profile_id = self.db.profiles.create(

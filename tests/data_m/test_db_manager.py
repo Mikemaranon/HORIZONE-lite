@@ -16,12 +16,33 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         user_manager = UserManager(
             db_manager=db,
             secret_key=config_manager.runtime.secret_key,
+            bootstrap_admin_password=config_manager.runtime.bootstrap_admin_password,
+            allow_insecure_default_admin=config_manager.runtime.allow_insecure_default_admin,
         )
 
         self.assertTrue(self.db_path.exists())
         self.assertIsNotNone(db.profiles.get_default())
         self.assertIsNotNone(db.users.get("admin"))
         self.assertIs(user_manager.db, db)
+
+    def test_admin_bootstrap_requires_explicit_configuration(self):
+        import os
+
+        from tests.test_support import reset_singletons
+
+        os.environ.pop("POLAR_ALLOW_INSECURE_DEFAULT_ADMIN", None)
+        reset_singletons()
+
+        db = DBManager()
+        config_manager = ConfigManager()
+        UserManager(
+            db_manager=db,
+            secret_key=config_manager.runtime.secret_key,
+            bootstrap_admin_password=config_manager.runtime.bootstrap_admin_password,
+            allow_insecure_default_admin=config_manager.runtime.allow_insecure_default_admin,
+        )
+
+        self.assertIsNone(db.users.get("admin"))
 
     def test_creates_default_profile_on_first_boot(self):
         db = DBManager()
@@ -195,6 +216,20 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(setting["value"], "secret")
         self.assertEqual(len(cached_models), 1)
         self.assertEqual(cached_models[0]["display_name"], "Llama 3.2 Updated")
+
+    def test_db_manager_logs_redact_secret_params(self):
+        db = DBManager()
+        provider = db.providers.get_first_by_type("ollama")
+
+        db.execute(
+            "UPDATE providers SET api_key = ? WHERE id = ?",
+            ("secret-token", provider["id"]),
+        )
+
+        logs = db.logger.get_logs(source="DBManager", limit=5)
+        payloads = [str(log["payload"]) for log in logs]
+        self.assertTrue(any("[REDACTED]" in payload for payload in payloads))
+        self.assertFalse(any("secret-token" in payload for payload in payloads))
 
     def test_project_documents_support_virtual_folders(self):
         db = DBManager()

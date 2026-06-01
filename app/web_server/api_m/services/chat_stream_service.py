@@ -7,12 +7,17 @@ import uuid
 from flask import Response, stream_with_context
 
 from model_m import ProviderError
+from .chat_executor import ChatExecutor
 
 
 class ChatStreamService:
     DISPLAY_DELTA_SPLIT_THRESHOLD = 48
     DISPLAY_DELTA_TARGET_CHARS = 24
     DISPLAY_DELTA_DELAY_SECONDS = 0.018
+    INTERNAL_ERROR_PAYLOAD = {
+        "code": "streaming_internal_error",
+        "message": "Streaming failed unexpectedly.",
+    }
 
     def __init__(
         self,
@@ -20,12 +25,14 @@ class ChatStreamService:
         model_manager,
         persistence_service,
         tool_manager=None,
+        executor=None,
         display_delta_delay_seconds=None,
     ):
         self.db = db_manager
         self.model_manager = model_manager
         self.persistence_service = persistence_service
         self.tool_manager = tool_manager
+        self.executor = executor or ChatExecutor(model_manager, tool_manager=tool_manager)
         self.display_delta_delay_seconds = (
             self.DISPLAY_DELTA_DELAY_SECONDS
             if display_delta_delay_seconds is None
@@ -81,23 +88,14 @@ class ChatStreamService:
                 final_response = None
                 streamed_text_parts = []
 
-                if self.tool_manager:
-                    event_stream = self.tool_manager.stream_chat(
-                        provider,
-                        input_messages,
-                        model,
-                        generation_settings,
-                        should_stop=cancel_event.is_set,
-                        tool_context=tool_context,
-                    )
-                else:
-                    event_stream = self.model_manager.stream_chat(
-                        provider,
-                        input_messages,
-                        model,
-                        generation_settings,
-                        should_stop=cancel_event.is_set,
-                    )
+                event_stream = self.executor.stream_chat(
+                    provider,
+                    input_messages,
+                    model,
+                    generation_settings,
+                    should_stop=cancel_event.is_set,
+                    tool_context=tool_context,
+                )
 
                 for event in event_stream:
                     event_type = event.get("type")
@@ -181,15 +179,10 @@ class ChatStreamService:
                 raise
             except ProviderError as error:
                 yield self._format_sse("error", {"error": error.to_dict()})
-            except Exception as error:
+            except Exception:
                 yield self._format_sse(
                     "error",
-                    {
-                        "error": {
-                            "code": "streaming_internal_error",
-                            "message": str(error) or "Streaming failed unexpectedly.",
-                        }
-                    },
+                    {"error": dict(self.INTERNAL_ERROR_PAYLOAD)},
                 )
             finally:
                 self._release_stream(request_id)

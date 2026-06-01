@@ -3,7 +3,9 @@ from flask import request
 from api_m.domains.base_api import BaseAPI
 from api_m.services import (
     ChatContextBuilder,
+    ChatExecutor,
     ChatPersistenceService,
+    ChatRequestPreparer,
     ChatRequestError,
     ChatResourceNotFoundError,
     ChatService,
@@ -21,10 +23,17 @@ class ChatAPI(BaseAPI):
         else:
             context_builder = ChatContextBuilder(self.db)
             persistence_service = ChatPersistenceService(self.db, self.model_manager)
+            executor = ChatExecutor(self.model_manager)
             self.chat_stream_service = ChatStreamService(
                 self.db,
                 self.model_manager,
                 persistence_service,
+                executor=executor,
+            )
+            request_preparer = ChatRequestPreparer(
+                self.db,
+                context_builder,
+                request_id_resolver=self.chat_stream_service.resolve_request_id,
             )
             self.chat_service = ChatService(
                 self.db,
@@ -32,6 +41,8 @@ class ChatAPI(BaseAPI):
                 context_builder,
                 persistence_service,
                 self.chat_stream_service,
+                request_preparer=request_preparer,
+                executor=executor,
             )
         self.__class__._active_streams = self.chat_stream_service._active_streams
         self.__class__._active_streams_lock = self.chat_stream_service._active_streams_lock
@@ -49,7 +60,6 @@ class ChatAPI(BaseAPI):
         try:
             response = self.chat_service.handle_request(
                 data,
-                parse_int=self.parse_int,
                 default_profile=self.get_default_profile(),
                 default_provider=self.config_manager.providers.default_provider,
             )

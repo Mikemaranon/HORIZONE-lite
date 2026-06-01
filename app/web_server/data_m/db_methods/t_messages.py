@@ -50,6 +50,28 @@ class MessagesTable:
         )
         return message_id
 
+    def append_many(self, conversation_id, messages):
+        message_ids = []
+
+        for message in messages:
+            message_ids.append(
+                self.create(
+                    conversation_id=conversation_id,
+                    role=message.get("role"),
+                    content=message.get("content", ""),
+                    project_model_id=message.get("project_model_id"),
+                    project_model_name=message.get("project_model_name", ""),
+                    model_config_id=message.get("model_config_id"),
+                    model_name=message.get("model_name", ""),
+                    profile_id=message.get("profile_id"),
+                    profile_name=message.get("profile_name", ""),
+                    tool_events=message.get("tool_events"),
+                    provider_message_id=message.get("provider_message_id"),
+                )
+            )
+
+        return message_ids
+
     def get(self, message_id):
         _, row = self.db.execute(
             """

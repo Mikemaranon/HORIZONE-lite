@@ -14,10 +14,12 @@ from .providers import (
     AnthropicProvider,
     CloudProvider,
     GoogleProvider,
+    LEGACY_DIRECT_PROVIDER_NAMES,
     ModelProvider,
     MLXProvider,
     OllamaProvider,
     OpenAIProvider,
+    REGISTERED_PROVIDER_NAMES,
 )
 
 __all__ = [
@@ -25,6 +27,7 @@ __all__ = [
     "CloudProvider",
     "ConversationTitleService",
     "GoogleProvider",
+    "LEGACY_DIRECT_PROVIDER_NAMES",
     "ModelCatalogService",
     "ModelManager",
     "ProviderManager",
@@ -34,6 +37,7 @@ __all__ = [
     "MLXProvider",
     "OllamaProvider",
     "OpenAIProvider",
+    "REGISTERED_PROVIDER_NAMES",
     "ProviderError",
     "ProviderUnavailableError",
     "UnsupportedProviderError",

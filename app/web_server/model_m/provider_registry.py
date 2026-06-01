@@ -7,6 +7,7 @@ from .providers import (
     CloudProvider,
     MLXProvider,
     OllamaProvider,
+    REGISTERED_PROVIDER_NAMES,
 )
 
 
@@ -32,7 +33,7 @@ class ProviderRegistry:
         return list(self.providers.keys())
 
     def _build_providers(self, provider_config):
-        return {
+        providers = {
             "mlx": MLXProvider(
                 provider_config,
                 db_manager=self.db_manager,
@@ -51,3 +52,4 @@ class ProviderRegistry:
                 settings_resolver=self.settings_resolver,
             ),
         }
+        return {name: providers[name] for name in REGISTERED_PROVIDER_NAMES}

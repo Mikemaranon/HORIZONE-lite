@@ -36,17 +36,10 @@ class ChatPersistenceService:
 
     def persist_request_messages(self, conversation_id, request_messages):
         stored_messages = self.db.messages.for_conversation(conversation_id)
-        next_position = len(stored_messages)
+        stored_count = len(stored_messages)
+        new_messages = request_messages[stored_count:]
 
-        for offset, message in enumerate(request_messages[next_position:]):
-            self.db.messages.create(
-                conversation_id=conversation_id,
-                role=message.get("role"),
-                content=message.get("content", ""),
-                position=next_position + offset,
-                project_model_id=message.get("project_model_id"),
-                project_model_name=message.get("project_model_name", ""),
-            )
+        self.db.messages.append_many(conversation_id, new_messages)
 
     def persist_assistant_message(self, conversation_id, response):
         assistant_message = response.get("message", {})

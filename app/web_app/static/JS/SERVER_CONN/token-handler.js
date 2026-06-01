@@ -1,6 +1,9 @@
 const TOKEN_KEY = "auth_token";
 
 export function store_token(token) {
+    if (!token) {
+        return;
+    }
     try {
         delete_token(); // Clear any existing token
     } catch (error) {
@@ -45,17 +48,18 @@ export async function login(username, password) {
 
 export async function send_API_request(method, endpoint, body = null, requestOptions = {}) {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-        throw new Error("No authentication token found.");
-    }
 
     const options = {
         method: method.toUpperCase(),
         headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + token
-        }
+        },
+        credentials: "same-origin",
     };
+
+    if (token) {
+        options.headers.Authorization = "Bearer " + token;
+    }
     
     if (body && method.toUpperCase() !== "GET") {
         options.body = JSON.stringify(body);

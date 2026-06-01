@@ -34,9 +34,12 @@ class Server:
         return DBManager()
 
     def ini_user_manager(self):
+        runtime = self.config_manager.runtime
         return UserManager(
             db_manager=self.DBManager,
-            secret_key=self.config_manager.runtime.secret_key,
+            secret_key=runtime.secret_key,
+            bootstrap_admin_password=runtime.bootstrap_admin_password,
+            allow_insecure_default_admin=runtime.allow_insecure_default_admin,
         )
 
     def ini_model_manager(self):
@@ -51,7 +54,12 @@ class Server:
         )
 
     def ini_app_routes(self):
-        return AppRoutes(self.app, self.user_manager, self.DBManager)
+        return AppRoutes(
+            self.app,
+            self.user_manager,
+            self.DBManager,
+            self.config_manager,
+        )
 
     def ini_api_manager(self):
         return ApiManager(self.app, services=self.services)

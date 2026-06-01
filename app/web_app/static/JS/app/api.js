@@ -386,17 +386,15 @@ function ensureSuccessfulResponse(response, payload) {
 
 async function apiRequestFormData(method, endpoint, body) {
     const token = getToken();
-    if (!token) {
-        delete_token();
-        window.location.href = "/login";
-        throw new Error("Your session has expired.");
+    const headers = {};
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
     }
 
     const response = await fetch(endpoint, {
         method: method.toUpperCase(),
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
+        headers,
+        credentials: "same-origin",
         body,
     });
 

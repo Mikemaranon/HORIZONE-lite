@@ -6,7 +6,11 @@ class RuntimeConfig:
     secret_key: str
     host: str = "0.0.0.0"
     port: int = 5050
-    debug: bool = True
+    debug: bool = False
+    bootstrap_admin_password: str | None = None
+    allow_insecure_default_admin: bool = False
+    return_token_in_login_response: bool = False
+    allow_public_registration: bool = False
 
 
 @dataclass(frozen=True)

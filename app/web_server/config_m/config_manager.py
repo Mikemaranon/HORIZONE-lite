@@ -1,4 +1,5 @@
 import os
+import secrets
 
 from .app_config import ProviderConfig, RuntimeConfig
 
@@ -10,13 +11,23 @@ class ConfigManager:
 
     def _load_runtime_config(self) -> RuntimeConfig:
         return RuntimeConfig(
-            secret_key=os.environ.get(
-                "SECRET_KEY",
-                "horizone-studio-local-dev-secret-key-2026",
-            ),
+            secret_key=self._load_secret_key(),
             host=os.environ.get("HOST", "0.0.0.0"),
             port=self._get_env_int("PORT", 5050),
-            debug=self._get_env_bool("FLASK_DEBUG", True),
+            debug=self._get_env_bool("FLASK_DEBUG", False),
+            bootstrap_admin_password=os.environ.get("POLAR_BOOTSTRAP_ADMIN_PASSWORD"),
+            allow_insecure_default_admin=self._get_env_bool(
+                "POLAR_ALLOW_INSECURE_DEFAULT_ADMIN",
+                False,
+            ),
+            return_token_in_login_response=self._get_env_bool(
+                "POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE",
+                False,
+            ),
+            allow_public_registration=self._get_env_bool(
+                "POLAR_ALLOW_PUBLIC_REGISTRATION",
+                False,
+            ),
         )
 
     def _load_provider_config(self) -> ProviderConfig:
@@ -52,6 +63,7 @@ class ConfigManager:
                 "host": self.runtime.host,
                 "port": self.runtime.port,
                 "debug": self.runtime.debug,
+                "allow_public_registration": self.runtime.allow_public_registration,
             },
             "providers": {
                 "default_provider": self.providers.default_provider,
@@ -85,3 +97,9 @@ class ConfigManager:
         raw_value = os.environ.get(key, "")
         values = [item.strip() for item in raw_value.split(",") if item.strip()]
         return tuple(values)
+
+    def _load_secret_key(self) -> str:
+        configured = os.environ.get("SECRET_KEY") or os.environ.get("POLAR_SECRET_KEY")
+        if configured:
+            return configured
+        return secrets.token_urlsafe(48)

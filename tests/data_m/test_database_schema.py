@@ -50,6 +50,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         _, model_columns = database.execute("PRAGMA table_info(models)", fetchall=True)
         _, conversation_columns = database.execute("PRAGMA table_info(conversations)", fetchall=True)
         _, message_columns = database.execute("PRAGMA table_info(messages)", fetchall=True)
+        _, message_indexes = database.execute("PRAGMA index_list(messages)", fetchall=True)
         _, tool_columns = database.execute("PRAGMA table_info(tools)", fetchall=True)
 
         project_column_names = {column[1] for column in project_columns}
@@ -61,6 +62,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         model_column_names = {column[1] for column in model_columns}
         conversation_column_names = {column[1] for column in conversation_columns}
         message_column_names = {column[1] for column in message_columns}
+        message_index_names = {index[1] for index in message_indexes}
         tool_column_names = {column[1] for column in tool_columns}
 
         self.assertIn("system_prompt", project_column_names)
@@ -85,4 +87,5 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("profile_id", message_column_names)
         self.assertIn("profile_name", message_column_names)
         self.assertIn("tool_events", message_column_names)
+        self.assertIn("idx_messages_conversation_position", message_index_names)
         self.assertIn("display_name", tool_column_names)

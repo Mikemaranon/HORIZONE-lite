@@ -18,6 +18,9 @@ class UserAPI(BaseAPI):
     # ============================================================
 
     def register_user(self):
+        runtime = getattr(self.config_manager, "runtime", None)
+        if not getattr(runtime, "allow_public_registration", False):
+            return self.error("Public registration is disabled", 403)
         
         data = request.get_json()
         username = data.get("username")
@@ -79,13 +82,24 @@ class UserAPI(BaseAPI):
             status_code = 401 if message == "Unauthorized" else 400
             return self.error(message, status_code)
 
-        return self.ok(
-            {
-                "message": "Session profile updated.",
-                "user": user,
-                "token": refreshed_token,
-            }
+        payload = {
+            "message": "Session profile updated.",
+            "user": user,
+        }
+        runtime = getattr(self.config_manager, "runtime", None)
+        if getattr(runtime, "return_token_in_login_response", False):
+            payload["token"] = refreshed_token
+
+        response, status_code = self.ok(payload)
+        response.set_cookie(
+            "token",
+            refreshed_token,
+            httponly=True,
+            secure=request.is_secure,
+            samesite="Lax",
+            max_age=60 * 60,
         )
+        return response, status_code
 
     def get_user(self):
 

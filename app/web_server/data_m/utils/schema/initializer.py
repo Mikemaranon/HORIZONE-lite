@@ -33,6 +33,7 @@ class DatabaseSchemaInitializer:
 
         self.ensure_project_models_shape(database)
         self.ensure_project_model_defaults(database)
+        self.ensure_chat_integrity_indexes(database)
 
     def ensure_column(self, database, table_name, column_name, column_definition):
         _, rows = database.execute(
@@ -141,5 +142,42 @@ class DatabaseSchemaInitializer:
             CREATE UNIQUE INDEX IF NOT EXISTS idx_project_models_one_default
             ON project_models(project_id)
             WHERE is_default = 1
+            """
+        )
+
+    def ensure_chat_integrity_indexes(self, database):
+        database.execute(
+            """
+            UPDATE messages
+            SET position = (
+                SELECT COUNT(*) - 1
+                FROM messages AS ordered
+                WHERE ordered.conversation_id = messages.conversation_id
+                    AND (
+                        ordered.position < messages.position
+                        OR (
+                            ordered.position = messages.position
+                            AND ordered.id <= messages.id
+                        )
+                    )
+            )
+            """
+        )
+        database.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_position
+            ON messages(conversation_id, position)
+            """
+        )
+        database.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
+            ON messages(conversation_id, created_at)
+            """
+        )
+        database.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversations_project_updated
+            ON conversations(project_id, updated_at)
             """
         )

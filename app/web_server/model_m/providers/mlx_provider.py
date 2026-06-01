@@ -12,8 +12,16 @@ class MLXProvider(ModelProvider):
     KNOWN_MODEL_ALIASES = {
         "gemma-3-4b-it-4bit": "mlx-community/gemma-3-4b-it-4bit",
     }
+    DEFAULT_MAX_LOADED_MODELS = 1
 
-    def __init__(self, config, db_manager=None, http_client=None, settings_resolver=None):
+    def __init__(
+        self,
+        config,
+        db_manager=None,
+        http_client=None,
+        settings_resolver=None,
+        max_loaded_models=None,
+    ):
         super().__init__(
             config,
             db_manager=db_manager,
@@ -22,6 +30,11 @@ class MLXProvider(ModelProvider):
         )
         self._loaded_models = {}
         self._model_lock = threading.Lock()
+        self.max_loaded_models = (
+            self.DEFAULT_MAX_LOADED_MODELS
+            if max_loaded_models is None
+            else max(1, int(max_loaded_models))
+        )
 
     def is_available(self) -> bool:
         return find_spec("mlx_lm") is not None
@@ -197,6 +210,7 @@ class MLXProvider(ModelProvider):
         with self._model_lock:
             if cache_key not in self._loaded_models:
                 try:
+                    self._evict_loaded_models_if_needed(cache_key)
                     self._loaded_models[cache_key] = load_fn(cache_key)
                 except Exception as error:
                     message = f"Could not load MLX model '{cache_key}': {error}"
@@ -209,6 +223,18 @@ class MLXProvider(ModelProvider):
                     ) from error
 
             return self._loaded_models[cache_key]
+
+    def clear_cache(self):
+        with self._model_lock:
+            self._loaded_models.clear()
+
+    def _evict_loaded_models_if_needed(self, incoming_cache_key):
+        if incoming_cache_key in self._loaded_models:
+            return
+
+        while len(self._loaded_models) >= self.max_loaded_models:
+            oldest_cache_key = next(iter(self._loaded_models))
+            self._loaded_models.pop(oldest_cache_key, None)
 
     def _prepare_generation(self, messages, model, settings):
         load_fn, stream_generate_fn, make_sampler_fn = self._import_mlx_runtime()

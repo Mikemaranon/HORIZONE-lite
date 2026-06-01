@@ -74,6 +74,8 @@ class ProviderManager:
         provider_type: str,
         endpoint: str = "",
         api_key: str = "",
+        *,
+        allow_probe: bool = True,
     ) -> dict:
         if provider_type != "cloud":
             return {
@@ -82,4 +84,8 @@ class ProviderManager:
             }
 
         provider = self.get_provider("cloud")
-        return provider.resolve_configuration(endpoint, api_key)
+        return provider.resolve_configuration(
+            endpoint,
+            api_key,
+            allow_probe=allow_probe,
+        )

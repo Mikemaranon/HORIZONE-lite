@@ -14,9 +14,8 @@ async function handleLoginSubmit(event) {
         const data = await response.json();
         console.log(data);
 
-        if (response.ok && data.token) {
+        if (response.ok) {
             store_token(data.token);
-            console.log("token: ", data.token);
             loadPage("/index");
         } else {
             errorMessage.textContent = data.error || "An error occurred.";

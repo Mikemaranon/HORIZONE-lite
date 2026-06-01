@@ -1,13 +1,19 @@
 from api_m.services import (
     ChatContextBuilder,
+    ChatExecutor,
     ChatExportService,
     ChatPersistenceService,
+    ChatRequestPreparer,
     ChatService,
     ChatStreamService,
+    ConversationService,
     DocumentIngestionService,
+    ModelConfigService,
     ProjectContextRetrievalService,
     ProjectDocumentService,
     ProjectService,
+    ProfileService,
+    ProviderConfigService,
     NativeDirectoryPickerService,
     SourceAttributionService,
     WorkspaceService,
@@ -62,15 +68,36 @@ class ServiceRegistry:
             self.chat_context_builder,
             tool_manager=self.tool_manager,
         )
+        self.conversation_service = ConversationService(
+            db_manager,
+            config_manager,
+            export_service=self.chat_export_service,
+        )
+        self.model_config_service = ModelConfigService(db_manager)
+        self.provider_config_service = ProviderConfigService(
+            db_manager,
+            model_manager,
+        )
+        self.profile_service = ProfileService(db_manager)
         self.chat_persistence_service = ChatPersistenceService(
             db_manager,
             model_manager,
+        )
+        self.chat_executor = ChatExecutor(
+            model_manager,
+            tool_manager=self.tool_manager,
         )
         self.chat_stream_service = ChatStreamService(
             db_manager,
             model_manager,
             self.chat_persistence_service,
             tool_manager=self.tool_manager,
+            executor=self.chat_executor,
+        )
+        self.chat_request_preparer = ChatRequestPreparer(
+            db_manager,
+            self.chat_context_builder,
+            request_id_resolver=self.chat_stream_service.resolve_request_id,
         )
         self.source_attribution_service = SourceAttributionService(db_manager)
         self.chat_service = ChatService(
@@ -81,6 +108,8 @@ class ServiceRegistry:
             self.chat_stream_service,
             tool_manager=self.tool_manager,
             source_attribution_service=self.source_attribution_service,
+            request_preparer=self.chat_request_preparer,
+            executor=self.chat_executor,
         )
 
         self.project_service = ProjectService(db_manager)

@@ -186,5 +186,8 @@ function populateProviderModal(provider = null) {
     elements.providerTypeSelect.innerHTML = getProviderTypeOptionsMarkup(provider?.provider_type || "cloud");
     elements.providerTypeSelect.value = provider?.provider_type || "cloud";
     elements.providerEndpointInput.value = provider?.endpoint || "";
-    elements.providerApiKeyInput.value = provider?.api_key || "";
+    elements.providerApiKeyInput.value = "";
+    elements.providerApiKeyInput.placeholder = provider?.has_api_key
+        ? "Saved key hidden; enter a new key to replace it"
+        : "";
 }

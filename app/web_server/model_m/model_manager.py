@@ -56,9 +56,12 @@ class ModelManager:
         provider_type: str,
         endpoint: str = "",
         api_key: str = "",
+        *,
+        allow_probe: bool = True,
     ) -> dict:
         return self.provider_manager.resolve_provider_configuration(
             provider_type,
             endpoint,
             api_key,
+            allow_probe=allow_probe,
         )

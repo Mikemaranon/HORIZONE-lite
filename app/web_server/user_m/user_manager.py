@@ -3,6 +3,7 @@
 import jwt
 import datetime
 import threading
+import uuid
 from werkzeug.security import check_password_hash, generate_password_hash
 from data_m import DBManager
 
@@ -17,28 +18,59 @@ class UserManager:
                     cls._instance = super(UserManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, db_manager=None, secret_key="your-secret-key"):
+    def __init__(
+        self,
+        db_manager=None,
+        secret_key=None,
+        *,
+        bootstrap_admin_password=None,
+        allow_insecure_default_admin=False,
+    ):
         if hasattr(self, 'initialized') and self.initialized:
             return # Already initialized
         # Initialize the singleton instance
         
         self.db = db_manager or DBManager()
         self.secret_key = secret_key
+        if not self.secret_key:
+            raise ValueError("A secret key is required for local session tokens.")
         self.initialized = True
 
-        # ========================================================
-        #  Ensure default admin user exists
-        # ========================================================
+        self._ensure_initial_admin(
+            bootstrap_admin_password=bootstrap_admin_password,
+            allow_insecure_default_admin=allow_insecure_default_admin,
+        )
+
+    def _ensure_initial_admin(
+        self,
+        *,
+        bootstrap_admin_password=None,
+        allow_insecure_default_admin=False,
+    ):
         existing_admin = self.db.users.get("admin")
-        if not existing_admin:
-            
-            hashed = generate_password_hash("admin")
-            self.db.users.create(
-                username="admin",
-                password_hash=hashed,
-                role="admin"
+        if existing_admin:
+            return
+
+        password = bootstrap_admin_password
+        message = "Bootstrap admin user created from POLAR_BOOTSTRAP_ADMIN_PASSWORD"
+
+        if not password and allow_insecure_default_admin:
+            password = "admin"
+            message = "Insecure default admin user created by explicit opt-in"
+
+        if not password:
+            self._log_info(
+                "No admin user created; set POLAR_BOOTSTRAP_ADMIN_PASSWORD to bootstrap local login."
             )
-            self._log_info("Default admin user created (admin/admin)")
+            return
+
+        hashed = generate_password_hash(password)
+        self.db.users.create(
+            username="admin",
+            password_hash=hashed,
+            role="admin"
+        )
+        self._log_info(message)
 
 
     def authenticate(self, username: str, password: str):
@@ -71,9 +103,10 @@ class UserManager:
             token = self.get_request_token(request)  # fallback to Authorization header
         
         if token:
-            user = self.get_user(token)
-            if user:
-                return user
+            if self.validate_token(token):
+                user = self.get_user(token)
+                if user:
+                    return user
         return None
     
     # ========================================================
@@ -190,7 +223,9 @@ class UserManager:
         expiration_time = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
         payload = {
             'username': username,
-            'exp': expiration_time
+            'exp': expiration_time,
+            'iat': datetime.datetime.now(datetime.UTC),
+            'jti': uuid.uuid4().hex,
         }
         token = jwt.encode(payload, self.secret_key, algorithm='HS256')
 

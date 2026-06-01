@@ -10,6 +10,12 @@ class ConfigManagerTests(unittest.TestCase):
             "PORT",
             "HOST",
             "FLASK_DEBUG",
+            "SECRET_KEY",
+            "POLAR_SECRET_KEY",
+            "POLAR_BOOTSTRAP_ADMIN_PASSWORD",
+            "POLAR_ALLOW_INSECURE_DEFAULT_ADMIN",
+            "POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE",
+            "POLAR_ALLOW_PUBLIC_REGISTRATION",
             "DEFAULT_PROVIDER",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
@@ -29,18 +35,32 @@ class ConfigManagerTests(unittest.TestCase):
 
         self.assertEqual(config.runtime.port, 5050)
         self.assertEqual(config.runtime.host, "0.0.0.0")
-        self.assertTrue(config.runtime.debug)
+        self.assertFalse(config.runtime.debug)
+        self.assertTrue(config.runtime.secret_key)
+        self.assertFalse(config.runtime.allow_insecure_default_admin)
+        self.assertFalse(config.runtime.return_token_in_login_response)
+        self.assertFalse(config.runtime.allow_public_registration)
 
     def test_runtime_values_can_be_overridden(self):
         os.environ["PORT"] = "9090"
         os.environ["HOST"] = "127.0.0.1"
-        os.environ["FLASK_DEBUG"] = "false"
+        os.environ["FLASK_DEBUG"] = "true"
+        os.environ["SECRET_KEY"] = "configured-secret"
+        os.environ["POLAR_BOOTSTRAP_ADMIN_PASSWORD"] = "configured-password"
+        os.environ["POLAR_ALLOW_INSECURE_DEFAULT_ADMIN"] = "true"
+        os.environ["POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE"] = "true"
+        os.environ["POLAR_ALLOW_PUBLIC_REGISTRATION"] = "true"
 
         config = ConfigManager()
 
         self.assertEqual(config.runtime.port, 9090)
         self.assertEqual(config.runtime.host, "127.0.0.1")
-        self.assertFalse(config.runtime.debug)
+        self.assertTrue(config.runtime.debug)
+        self.assertEqual(config.runtime.secret_key, "configured-secret")
+        self.assertEqual(config.runtime.bootstrap_admin_password, "configured-password")
+        self.assertTrue(config.runtime.allow_insecure_default_admin)
+        self.assertTrue(config.runtime.return_token_in_login_response)
+        self.assertTrue(config.runtime.allow_public_registration)
 
     def test_provider_values_can_be_overridden(self):
         os.environ["DEFAULT_PROVIDER"] = "ollama"

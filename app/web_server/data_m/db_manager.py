@@ -1,6 +1,6 @@
 # db_manager.py
 
-from .utils import Database, LogRepository
+from .utils import Database, LogRepository, redact_query_params
 from .db_methods import (
     UsersTable,
     SessionsTable,
@@ -93,7 +93,7 @@ class DBManager:
                 level="INFO",
                 source="DBManager",
                 message=f"{op} executed",
-                payload={"query": query, "params": params}
+                payload={"query": query, "params": redact_query_params(query, params)}
             )
 
         return data

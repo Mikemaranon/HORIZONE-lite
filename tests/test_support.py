@@ -29,12 +29,16 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
         self.tools_path = Path(self.temp_dir.name) / "tools"
         os.environ["APP_DB_PATH"] = str(self.db_path)
         os.environ["HORIZONE_LITE_TOOLS_PATH"] = str(self.tools_path)
+        os.environ["POLAR_ALLOW_INSECURE_DEFAULT_ADMIN"] = "1"
+        os.environ["SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
         reset_singletons()
 
     def tearDown(self):
         reset_singletons()
         os.environ.pop("APP_DB_PATH", None)
         os.environ.pop("HORIZONE_LITE_TOOLS_PATH", None)
+        os.environ.pop("POLAR_ALLOW_INSECURE_DEFAULT_ADMIN", None)
+        os.environ.pop("SECRET_KEY", None)
         self.temp_dir.cleanup()
 
 
@@ -54,6 +58,8 @@ class ApiTestCase(IsolatedDatabaseTestCase):
         self.user_manager = UserManager(
             db_manager=self.db,
             secret_key=self.config_manager.runtime.secret_key,
+            bootstrap_admin_password=self.config_manager.runtime.bootstrap_admin_password,
+            allow_insecure_default_admin=self.config_manager.runtime.allow_insecure_default_admin,
         )
         self.model_manager = ModelManager(self.config_manager, self.db)
         self.api_manager = ApiManager(
