@@ -12,6 +12,7 @@ import {
     disableMessagesAutoScroll,
     enableMessagesAutoScroll,
     finalizeStreamingAssistantMessage,
+    findMessageByKey,
     removeStreamingAssistantMessage,
     removeTypingMessage,
     showToolStatusMessage,
@@ -186,7 +187,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
 }
 
 
-async function sendChatTurn({ conversationId, requestId, responderAgent = null }) {
+async function sendChatTurn({ conversationId, requestId, responderAgent = null, toolConfirmation = null }) {
     setActiveGenerationRequestId(requestId);
     let assistantMessageMeta = createPendingAssistantMessage(responderAgent);
     appendTypingMessage(assistantMessageMeta);
@@ -196,6 +197,7 @@ async function sendChatTurn({ conversationId, requestId, responderAgent = null }
         conversationId,
         requestId,
         responderAgent,
+        toolConfirmation,
     }), {
         onStart(payloadData) {
             if (payloadData?.request_id) {
@@ -253,7 +255,7 @@ async function sendChatTurn({ conversationId, requestId, responderAgent = null }
 }
 
 
-function buildChatPayload({ conversationId, requestId, responderAgent = null }) {
+function buildChatPayload({ conversationId, requestId, responderAgent = null, toolConfirmation = null }) {
     if (!responderAgent) {
         return {
             conversation_id: conversationId,
@@ -264,6 +266,7 @@ function buildChatPayload({ conversationId, requestId, responderAgent = null }) 
             model_config_id: getSelectedModelConfigId(),
             profile_id: getSelectedProfileId(),
             request_id: requestId,
+            ...(toolConfirmation ? { tool_confirmation: toolConfirmation } : {}),
         };
     }
 
@@ -277,7 +280,65 @@ function buildChatPayload({ conversationId, requestId, responderAgent = null }) 
         model_config_id: responderAgent.model_id || model.id || getSelectedModelConfigId(),
         profile_id: responderAgent.profile_id || getSelectedProfileId(),
         request_id: requestId,
+        ...(toolConfirmation ? { tool_confirmation: toolConfirmation } : {}),
     };
+}
+
+
+export async function handleToolConfirmationClick(event) {
+    const actionButton = event.target.closest("[data-tool-confirm-action]");
+    if (!actionButton) {
+        return;
+    }
+
+    event.preventDefault();
+    const message = findMessageByKey(actionButton.dataset.messageKey || "");
+    const toolEventIndex = Number(actionButton.dataset.toolEventIndex);
+    const toolEvent = Array.isArray(message?.tool_events)
+        ? message.tool_events[toolEventIndex]
+        : null;
+    if (!toolEvent) {
+        return;
+    }
+
+    const action = actionButton.dataset.toolConfirmAction;
+    if (action === "cancel") {
+        markToolConfirmationCancelled(toolEvent);
+        renderMessages({ preserveViewport: true });
+        showStatus("Workspace write cancelled.", false);
+        return;
+    }
+
+    if (state.loading) {
+        return;
+    }
+
+    try {
+        setLoading(true);
+        setGenerationStopRequested(false);
+        markToolConfirmationApproved(toolEvent);
+        renderMessages({ preserveViewport: true });
+
+        await sendChatTurn({
+            conversationId: state.activeConversationId,
+            requestId: createRequestId(),
+            toolConfirmation: {
+                name: toolEvent.tool_name,
+                arguments: toolEvent.arguments || {},
+                reason: toolEvent.reason || "",
+            },
+        });
+    } catch (error) {
+        markToolConfirmationPending(toolEvent);
+        removeTypingMessage();
+        removeStreamingAssistantMessage();
+        renderMessages({ preserveViewport: true });
+        showStatus(error.message || "The workspace write could not be confirmed.", true);
+    } finally {
+        setActiveGenerationRequestId(null);
+        setGenerationStopRequested(false);
+        setLoading(false);
+    }
 }
 
 
@@ -554,6 +615,31 @@ function createRequestId() {
     }
 
     return `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+
+function markToolConfirmationApproved(toolEvent) {
+    toolEvent.policy = {
+        ...(toolEvent.policy || {}),
+        status: "confirming",
+    };
+}
+
+
+function markToolConfirmationPending(toolEvent) {
+    toolEvent.policy = {
+        ...(toolEvent.policy || {}),
+        status: "confirmation_required",
+    };
+}
+
+
+function markToolConfirmationCancelled(toolEvent) {
+    toolEvent.policy = {
+        ...(toolEvent.policy || {}),
+        status: "cancelled",
+    };
+    toolEvent.error = "Workspace write cancelled by the user.";
 }
 
 

@@ -1,6 +1,6 @@
 from .chat_tables import CHAT_SCHEMA_STATEMENTS
 from .core_tables import CORE_SCHEMA_STATEMENTS
-from .migrations import SCHEMA_MIGRATIONS
+from .migrations import SCHEMA_MIGRATIONS, VERSIONED_SCHEMA_MIGRATIONS
 from .project_tables import PROJECT_SCHEMA_STATEMENTS
 from .settings_tables import SETTINGS_SCHEMA_STATEMENTS
 from .tool_tables import TOOL_SCHEMA_STATEMENTS
@@ -17,23 +17,67 @@ class DatabaseSchemaInitializer:
             + SETTINGS_SCHEMA_STATEMENTS
             + TOOL_SCHEMA_STATEMENTS
         )
-        self.migrations = SCHEMA_MIGRATIONS
+        self.column_migrations = SCHEMA_MIGRATIONS
+        self.versioned_migrations = VERSIONED_SCHEMA_MIGRATIONS
 
     def initialize(self, database):
         for statement in self.schema_statements:
             database.execute(statement)
 
-        for migration in self.migrations:
+        self.ensure_migrations_table(database)
+        self.run_versioned_migrations(database)
+
+    def ensure_migrations_table(self, database):
+        database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+
+    def run_versioned_migrations(self, database):
+        handlers = {
+            "legacy_column_backfills": self.ensure_legacy_column_backfills,
+            "project_models_shape": self.ensure_project_models_shape,
+            "project_model_defaults": self.ensure_project_model_defaults,
+            "chat_integrity_indexes": self.ensure_chat_integrity_indexes,
+            "hot_path_indexes": self.ensure_hot_path_indexes,
+        }
+
+        for migration in self.versioned_migrations:
+            if self.has_migration(database, migration.version):
+                continue
+
+            handler = handlers[migration.name]
+            with database.transaction():
+                handler(database)
+                database.execute(
+                    """
+                    INSERT INTO schema_migrations (version, name)
+                    VALUES (?, ?)
+                    """,
+                    (migration.version, migration.name),
+                )
+
+    def has_migration(self, database, version):
+        _, row = database.execute(
+            "SELECT 1 FROM schema_migrations WHERE version = ?",
+            (version,),
+            fetchone=True,
+        )
+        return row is not None
+
+    def ensure_legacy_column_backfills(self, database):
+        for migration in self.column_migrations:
             self.ensure_column(
                 database,
                 migration.table_name,
                 migration.column_name,
                 migration.column_definition,
             )
-
-        self.ensure_project_models_shape(database)
-        self.ensure_project_model_defaults(database)
-        self.ensure_chat_integrity_indexes(database)
 
     def ensure_column(self, database, table_name, column_name, column_definition):
         _, rows = database.execute(
@@ -181,3 +225,33 @@ class DatabaseSchemaInitializer:
             ON conversations(project_id, updated_at)
             """
         )
+
+    def ensure_hot_path_indexes(self, database):
+        statements = [
+            """
+            CREATE INDEX IF NOT EXISTS idx_models_provider_config
+            ON models(provider_config_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_models_provider_name
+            ON models(provider, name)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_providers_provider_type
+            ON providers(provider_type)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_conversations_model_config
+            ON conversations(model_config_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_workspace_command_runs_workspace
+            ON workspace_command_runs(workspace_id, started_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_workspace_events_project_created
+            ON workspace_events(project_id, created_at)
+            """,
+        ]
+        for statement in statements:
+            database.execute(statement)

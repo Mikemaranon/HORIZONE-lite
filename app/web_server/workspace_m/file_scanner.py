@@ -71,6 +71,22 @@ class FileScanner:
 
         return files
 
+    def describe_file(self, root_path, relative_path):
+        root = Path(self.path_guard.normalize_root(root_path))
+        file_path = self.path_guard.resolve_inside(root, relative_path)
+        if not file_path.exists() or not file_path.is_file():
+            return None
+
+        gitignore_patterns = self._load_gitignore_patterns(root)
+        if self._is_ignored(root, file_path, False, gitignore_patterns):
+            return None
+
+        stat = file_path.stat()
+        if stat.st_size > self.max_file_size:
+            return None
+
+        return self._file_record(root, file_path, stat)
+
     def _file_record(self, root, file_path, stat):
         relative_path = file_path.relative_to(root).as_posix()
         extension = file_path.suffix.lower()

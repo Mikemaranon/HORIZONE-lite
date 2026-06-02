@@ -65,3 +65,36 @@ class ChatRequestPreparerTests(IsolatedDatabaseTestCase):
             ["Remember Aurora.", "What should you remember?"],
         )
         self.assertEqual(prepared.input_messages[-1]["content"], "What should you remember?")
+
+    def test_prepare_accepts_structured_tool_confirmation(self):
+        profile = self.db.profiles.get_default()
+
+        prepared = self.preparer.prepare(
+            {
+                "messages": [{"role": "user", "content": "Continue"}],
+                "provider": "ollama",
+                "model": "qwen3",
+                "tool_confirmation": {
+                    "name": "workspace_write_file",
+                    "arguments": {
+                        "path": "notes.txt",
+                        "content": "hello",
+                    },
+                    "reason": "User approved the write.",
+                },
+            },
+            default_profile=profile,
+            default_provider="mlx",
+        )
+
+        self.assertEqual(
+            prepared.tool_confirmation,
+            {
+                "name": "workspace_write_file",
+                "arguments": {
+                    "path": "notes.txt",
+                    "content": "hello",
+                },
+                "reason": "User approved the write.",
+            },
+        )

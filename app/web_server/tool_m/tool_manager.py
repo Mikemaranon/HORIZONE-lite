@@ -1,3 +1,5 @@
+import os
+
 from .tool_call_orchestrator import ToolCallOrchestrator
 from .tool_call_parser import ToolCallParser
 from .tool_call_policy import ToolCallPolicy
@@ -14,12 +16,11 @@ class ToolManager:
         tool_registry,
         tool_executor,
         workspace_tool_provider=None,
-        deterministic_tool_router=None,
-        model_tool_planner=None,
         tool_call_parser=None,
         tool_call_policy=None,
         tool_call_orchestrator=None,
         max_tool_round_trips=3,
+        custom_tools_enabled=None,
     ):
         self.db = db_manager
         self.model_manager = model_manager
@@ -27,9 +28,8 @@ class ToolManager:
         self.tool_registry = tool_registry
         self.tool_executor = tool_executor
         self.workspace_tool_provider = workspace_tool_provider
-        self.deterministic_tool_router = deterministic_tool_router
-        self.model_tool_planner = model_tool_planner
         self.max_tool_round_trips = max_tool_round_trips
+        self.custom_tools_enabled = custom_tools_enabled
         self.tool_call_parser = tool_call_parser or ToolCallParser()
         self.tool_call_policy = tool_call_policy or ToolCallPolicy()
         self.tool_call_orchestrator = tool_call_orchestrator or ToolCallOrchestrator(
@@ -80,6 +80,9 @@ class ToolManager:
         return self.db.tools.get(tool_id)
 
     def upload_tool(self, *, filename=None, source_text=None, uploaded_file=None):
+        if not self._custom_tools_enabled():
+            raise ValueError("Custom tools are disabled. Set ENABLE_CUSTOM_TOOLS=1 to enable uploads.")
+
         if uploaded_file is not None:
             tool_path = self.tool_loader.save_uploaded_file(uploaded_file)
         else:
@@ -179,3 +182,13 @@ class ToolManager:
         sanitized_tool = dict(tool or {})
         sanitized_tool.pop("runner", None)
         return sanitized_tool
+
+    def _custom_tools_enabled(self):
+        if self.custom_tools_enabled is not None:
+            return bool(self.custom_tools_enabled)
+        return str(os.environ.get("ENABLE_CUSTOM_TOOLS") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }

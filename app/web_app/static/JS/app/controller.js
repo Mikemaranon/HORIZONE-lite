@@ -19,6 +19,7 @@ import {
     handleConversationTitleInput,
     handleConversationTitleKeyDown,
     handleSendButtonClick,
+    handleToolConfirmationClick,
     openNewConversationWorkspace,
     registerChatCallbacks,
     syncMessagesAutoScrollState,
@@ -325,6 +326,7 @@ export function bindUI() {
     elements.documentsFileList?.addEventListener("dragend", handleProjectDocumentDragEnd);
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
     elements.messagesContainer?.addEventListener("scroll", syncMessagesAutoScrollState, { passive: true });
+    elements.messagesContainer?.addEventListener("click", handleToolConfirmationClick);
     elements.messagesContainer?.addEventListener("click", handleToolTraceMessageClick);
     elements.messagesContainer?.addEventListener("wheel", (event) => handleMessagesWheel(event, {
         disableMessagesAutoScroll,

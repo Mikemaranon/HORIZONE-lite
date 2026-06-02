@@ -8,6 +8,12 @@ class ColumnMigration:
     column_definition: str
 
 
+@dataclass(frozen=True)
+class SchemaMigration:
+    version: int
+    name: str
+
+
 SCHEMA_MIGRATIONS = [
     ColumnMigration("projects", "system_prompt", "TEXT DEFAULT ''"),
     ColumnMigration("profiles", "personality", "TEXT DEFAULT ''"),
@@ -32,4 +38,13 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("project_models", "color", "TEXT DEFAULT '#1c8b59'"),
     ColumnMigration("project_models", "system_prompt", "TEXT DEFAULT ''"),
     ColumnMigration("project_models", "is_default", "INTEGER NOT NULL DEFAULT 0"),
+]
+
+
+VERSIONED_SCHEMA_MIGRATIONS = [
+    SchemaMigration(1, "legacy_column_backfills"),
+    SchemaMigration(2, "project_models_shape"),
+    SchemaMigration(3, "project_model_defaults"),
+    SchemaMigration(4, "chat_integrity_indexes"),
+    SchemaMigration(5, "hot_path_indexes"),
 ]

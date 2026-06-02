@@ -17,6 +17,9 @@ class WorkspaceManager:
     def scan(self, root_path):
         return self.file_scanner.scan(root_path)
 
+    def describe_file(self, root_path, relative_path):
+        return self.file_scanner.describe_file(root_path, relative_path)
+
     def read_file(self, root_path, relative_path):
         return self.file_reader.read(root_path, relative_path)
 

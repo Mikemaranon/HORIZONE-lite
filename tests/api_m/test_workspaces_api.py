@@ -152,26 +152,7 @@ class WorkspacesApiTests(ApiTestCase):
             model="qwen3",
         )
 
-        model_calls = {"count": 0}
-
         def fake_chat(provider, messages, model, settings):
-            model_calls["count"] += 1
-            if model_calls["count"] == 1:
-                self.assertEqual(messages[0]["role"], "system")
-                self.assertIn("workspace_write_file", messages[0]["content"])
-                return {
-                    "provider": provider,
-                    "model": model,
-                    "message": {
-                        "role": "assistant",
-                        "content": '{"tool_call":{"name":"workspace_write_file","arguments":{"path":"helloworld.sh","content":"#!/usr/bin/env bash\\necho \\"Hello, world!\\"\\n","overwrite":false,"create_dirs":false},"reason":"The user asked to create a file in the connected workspace."}}',
-                    },
-                    "usage": {},
-                    "finish_reason": None,
-                    "message_id": None,
-                    "raw": {},
-                }
-
             self.assertIn("Tool result for workspace_write_file", messages[-1]["content"])
             return {
                 "provider": provider,
@@ -192,18 +173,28 @@ class WorkspacesApiTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "crea un archivo helloworld.sh"}],
+                "messages": [{"role": "user", "content": "continua con la accion aprobada"}],
+                "tool_confirmation": {
+                    "name": "workspace_write_file",
+                    "arguments": {
+                        "path": "helloworld.sh",
+                        "content": "#!/usr/bin/env bash\necho \"Hello, world!\"\n",
+                        "overwrite": False,
+                        "create_dirs": False,
+                    },
+                    "reason": "The user approved this workspace write.",
+                },
             },
             headers=self.auth_headers,
         )
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(model_calls["count"], 2)
         self.assertTrue((workspace_root / "helloworld.sh").exists())
         self.assertIn("Hello, world!", (workspace_root / "helloworld.sh").read_text(encoding="utf-8"))
         self.assertIn("workspace_write_file", payload["response"]["raw"]["tool_events"][0]["tool_name"])
         self.assertIn("created helloworld.sh", payload["response"]["raw"]["tool_events"][0]["tool_summary"])
+        self.assertEqual(payload["response"]["raw"]["tool_events"][0]["policy"]["status"], "confirmed")
         self.assertIn("Created", payload["response"]["message"]["content"])
 
     def test_chat_can_append_workspace_file_with_contextual_tool(self):
@@ -221,25 +212,7 @@ class WorkspacesApiTests(ApiTestCase):
             model="qwen3",
         )
 
-        model_calls = {"count": 0}
-
         def fake_chat(provider, messages, model, settings):
-            model_calls["count"] += 1
-            if model_calls["count"] == 1:
-                self.assertIn("workspace_append_file", messages[0]["content"])
-                return {
-                    "provider": provider,
-                    "model": model,
-                    "message": {
-                        "role": "assistant",
-                        "content": '{"tool_call":{"name":"workspace_append_file","arguments":{"path":"hello.txt","content":"que tal estas?","ensure_newline_before":true,"ensure_newline_after":true},"reason":"The user asked to add text to an existing file."}}',
-                    },
-                    "usage": {},
-                    "finish_reason": None,
-                    "message_id": None,
-                    "raw": {},
-                }
-
             self.assertIn("Tool result for workspace_append_file", messages[-1]["content"])
             return {
                 "provider": provider,
@@ -260,14 +233,23 @@ class WorkspacesApiTests(ApiTestCase):
             "/api/chat",
             json={
                 "conversation_id": conversation_id,
-                "messages": [{"role": "user", "content": "necesito que añadas la frase \"que tal estas?\" a hello.txt"}],
+                "messages": [{"role": "user", "content": "continua con la accion aprobada"}],
+                "tool_confirmation": {
+                    "name": "workspace_append_file",
+                    "arguments": {
+                        "path": "hello.txt",
+                        "content": "que tal estas?",
+                        "ensure_newline_before": True,
+                        "ensure_newline_after": True,
+                    },
+                    "reason": "The user approved this workspace append.",
+                },
             },
             headers=self.auth_headers,
         )
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(model_calls["count"], 2)
         self.assertEqual(
             (workspace_root / "hello.txt").read_text(encoding="utf-8"),
             "hola\nque tal estas?\n",
@@ -280,6 +262,116 @@ class WorkspacesApiTests(ApiTestCase):
             "appended to hello.txt",
             payload["response"]["raw"]["tool_events"][0]["tool_summary"],
         )
+        self.assertEqual(payload["response"]["raw"]["tool_events"][0]["policy"]["status"], "confirmed")
+
+    def test_chat_blocks_workspace_write_without_user_confirmation(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        project_id = self.db.projects.create("Guarded Agent Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Guarded workspace write",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool_call":{"name":"workspace_write_file","arguments":{"path":"surprise.txt","content":"nope","overwrite":false,"create_dirs":false},"reason":"Trying to write without user intent."}}',
+                },
+                "usage": {},
+                "finish_reason": None,
+                "message_id": None,
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "crea surprise.txt con el texto nope"}],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(model_calls["count"], 1)
+        self.assertFalse((workspace_root / "surprise.txt").exists())
+        self.assertEqual(payload["response"]["finish_reason"], "confirmation_required")
+        self.assertIn("approval", payload["response"]["message"]["content"].lower())
+        self.assertEqual(
+            payload["response"]["raw"]["tool_events"][0]["policy"]["status"],
+            "confirmation_required",
+        )
+
+    def test_streaming_chat_blocks_workspace_write_without_user_confirmation(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        (workspace_root / "hello.txt").write_text("hola\n", encoding="utf-8")
+        project_id = self.db.projects.create("Guarded Streaming Agent Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Guarded streaming workspace write",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool_call":{"name":"workspace_write_file","arguments":{"path":"hello.txt","content":"adios","overwrite":true,"create_dirs":false},"reason":"The user asked to update hello.txt."}}',
+                },
+                "usage": {},
+                "finish_reason": None,
+                "message_id": None,
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "actualiza hello.txt con adios"}],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+            buffered=True,
+        )
+        payload = response.get_data(as_text=True)
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(model_calls["count"], 1)
+        self.assertEqual((workspace_root / "hello.txt").read_text(encoding="utf-8"), "hola\n")
+        self.assertIn("event: tool_result", payload)
+        self.assertIn('"finish_reason": "confirmation_required"', payload)
+        self.assertIn('"status": "confirmation_required"', payload)
+        self.assertIn("approval", stored_messages[-1]["content"].lower())
+        self.assertEqual(stored_messages[-1]["tool_events"][0]["policy"]["status"], "confirmation_required")
 
     def test_conversation_export_includes_contextual_workspace_tools(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"

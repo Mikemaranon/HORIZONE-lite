@@ -9,23 +9,43 @@ class WorkspaceFileIndexTable:
         )
 
         for file_record in files:
-            self.db.execute(
-                """
-                INSERT INTO workspace_file_index (
-                    workspace_id, path, kind, size_bytes, mtime, language, is_ignored
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    workspace_id,
-                    file_record["path"],
-                    file_record.get("kind", "file"),
-                    file_record.get("size_bytes", 0),
-                    file_record.get("mtime", 0),
-                    file_record.get("language", ""),
-                    1 if file_record.get("is_ignored") else 0,
-                ),
+            self.upsert_file(workspace_id, file_record)
+
+    def upsert_file(self, workspace_id, file_record):
+        self.db.execute(
+            """
+            INSERT INTO workspace_file_index (
+                workspace_id, path, kind, size_bytes, mtime, language, is_ignored, indexed_at
             )
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(workspace_id, path)
+            DO UPDATE SET
+                kind = excluded.kind,
+                size_bytes = excluded.size_bytes,
+                mtime = excluded.mtime,
+                language = excluded.language,
+                is_ignored = excluded.is_ignored,
+                indexed_at = CURRENT_TIMESTAMP
+            """,
+            (
+                workspace_id,
+                file_record["path"],
+                file_record.get("kind", "file"),
+                file_record.get("size_bytes", 0),
+                file_record.get("mtime", 0),
+                file_record.get("language", ""),
+                1 if file_record.get("is_ignored") else 0,
+            ),
+        )
+
+    def delete_file(self, workspace_id, relative_path):
+        self.db.execute(
+            """
+            DELETE FROM workspace_file_index
+            WHERE workspace_id = ? AND path = ?
+            """,
+            (workspace_id, relative_path),
+        )
 
     def list_for_workspace(self, workspace_id, query=None, limit=200):
         params = [workspace_id]

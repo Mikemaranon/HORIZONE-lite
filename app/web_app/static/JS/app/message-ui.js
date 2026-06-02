@@ -26,12 +26,14 @@ export function createMessageMarkup(message) {
         ? escapeHtml(message.content || "")
         : renderMarkdown(message.content || "");
     const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message);
+    const toolConfirmationMarkup = isUser ? "" : createPendingToolConfirmationListMarkup(message);
 
     return createMessageFrameMarkup(
         message,
         `
             <div class="message__content ${contentClass}" data-message-content="true">${renderedContent}</div>
             ${persistentToolStatusMarkup}
+            ${toolConfirmationMarkup}
         `,
         createMessageMetaMarkup(message, roleLabel),
     );
@@ -366,7 +368,7 @@ function getOrCreateMessageClientKey(message) {
 }
 
 
-function findMessageByKey(messageKey) {
+export function findMessageByKey(messageKey) {
     return (state.activeMessages || []).find((message) => getOrCreateMessageClientKey(message) === messageKey) || null;
 }
 
@@ -384,6 +386,9 @@ function createToolStatusLabel(toolEvent) {
     const argumentsPayload = toolEvent?.arguments || {};
 
     if (!toolEvent?.ok) {
+        if (isToolConfirmationRequired(toolEvent)) {
+            return `Needs approval: ${escapeHtml(resolveToolDisplayName(toolEvent))}`;
+        }
         return `Tool failed: ${escapeHtml(resolveToolDisplayName(toolEvent))}`;
     }
 
@@ -406,6 +411,74 @@ function createToolStatusLabel(toolEvent) {
     }
 
     return "";
+}
+
+
+function createPendingToolConfirmationListMarkup(message) {
+    const toolEvents = Array.isArray(message?.tool_events) ? message.tool_events : [];
+    const pendingEvents = toolEvents
+        .map((toolEvent, index) => ({ toolEvent, index }))
+        .filter(({ toolEvent }) => isWorkspaceWriteConfirmationRequired(toolEvent));
+
+    if (!pendingEvents.length) {
+        return "";
+    }
+
+    const messageKey = getOrCreateMessageClientKey(message);
+    return `
+        <div class="tool-confirmations">
+            ${pendingEvents.map(({ toolEvent, index }) => createToolConfirmationMarkup(
+                toolEvent,
+                messageKey,
+                index,
+            )).join("")}
+        </div>
+    `;
+}
+
+
+function createToolConfirmationMarkup(toolEvent, messageKey, toolEventIndex) {
+    const toolName = String(toolEvent?.tool_name || "").trim();
+    const path = String(toolEvent?.arguments?.path || "").trim();
+    const action = toolName === "workspace_append_file" ? "Append to workspace file" : "Write workspace file";
+    const detail = path ? path : resolveToolDisplayName(toolEvent);
+
+    return `
+        <section class="tool-confirmation" aria-label="Workspace write approval">
+            <div class="tool-confirmation__body">
+                <span class="tool-confirmation__label">${escapeHtml(action)}</span>
+                <strong class="tool-confirmation__path">${escapeHtml(detail)}</strong>
+            </div>
+            <div class="tool-confirmation__actions">
+                <button
+                    class="tool-confirmation__button tool-confirmation__button--approve"
+                    type="button"
+                    data-tool-confirm-action="approve"
+                    data-message-key="${escapeHtml(messageKey)}"
+                    data-tool-event-index="${toolEventIndex}"
+                >Allow</button>
+                <button
+                    class="tool-confirmation__button"
+                    type="button"
+                    data-tool-confirm-action="cancel"
+                    data-message-key="${escapeHtml(messageKey)}"
+                    data-tool-event-index="${toolEventIndex}"
+                >Cancel</button>
+            </div>
+        </section>
+    `;
+}
+
+
+function isWorkspaceWriteConfirmationRequired(toolEvent) {
+    const toolName = String(toolEvent?.tool_name || "").trim();
+    return ["workspace_write_file", "workspace_append_file"].includes(toolName)
+        && isToolConfirmationRequired(toolEvent);
+}
+
+
+function isToolConfirmationRequired(toolEvent) {
+    return String(toolEvent?.policy?.status || "").trim() === "confirmation_required";
 }
 
 

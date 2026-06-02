@@ -39,6 +39,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
         os.environ.pop("HORIZONE_LITE_TOOLS_PATH", None)
         os.environ.pop("POLAR_ALLOW_INSECURE_DEFAULT_ADMIN", None)
         os.environ.pop("SECRET_KEY", None)
+        os.environ.pop("ENABLE_CUSTOM_TOOLS", None)
         self.temp_dir.cleanup()
 
 

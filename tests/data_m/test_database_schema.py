@@ -6,6 +6,45 @@ from data_m.utils.database import Database
 
 
 class DatabaseSchemaTests(IsolatedDatabaseTestCase):
+    def test_schema_migrations_are_versioned_and_hot_indexes_exist(self):
+        database = Database()
+
+        _, migration_rows = database.execute(
+            """
+            SELECT version, name
+            FROM schema_migrations
+            ORDER BY version ASC
+            """,
+            fetchall=True,
+        )
+        _, message_indexes = database.execute("PRAGMA index_list(messages)", fetchall=True)
+        _, conversation_indexes = database.execute("PRAGMA index_list(conversations)", fetchall=True)
+        _, model_indexes = database.execute("PRAGMA index_list(models)", fetchall=True)
+        _, provider_indexes = database.execute("PRAGMA index_list(providers)", fetchall=True)
+
+        migration_names = [row[1] for row in migration_rows]
+        message_index_names = {index[1] for index in message_indexes}
+        conversation_index_names = {index[1] for index in conversation_indexes}
+        model_index_names = {index[1] for index in model_indexes}
+        provider_index_names = {index[1] for index in provider_indexes}
+
+        self.assertEqual(
+            migration_names,
+            [
+                "legacy_column_backfills",
+                "project_models_shape",
+                "project_model_defaults",
+                "chat_integrity_indexes",
+                "hot_path_indexes",
+            ],
+        )
+        self.assertIn("idx_messages_conversation_position", message_index_names)
+        self.assertIn("idx_conversations_project_updated", conversation_index_names)
+        self.assertIn("idx_conversations_model_config", conversation_index_names)
+        self.assertIn("idx_models_provider_config", model_index_names)
+        self.assertIn("idx_models_provider_name", model_index_names)
+        self.assertIn("idx_providers_provider_type", provider_index_names)
+
     def test_legacy_tables_receive_expected_columns_on_boot(self):
         connection = sqlite3.connect(self.db_path)
         try:

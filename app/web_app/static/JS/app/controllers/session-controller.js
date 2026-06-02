@@ -15,11 +15,6 @@ import { showStatus } from "../status-ui.js";
 
 
 export function ensureAuthenticated() {
-    if (!getToken()) {
-        window.location.href = "/login";
-        return false;
-    }
-
     return true;
 }
 

@@ -1,4 +1,4 @@
-from .tool_call_parser import ToolCallParseError
+from .tool_call_parser import ToolCallParseError, ToolCallRequest
 from .tool_execution_trace import ToolExecutionTrace
 
 
@@ -35,6 +35,32 @@ class ToolCallOrchestrator:
         final_messages = tool_catalog.build_answer_messages(messages)
         tool_events = []
         response = None
+        confirmed_tool_call = self._build_confirmed_tool_call(tool_context)
+        if confirmed_tool_call:
+            tool_event = self._execute_tool_call(
+                confirmed_tool_call,
+                tool_catalog=tool_catalog,
+                tool_context=tool_context,
+            )
+            tool_events.append(tool_event)
+            final_messages.extend(
+                self.execution_trace.build_exchange_messages(
+                    confirmed_tool_call,
+                    tool_event,
+                )
+            )
+            final_response = self.model_manager.chat(
+                provider_name,
+                final_messages,
+                model,
+                settings or {},
+            )
+            return self._finalize_response(
+                final_response,
+                tool_events,
+                provider_name=provider_name,
+                model=model,
+            )
 
         for _ in range(self.max_tool_round_trips + 1):
             if self._is_stop_requested(should_stop):
@@ -89,6 +115,12 @@ class ToolCallOrchestrator:
                 tool_context=tool_context,
             )
             tool_events.append(tool_event)
+            if self._requires_confirmation(tool_event):
+                return self._build_confirmation_response(
+                    provider_name,
+                    model,
+                    tool_events,
+                )
             exchange_messages = self.execution_trace.build_exchange_messages(tool_call, tool_event)
             planning_messages.extend(exchange_messages)
             final_messages.extend(exchange_messages)
@@ -117,6 +149,31 @@ class ToolCallOrchestrator:
         final_messages = tool_catalog.build_answer_messages(messages)
         tool_events = []
         response = None
+        confirmed_tool_call = self._build_confirmed_tool_call(tool_context)
+        if confirmed_tool_call:
+            yield self._build_tool_start_stream_event(confirmed_tool_call, tool_catalog)
+            tool_event = self._execute_tool_call(
+                confirmed_tool_call,
+                tool_catalog=tool_catalog,
+                tool_context=tool_context,
+            )
+            tool_events.append(tool_event)
+            final_messages.extend(
+                self.execution_trace.build_exchange_messages(
+                    confirmed_tool_call,
+                    tool_event,
+                )
+            )
+            yield self._build_tool_result_stream_event(tool_event)
+            yield from self._stream_final_response(
+                provider_name,
+                final_messages,
+                model,
+                settings or {},
+                tool_events,
+                should_stop=should_stop,
+            )
+            return
 
         for _ in range(self.max_tool_round_trips + 1):
             if self._is_stop_requested(should_stop):
@@ -188,10 +245,20 @@ class ToolCallOrchestrator:
                 tool_context=tool_context,
             )
             tool_events.append(tool_event)
+            yield self._build_tool_result_stream_event(tool_event)
+            if self._requires_confirmation(tool_event):
+                yield {
+                    "type": "response",
+                    "response": self._build_confirmation_response(
+                        provider_name,
+                        model,
+                        tool_events,
+                    ),
+                }
+                return
             exchange_messages = self.execution_trace.build_exchange_messages(tool_call, tool_event)
             planning_messages.extend(exchange_messages)
             final_messages.extend(exchange_messages)
-            yield self._build_tool_result_stream_event(tool_event)
 
         self._append_user_instruction(
             final_messages,
@@ -215,6 +282,54 @@ class ToolCallOrchestrator:
     def _parse_tool_decision(self, response):
         return self.tool_call_parser.parse_decision_response(response)
 
+    def _requires_confirmation(self, tool_event):
+        return str((tool_event.get("policy") or {}).get("status") or "").strip() == "confirmation_required"
+
+    def _build_confirmation_response(self, provider_name, model, tool_events):
+        tool_event = tool_events[-1] if tool_events else {}
+        tool_name = str(tool_event.get("tool_name") or "tool").strip()
+        path = str((tool_event.get("arguments") or {}).get("path") or "").strip()
+        target = f" `{path}`" if path else ""
+        action = "append to" if tool_name == "workspace_append_file" else "write"
+
+        return {
+            "provider": provider_name,
+            "model": model,
+            "message": {
+                "role": "assistant",
+                "content": (
+                    f"I need your approval before I {action}{target} in the workspace."
+                ),
+            },
+            "usage": {},
+            "finish_reason": "confirmation_required",
+            "message_id": None,
+            "raw": {
+                "tool_events": tool_events,
+            },
+        }
+
+    def _build_confirmed_tool_call(self, tool_context=None):
+        confirmation = (tool_context or {}).get("confirmed_tool_call")
+        if not isinstance(confirmation, dict):
+            return None
+
+        name = str(confirmation.get("name") or confirmation.get("tool_name") or "").strip()
+        if not name:
+            return None
+
+        arguments = confirmation.get("arguments")
+        if arguments is None:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            return None
+
+        return ToolCallRequest(
+            name=name,
+            arguments=arguments,
+            reason=str(confirmation.get("reason") or "").strip(),
+        )
+
     def _append_parse_error_message(self, tool_aware_messages, error):
         self._append_user_instruction(
             tool_aware_messages,
@@ -226,7 +341,7 @@ class ToolCallOrchestrator:
         )
 
     def _append_decision_error_message(self, planning_messages, error, response=None):
-        self._append_assistant_response(planning_messages, response)
+        self._append_sanitized_planning_response(planning_messages, response)
         self._append_user_instruction(
             planning_messages,
             (
@@ -235,6 +350,18 @@ class ToolCallOrchestrator:
                 "either a top-level tool_call or "
                 '{"tool_decision":{"needs_tool":false,"reason":"brief reason"}}.'
             ),
+        )
+
+    def _append_sanitized_planning_response(self, messages, response=None):
+        content = str(((response or {}).get("message") or {}).get("content") or "").strip()
+        if not content:
+            return
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": "Invalid non-JSON tool planning response omitted.",
+            }
         )
 
     def _append_assistant_response(self, messages, response=None):

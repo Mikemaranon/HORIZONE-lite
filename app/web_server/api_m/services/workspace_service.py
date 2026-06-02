@@ -116,9 +116,8 @@ class WorkspaceService:
         except (OSError, PathGuardError, ValueError) as error:
             raise WorkspaceRequestError(str(error))
 
-        indexed_files = self.workspace_manager.scan(workspace["root_path"])
         with self.db.transaction():
-            self.db.workspace_file_index.replace_for_workspace(workspace_id, indexed_files)
+            self._update_file_index(workspace, file_payload["path"])
             self.db.project_workspaces.update_indexed_at(workspace_id)
             refreshed_workspace = self.db.project_workspaces.get(workspace_id)
             action = "Created" if file_payload.get("created") else "Updated"
@@ -133,7 +132,7 @@ class WorkspaceService:
         return {
             "workspace": refreshed_workspace,
             "file": file_payload,
-            "file_count": len(indexed_files),
+            "file_count": self.db.workspace_file_index.count_for_workspace(workspace_id),
         }
 
     def append_file(self, data, *, conversation_id=None, message_id=None):
@@ -160,9 +159,8 @@ class WorkspaceService:
         except (OSError, PathGuardError, ValueError, UnicodeError) as error:
             raise WorkspaceRequestError(str(error))
 
-        indexed_files = self.workspace_manager.scan(workspace["root_path"])
         with self.db.transaction():
-            self.db.workspace_file_index.replace_for_workspace(workspace_id, indexed_files)
+            self._update_file_index(workspace, file_payload["path"])
             self.db.project_workspaces.update_indexed_at(workspace_id)
             refreshed_workspace = self.db.project_workspaces.get(workspace_id)
             self._record_event(
@@ -180,7 +178,7 @@ class WorkspaceService:
         return {
             "workspace": refreshed_workspace,
             "file": file_payload,
-            "file_count": len(indexed_files),
+            "file_count": self.db.workspace_file_index.count_for_workspace(workspace_id),
         }
 
     def search(self, data):
@@ -238,6 +236,17 @@ class WorkspaceService:
             conversation_id=conversation_id,
             message_id=message_id,
         )
+
+    def _update_file_index(self, workspace, relative_path):
+        file_record = self.workspace_manager.describe_file(
+            workspace["root_path"],
+            relative_path,
+        )
+        if file_record:
+            self.db.workspace_file_index.upsert_file(workspace["id"], file_record)
+            return
+
+        self.db.workspace_file_index.delete_file(workspace["id"], relative_path)
 
     def _require_int(self, value, field_name):
         if value is None or value == "":

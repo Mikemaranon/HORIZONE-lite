@@ -76,10 +76,40 @@ class ToolCallingTests(unittest.TestCase):
         decision = policy.evaluate(
             {"name": "workspace_run_command", "risk_level": "runs_command"},
             tool_call,
-            context={"confirmed_tools": ["workspace_run_command"]},
+            context={
+                "confirmed_tool_calls": [
+                    {
+                        "name": "workspace_run_command",
+                        "arguments": {"command": "pytest"},
+                    }
+                ]
+            },
         )
 
         self.assertTrue(decision["allowed"])
+        self.assertEqual(decision["status"], "confirmed")
+
+    def test_policy_rejects_confirmation_with_different_arguments(self):
+        policy = ToolCallPolicy(auto_execute_risks={"read_only"})
+        tool_call = ToolCallParser().parse_text(
+            '{"tool_call":{"name":"workspace_run_command","arguments":{"command":"pytest"}}}'
+        )
+
+        decision = policy.evaluate(
+            {"name": "workspace_run_command", "risk_level": "runs_command"},
+            tool_call,
+            context={
+                "confirmed_tool_calls": [
+                    {
+                        "name": "workspace_run_command",
+                        "arguments": {"command": "rm -rf ."},
+                    }
+                ]
+            },
+        )
+
+        self.assertFalse(decision["allowed"])
+        self.assertEqual(decision["status"], "confirmation_required")
 
 
 if __name__ == "__main__":

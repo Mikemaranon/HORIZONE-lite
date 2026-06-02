@@ -1,3 +1,5 @@
+import os
+
 from tests.test_support import ApiTestCase
 
 
@@ -17,7 +19,30 @@ class ToolsApiTests(ApiTestCase):
             {"current date", "web search"},
         )
 
+    def test_tools_endpoint_blocks_custom_upload_by_default(self):
+        response = self.client.post(
+            "/api/tools",
+            json={
+                "filename": "echo_tool.py",
+                "source": """
+TOOL_NAME = "echo_tool"
+TOOL_RISK_LEVEL = "read_only"
+TOOL_DESCRIPTION = "Echoes a value."
+TOOL_PARAMETERS = {"value": {"type": "string"}}
+
+def run(arguments):
+    return {"echo": arguments.get("value", "")}
+""".strip(),
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Custom tools are disabled", payload["error"])
+
     def test_tools_endpoint_can_upload_and_activate_tool(self):
+        os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
         create_response = self.client.post(
             "/api/tools",
             json={
@@ -25,6 +50,7 @@ class ToolsApiTests(ApiTestCase):
                 "source": """
 TOOL_NAME = "echo_tool"
 TOOL_DISPLAY_NAME = "Echo Tool"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Echoes a value."
 TOOL_PARAMETERS = {"value": {"type": "string"}}
 
@@ -52,13 +78,62 @@ def run(arguments):
         self.assertEqual(update_response.status_code, 200)
         self.assertTrue(updated_tool["is_active"])
 
+    def test_tools_endpoint_requires_custom_tool_risk_level(self):
+        os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
+        response = self.client.post(
+            "/api/tools",
+            json={
+                "filename": "missing_risk.py",
+                "source": """
+TOOL_NAME = "missing_risk"
+TOOL_DESCRIPTION = "Missing risk."
+TOOL_PARAMETERS = {}
+
+def run(arguments):
+    return {}
+""".strip(),
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("TOOL_RISK_LEVEL", payload["error"])
+
+    def test_tools_endpoint_rejects_blocked_custom_imports(self):
+        os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
+        response = self.client.post(
+            "/api/tools",
+            json={
+                "filename": "shell_tool.py",
+                "source": """
+import subprocess
+
+TOOL_NAME = "shell_tool"
+TOOL_RISK_LEVEL = "runs_command"
+TOOL_DESCRIPTION = "Runs a command."
+TOOL_PARAMETERS = {}
+
+def run(arguments):
+    return {}
+""".strip(),
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("subprocess", payload["error"])
+
     def test_chat_endpoint_runs_active_tool_calls(self):
+        os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
         create_response = self.client.post(
             "/api/tools",
             json={
                 "filename": "current_date_override.py",
                 "source": """
 TOOL_NAME = "current_date_override"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Returns a deterministic date for tests."
 TOOL_PARAMETERS = {}
 

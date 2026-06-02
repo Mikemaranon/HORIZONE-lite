@@ -6,8 +6,8 @@ from .db_connector import DBConnector
 from .schema import DatabaseSchemaInitializer
 
 class Database:
-    def __init__(self):
-        self.connector = DBConnector()
+    def __init__(self, db_path=None):
+        self.connector = DBConnector(db_path=db_path)
         self.schema_initializer = DatabaseSchemaInitializer()
         self._transaction_state = threading.local()
         self._init_db()

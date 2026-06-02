@@ -13,8 +13,8 @@ def _default_db_path():
     return project_root / RUNTIME_DIRNAME / DB_FILENAME
 
 class DBConnector:
-    def __init__(self):
-        configured_path = os.environ.get(DB_PATH_ENV)
+    def __init__(self, db_path=None):
+        configured_path = db_path or os.environ.get(DB_PATH_ENV)
         if configured_path:
             self.db_path = Path(configured_path).expanduser().resolve()
         else:
@@ -26,6 +26,9 @@ class DBConnector:
         # Establish and return a new database connection
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         return conn
 
     def close(self, conn):

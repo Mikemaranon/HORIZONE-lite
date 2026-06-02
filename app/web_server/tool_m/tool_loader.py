@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import os
 import shutil
@@ -5,13 +6,24 @@ from pathlib import Path
 
 from werkzeug.utils import secure_filename
 
-from .tool_contract import validate_tool_module
+from .tool_contract import TOOL_RISK_LEVELS, validate_tool_module
 
 
 class ToolLoader:
     BUILTIN_FILENAMES = {
         "current_date.py",
         "web_search.py",
+    }
+    MAX_CUSTOM_TOOL_BYTES = 64 * 1024
+    BLOCKED_CUSTOM_IMPORTS = {
+        "ctypes",
+        "multiprocessing",
+        "os",
+        "pathlib",
+        "shutil",
+        "socket",
+        "subprocess",
+        "sys",
     }
 
     def __init__(self, tools_directory=None):
@@ -62,11 +74,14 @@ class ToolLoader:
         if not normalized_filename or not normalized_filename.endswith(".py"):
             raise ValueError("Tool files must use the .py extension.")
 
+        normalized_source = str(source_text or "")
+        self._validate_custom_source(normalized_source)
+
         destination = self.tools_directory / normalized_filename
         if destination.exists():
             raise ValueError("A tool with that filename already exists.")
 
-        destination.write_text(source_text, encoding="utf-8")
+        destination.write_text(normalized_source, encoding="utf-8")
         return destination
 
     def save_uploaded_file(self, uploaded_file):
@@ -106,6 +121,56 @@ class ToolLoader:
     def _build_module_name(self, tool_path):
         stat = tool_path.stat()
         return f"horizone_lite_tool_{tool_path.stem}_{stat.st_mtime_ns}"
+
+    def _validate_custom_source(self, source_text):
+        source_bytes = source_text.encode("utf-8")
+        if len(source_bytes) > self.MAX_CUSTOM_TOOL_BYTES:
+            raise ValueError("Tool source is too large.")
+
+        try:
+            tree = ast.parse(source_text)
+        except SyntaxError as error:
+            raise ValueError("Tool source must be valid Python.") from error
+
+        risk_level = self._extract_string_constant(tree, "TOOL_RISK_LEVEL")
+        if not risk_level:
+            raise ValueError("Custom tools must define TOOL_RISK_LEVEL explicitly.")
+        if risk_level not in TOOL_RISK_LEVELS:
+            raise ValueError(
+                "TOOL_RISK_LEVEL must be one of: "
+                + ", ".join(sorted(TOOL_RISK_LEVELS))
+            )
+
+        blocked_imports = self._find_blocked_imports(tree)
+        if blocked_imports:
+            raise ValueError(
+                "Custom tool imports are not allowed for: "
+                + ", ".join(sorted(blocked_imports))
+            )
+
+    def _extract_string_constant(self, tree, variable_name):
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if not any(isinstance(target, ast.Name) and target.id == variable_name for target in node.targets):
+                continue
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                return node.value.value.strip()
+        return ""
+
+    def _find_blocked_imports(self, tree):
+        blocked_imports = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root_name = alias.name.split(".", 1)[0]
+                    if root_name in self.BLOCKED_CUSTOM_IMPORTS:
+                        blocked_imports.add(root_name)
+            elif isinstance(node, ast.ImportFrom):
+                root_name = (node.module or "").split(".", 1)[0]
+                if root_name in self.BLOCKED_CUSTOM_IMPORTS:
+                    blocked_imports.add(root_name)
+        return blocked_imports
 
     def _seed_builtin_tools(self):
         for builtin_filename in self.BUILTIN_FILENAMES:

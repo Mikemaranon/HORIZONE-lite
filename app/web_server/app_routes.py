@@ -53,6 +53,9 @@ class AppRoutes:
 
     def get_login(self):
         error_message = None
+        if request.method == "GET" and self.user_manager.check_user(request):
+            return redirect(url_for("index"))
+
         if request.method == "POST":
             data = request.get_json()
 

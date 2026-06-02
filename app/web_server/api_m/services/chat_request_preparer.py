@@ -25,6 +25,7 @@ class PreparedChatRequest:
     request_id: str
     stream_requested: bool
     assistant_message_meta: dict
+    tool_confirmation: dict | None
 
 
 class ChatRequestPreparer:
@@ -119,6 +120,7 @@ class ChatRequestPreparer:
                 model,
                 project_model=project_model,
             ),
+            tool_confirmation=self._parse_tool_confirmation(data.get("tool_confirmation")),
         )
 
     def _validate_messages(self, data):
@@ -321,6 +323,31 @@ class ChatRequestPreparer:
             return normalized
 
         return str(uuid.uuid4())
+
+    def _parse_tool_confirmation(self, raw_confirmation):
+        if raw_confirmation in (None, ""):
+            return None
+
+        if not isinstance(raw_confirmation, dict):
+            raise ChatRequestError("tool_confirmation must be an object")
+
+        name = str(
+            raw_confirmation.get("name") or raw_confirmation.get("tool_name") or ""
+        ).strip()
+        if not name:
+            raise ChatRequestError("tool_confirmation.name is required")
+
+        arguments = raw_confirmation.get("arguments")
+        if arguments is None:
+            arguments = {}
+        if not isinstance(arguments, dict):
+            raise ChatRequestError("tool_confirmation.arguments must be an object")
+
+        return {
+            "name": name,
+            "arguments": arguments,
+            "reason": str(raw_confirmation.get("reason") or "").strip(),
+        }
 
     def _build_assistant_message_meta(self, model_config, profile, provider, model, project_model=None):
         return {

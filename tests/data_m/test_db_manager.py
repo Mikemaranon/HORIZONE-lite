@@ -8,6 +8,21 @@ from user_m import UserManager
 
 
 class DBManagerTests(IsolatedDatabaseTestCase):
+    def test_explicit_db_paths_create_isolated_managers(self):
+        first_path = self.db_path.parent / "first.db"
+        second_path = self.db_path.parent / "second.db"
+
+        first_db = DBManager(db_path=first_path)
+        second_db = DBManager(db_path=second_path)
+
+        first_db.projects.create("First", "")
+        second_db.projects.create("Second", "")
+
+        self.assertIsNone(first_db.projects.get(2))
+        self.assertIsNone(second_db.projects.get(2))
+        self.assertEqual(first_db.projects.all()[0]["name"], "First")
+        self.assertEqual(second_db.projects.all()[0]["name"], "Second")
+
     def test_clean_boot_creates_database_file_and_default_records(self):
         self.assertFalse(self.db_path.exists())
 

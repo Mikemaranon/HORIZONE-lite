@@ -3,8 +3,8 @@ import json
 from .database import Database
 
 class LogRepository:
-    def __init__(self):
-        self.db = Database()
+    def __init__(self, db_path=None, database=None):
+        self.db = database or Database(db_path=db_path)
 
     def log(self, level, source, message, payload=None):
         payload_str = json.dumps(payload) if payload else None

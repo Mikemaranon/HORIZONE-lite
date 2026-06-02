@@ -27,6 +27,7 @@ class ToolManagerTests(IsolatedDatabaseTestCase):
             tool_loader=self.loader,
             tool_registry=self.registry,
             tool_executor=self.executor,
+            custom_tools_enabled=True,
         )
 
     def test_upload_tool_registers_catalog_entry(self):
@@ -35,6 +36,7 @@ class ToolManagerTests(IsolatedDatabaseTestCase):
             source_text="""
 TOOL_NAME = "echo_tool"
 TOOL_DISPLAY_NAME = "Echo Tool"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Echoes back the received payload."
 TOOL_PARAMETERS = {"value": {"type": "string"}}
 
@@ -54,6 +56,7 @@ def run(arguments):
             filename="echo_tool.py",
             source_text="""
 TOOL_NAME = "echo_tool"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Echoes back the received payload."
 TOOL_PARAMETERS = {}
 
@@ -75,6 +78,7 @@ def run(arguments):
             filename="echo_tool.py",
             source_text="""
 TOOL_NAME = "echo_tool"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Echoes back the received payload."
 TOOL_PARAMETERS = {}
 
@@ -90,6 +94,7 @@ def run(arguments):
             filename="current_date_override.py",
             source_text="""
 TOOL_NAME = "current_date_override"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Returns a deterministic date for tests."
 TOOL_PARAMETERS = {}
 
@@ -157,6 +162,7 @@ def run(arguments):
             filename="echo_tool.py",
             source_text="""
 TOOL_NAME = "echo_tool"
+TOOL_RISK_LEVEL = "read_only"
 TOOL_DESCRIPTION = "Echoes a value."
 TOOL_PARAMETERS = {"value": {"type": "string", "required": True}}
 
@@ -410,6 +416,98 @@ def run(arguments):
 
         self.assertEqual(captured_retry_roles, ["system", "user", "assistant", "user"])
         self.assertEqual(response["message"]["content"], "Final answer.")
+
+    def test_workspace_write_planning_retry_does_not_reinforce_model_refusal(self):
+        tool = self.manager.upload_tool(
+            filename="workspace_write_stub.py",
+            source_text="""
+TOOL_NAME = "workspace_write_file"
+TOOL_RISK_LEVEL = "writes_workspace"
+TOOL_DESCRIPTION = "Writes a file in the connected workspace."
+TOOL_PARAMETERS = {
+    "path": {"type": "string", "required": True},
+    "content": {"type": "string", "required": True},
+    "overwrite": {"type": "boolean"},
+    "create_dirs": {"type": "boolean"},
+}
+
+def run(arguments):
+    return {"file": {"path": arguments.get("path", ""), "created": False}}
+""".strip(),
+        )
+        self.manager.set_tool_active(tool["id"], True)
+        model_calls = {"count": 0}
+        captured_retry_messages = {}
+
+        def fake_chat(provider_name, messages, model, settings):
+            model_calls["count"] += 1
+            if model_calls["count"] == 1:
+                planning_prompt = messages[0]["content"]
+                self.assertIn("Planning does not execute tools", planning_prompt)
+                self.assertIn("explicit user confirmation", planning_prompt)
+                self.assertIn("writes_workspace", planning_prompt)
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": "I'm sorry, but I can't assist with that request.",
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+
+            captured_retry_messages["messages"] = messages
+            retry_content = "\n\n".join(message["content"] for message in messages)
+            self.assertNotIn("I'm sorry, but I can't assist", retry_content)
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": (
+                        '{"tool_call":{"name":"workspace_write_file",'
+                        '"arguments":{"path":"hello.txt","content":"Java",'
+                        '"overwrite":true,"create_dirs":false},'
+                        '"reason":"The user asked to update the workspace file."}}'
+                    ),
+                },
+                "usage": {},
+                "finish_reason": None,
+                "message_id": None,
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "Change hello.txt content to Java"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(model_calls["count"], 2)
+        self.assertEqual(
+            [message["role"] for message in captured_retry_messages["messages"]],
+            ["system", "user", "assistant", "user"],
+        )
+        self.assertEqual(response["finish_reason"], "confirmation_required")
+        self.assertEqual(
+            response["raw"]["tool_events"][0]["policy"]["status"],
+            "confirmation_required",
+        )
+        self.assertEqual(
+            response["raw"]["tool_events"][0]["arguments"],
+            {
+                "path": "hello.txt",
+                "content": "Java",
+                "overwrite": True,
+                "create_dirs": False,
+            },
+        )
 
     def test_time_sensitive_query_can_use_model_selected_web_search(self):
         tool = self.db.tools.get_by_name("web_search")

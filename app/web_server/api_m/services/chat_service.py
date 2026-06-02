@@ -129,4 +129,6 @@ class ChatService:
             "conversation_id": prepared.conversation_id,
             "project": prepared.project,
             "workspace": workspace,
+            "confirmed_tool_call": prepared.tool_confirmation,
+            "confirmed_tool_calls": [prepared.tool_confirmation] if prepared.tool_confirmation else [],
         }

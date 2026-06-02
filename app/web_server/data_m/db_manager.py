@@ -28,16 +28,18 @@ class DBManager:
     _instance = None
 
     def __new__(cls, *args, **kwargs):
+        if args or kwargs.get("db_path") or kwargs.get("database"):
+            return super().__new__(cls)
         if not cls._instance:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, db_path=None, database=None):
         if hasattr(self, "initialized") and self.initialized:
             return
 
-        self.db = Database()
-        self.logger = LogRepository()
+        self.db = database or Database(db_path=db_path)
+        self.logger = LogRepository(database=self.db)
 
         # Export table interfaces
         self.users = UsersTable(self.db)
