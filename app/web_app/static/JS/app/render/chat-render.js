@@ -37,7 +37,10 @@ export function renderMessages({ preserveViewport = false } = {}) {
 
     elements.messagesContainer.hidden = false;
     elements.messagesContainer.innerHTML = state.activeMessages
-        .map((message) => createMessageMarkup(message))
+        .map((message, index, messages) => createMessageMarkup(message, {
+            previousMessage: messages[index - 1] || null,
+            nextMessage: messages[index + 1] || null,
+        }))
         .join("");
     highlightMessageCodeBlocks(elements.messagesContainer);
 

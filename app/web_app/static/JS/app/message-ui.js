@@ -15,10 +15,15 @@ import {
 import { state } from "./state.js";
 
 const MESSAGES_AUTO_SCROLL_THRESHOLD = 24;
+const CONFIRMATION_LABEL_BY_STATE = {
+    pending: "pending",
+    confirmed: "confirmed",
+    denied: "denied",
+};
 let messageClientKeyCounter = 0;
 
 
-export function createMessageMarkup(message) {
+export function createMessageMarkup(message, options = {}) {
     const isUser = message.role === "user";
     const roleLabel = isUser ? "You" : null;
     const contentClass = isUser ? "message__content--plain" : "message__content--markdown";
@@ -36,6 +41,11 @@ export function createMessageMarkup(message) {
             ${toolConfirmationMarkup}
         `,
         createMessageMetaMarkup(message, roleLabel),
+        "",
+        {
+            isContinuation: isAssistantContinuation(message, options.previousMessage),
+            continues: isAssistantContinuation(options.nextMessage, message),
+        },
     );
 }
 
@@ -226,9 +236,16 @@ export function createPendingAssistantMessage(projectAgent = null) {
 }
 
 
-function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttributes = "") {
+function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttributes = "", options = {}) {
     const isUser = message.role === "user";
     const messageKey = getOrCreateMessageClientKey(message);
+    const classes = [`message`, `message--${isUser ? "user" : "assistant"}`];
+    if (!isUser && options.isContinuation) {
+        classes.push("message--assistant-continuation");
+    }
+    if (!isUser && options.continues) {
+        classes.push("message--assistant-continues");
+    }
     const avatarMarkup = isUser
         ? `<div class="message__avatar">YOU</div>`
         : createModelAvatarMarkup(
@@ -238,7 +255,7 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
         );
 
     return `
-        <article class="message message--${isUser ? "user" : "assistant"}" data-message-key="${escapeHtml(messageKey)}"${articleAttributes}>
+        <article class="${classes.join(" ")}" data-message-key="${escapeHtml(messageKey)}"${articleAttributes}>
             ${avatarMarkup}
             <div class="message__card">
                 <div class="message__meta">${metaMarkup}</div>
@@ -246,6 +263,30 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
             </div>
         </article>
     `;
+}
+
+
+function isAssistantContinuation(message, previousMessage) {
+    if (!message || !previousMessage) {
+        return false;
+    }
+    if (message.role !== "assistant" || previousMessage.role !== "assistant") {
+        return false;
+    }
+
+    return resolveAssistantInteractionKey(message) === resolveAssistantInteractionKey(previousMessage);
+}
+
+
+function resolveAssistantInteractionKey(message) {
+    return [
+        message.project_model_id || "",
+        message.project_model_name || "",
+        message.model_config_id || "",
+        message.model_name || "",
+        message.profile_id || "",
+        message.profile_name || "",
+    ].map((value) => String(value).trim()).join("|");
 }
 
 
@@ -384,10 +425,11 @@ function createToolStatusLabel(toolEvent) {
     const toolName = String(toolEvent?.tool_name || "").trim();
     const result = toolEvent?.result || {};
     const argumentsPayload = toolEvent?.arguments || {};
+    const confirmationState = getToolConfirmationState(toolEvent);
 
     if (!toolEvent?.ok) {
-        if (isToolConfirmationRequired(toolEvent)) {
-            return `Needs approval: ${escapeHtml(resolveToolDisplayName(toolEvent))}`;
+        if (confirmationState) {
+            return `Tool confirmation request: ${CONFIRMATION_LABEL_BY_STATE[confirmationState]}`;
         }
         return `Tool failed: ${escapeHtml(resolveToolDisplayName(toolEvent))}`;
     }
@@ -482,19 +524,49 @@ function isToolConfirmationRequired(toolEvent) {
 }
 
 
+function isToolConfirmationEvent(toolEvent) {
+    return Boolean(getToolConfirmationState(toolEvent));
+}
+
+
+function getToolConfirmationState(toolEvent) {
+    if (toolEvent?.ok) {
+        return "";
+    }
+
+    const status = String(toolEvent?.policy?.status || "").trim();
+    if (status === "confirmation_required") {
+        return "pending";
+    }
+    if (["confirming", "confirmed", "approved"].includes(status)) {
+        return "confirmed";
+    }
+    if (["cancelled", "canceled", "denied", "rejected"].includes(status)) {
+        return "denied";
+    }
+
+    return "";
+}
+
+
 function renderToolTraceModal(toolEvent) {
     const toolDisplayName = resolveToolDisplayName(toolEvent);
     const toolName = String(toolEvent?.tool_name || "tool").trim();
     const toolSummary = String(toolEvent?.tool_summary || "").trim();
+    const confirmationState = getToolConfirmationState(toolEvent);
 
     if (elements.toolTraceModalEyebrow) {
-        elements.toolTraceModalEyebrow.textContent = "Tool";
+        elements.toolTraceModalEyebrow.textContent = confirmationState ? "Confirmation" : "Tool";
     }
     if (elements.toolTraceModalTitle) {
-        elements.toolTraceModalTitle.textContent = toolDisplayName;
+        elements.toolTraceModalTitle.textContent = confirmationState
+            ? "Tool confirmation request"
+            : toolDisplayName;
     }
     if (elements.toolTraceModalSummary) {
-        elements.toolTraceModalSummary.textContent = toolSummary || `${toolDisplayName} details`;
+        elements.toolTraceModalSummary.textContent = confirmationState
+            ? createToolConfirmationSummary(toolEvent, confirmationState)
+            : (toolSummary || `${toolDisplayName} details`);
     }
     if (elements.toolTraceModalContent) {
         elements.toolTraceModalContent.innerHTML = createToolTraceContentMarkup(toolName, toolEvent);
@@ -503,6 +575,10 @@ function renderToolTraceModal(toolEvent) {
 
 
 function createToolTraceContentMarkup(toolName, toolEvent) {
+    if (isToolConfirmationEvent(toolEvent)) {
+        return createToolConfirmationTraceMarkup(toolEvent);
+    }
+
     if (!toolEvent?.ok) {
         return `
             <div class="tool-trace__group">
@@ -525,6 +601,52 @@ function createToolTraceContentMarkup(toolName, toolEvent) {
     }
 
     return createGenericToolTraceMarkup(toolEvent);
+}
+
+
+function createToolConfirmationSummary(toolEvent, confirmationState) {
+    const toolDisplayName = resolveToolDisplayName(toolEvent);
+    if (confirmationState === "confirmed") {
+        return `Confirmed before running ${toolDisplayName}.`;
+    }
+    if (confirmationState === "denied") {
+        return `Denied by the user; ${toolDisplayName} was not run.`;
+    }
+
+    return `Waiting for approval before running ${toolDisplayName}.`;
+}
+
+
+function createToolConfirmationTraceMarkup(toolEvent) {
+    const confirmationState = getToolConfirmationState(toolEvent);
+    const statusLabel = CONFIRMATION_LABEL_BY_STATE[confirmationState] || "pending";
+    const policy = toolEvent?.policy || {};
+    const argumentsPayload = toolEvent?.arguments || {};
+    const rows = [
+        ["Request status", statusLabel],
+        ["Tool", resolveToolDisplayName(toolEvent)],
+        ["Path", argumentsPayload?.path],
+        ["Risk", policy?.risk_level],
+        ["Reason", toolEvent?.reason || policy?.reason],
+    ].filter(([, value]) => String(value || "").trim());
+    const rowsMarkup = rows.map(([label, value]) => `
+        <div class="tool-trace-kv">
+            <span class="tool-trace-kv__label">${escapeHtml(label)}</span>
+            <span class="tool-trace-kv__value">${escapeHtml(String(value))}</span>
+        </div>
+    `).join("");
+    const argumentsMarkup = escapeHtml(JSON.stringify(argumentsPayload, null, 2));
+
+    return `
+        <div class="tool-trace__group">
+            <h4>Confirmation</h4>
+            <div class="tool-trace-kv-list">${rowsMarkup}</div>
+        </div>
+        <div class="tool-trace__group">
+            <h4>Requested arguments</h4>
+            <pre class="tool-trace__pre"><code>${argumentsMarkup}</code></pre>
+        </div>
+    `;
 }
 
 

@@ -53,6 +53,27 @@
     padding: 0 20px 16px 0;
 }
 
+.message--assistant-continues .message__card {
+    border-bottom-color: transparent;
+    padding-bottom: 4px;
+}
+
+.message--assistant-continuation {
+    margin-top: -14px;
+}
+
+.message--assistant-continuation .message__avatar {
+    visibility: hidden;
+}
+
+.message--assistant-continuation .message__meta {
+    display: none;
+}
+
+.message--assistant-continuation .message__card {
+    padding-top: 0;
+}
+
 .message--user .message__card {
     flex: 0 1 auto;
     width: fit-content;
