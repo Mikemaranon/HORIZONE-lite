@@ -1,4 +1,11 @@
-import { cancelChatStream, createConversation, deleteConversation, sendChatStream, updateConversation } from "../api.js";
+import {
+    cancelChatStream,
+    createConversation,
+    deleteConversation,
+    sendChatStream,
+    updateConversation,
+    updateToolConfirmation,
+} from "../api.js";
 import { renderApp } from "../app-runtime.js";
 import { closeComposerMentionMenu } from "../agent-mentions.js";
 import { extractMentionedAgents } from "../agent-mention-utils.js";
@@ -303,9 +310,16 @@ export async function handleToolConfirmationClick(event) {
 
     const action = actionButton.dataset.toolConfirmAction;
     if (action === "cancel") {
-        markToolConfirmationCancelled(toolEvent);
-        renderMessages({ preserveViewport: true });
-        showStatus("Workspace write cancelled.", false);
+        try {
+            markToolConfirmationCancelled(toolEvent);
+            await persistToolConfirmationStatus(message, toolEventIndex, "cancelled");
+            renderMessages({ preserveViewport: true });
+            showStatus("Workspace write cancelled.", false);
+        } catch (error) {
+            markToolConfirmationPending(toolEvent);
+            renderMessages({ preserveViewport: true });
+            showStatus(error.message || "The workspace write cancellation could not be saved.", true);
+        }
         return;
     }
 
@@ -317,6 +331,7 @@ export async function handleToolConfirmationClick(event) {
         setLoading(true);
         setGenerationStopRequested(false);
         markToolConfirmationApproved(toolEvent);
+        await persistToolConfirmationStatus(message, toolEventIndex, "confirming");
         renderMessages({ preserveViewport: true });
 
         await sendChatTurn({
@@ -328,8 +343,12 @@ export async function handleToolConfirmationClick(event) {
                 reason: toolEvent.reason || "",
             },
         });
+        markToolConfirmationConfirmed(toolEvent);
+        await persistToolConfirmationStatus(message, toolEventIndex, "confirmed");
+        renderMessages({ preserveViewport: true });
     } catch (error) {
         markToolConfirmationPending(toolEvent);
+        await persistToolConfirmationStatus(message, toolEventIndex, "confirmation_required").catch(() => {});
         removeTypingMessage();
         removeStreamingAssistantMessage();
         renderMessages({ preserveViewport: true });
@@ -626,6 +645,14 @@ function markToolConfirmationApproved(toolEvent) {
 }
 
 
+function markToolConfirmationConfirmed(toolEvent) {
+    toolEvent.policy = {
+        ...(toolEvent.policy || {}),
+        status: "confirmed",
+    };
+}
+
+
 function markToolConfirmationPending(toolEvent) {
     toolEvent.policy = {
         ...(toolEvent.policy || {}),
@@ -640,6 +667,19 @@ function markToolConfirmationCancelled(toolEvent) {
         status: "cancelled",
     };
     toolEvent.error = "Workspace write cancelled by the user.";
+}
+
+
+async function persistToolConfirmationStatus(message, toolEventIndex, status) {
+    if (!message?.id) {
+        return;
+    }
+
+    await updateToolConfirmation({
+        message_id: message.id,
+        tool_event_index: toolEventIndex,
+        status,
+    });
 }
 
 

@@ -39,7 +39,8 @@ def run(arguments):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Custom tools are disabled", payload["error"])
+        self.assertEqual(payload["error"]["code"], "bad_request")
+        self.assertIn("Custom tools are disabled", payload["error"]["message"])
 
     def test_tools_endpoint_can_upload_and_activate_tool(self):
         os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
@@ -78,6 +79,34 @@ def run(arguments):
         self.assertEqual(update_response.status_code, 200)
         self.assertTrue(updated_tool["is_active"])
 
+    def test_tools_endpoint_can_toggle_workspace_runtime_tools(self):
+        list_response = self.client.get("/api/tools", headers=self.auth_headers)
+        listed_tool = next(
+            tool
+            for tool in list_response.get_json()["workspace_tools"]
+            if tool["name"] == "workspace_search"
+        )
+
+        update_response = self.client.patch(
+            "/api/tools",
+            json={
+                "id": listed_tool["id"],
+                "is_active": False,
+            },
+            headers=self.auth_headers,
+        )
+        payload = update_response.get_json()
+        refresh_response = self.client.get("/api/tools", headers=self.auth_headers)
+        refreshed_tool = next(
+            tool
+            for tool in refresh_response.get_json()["workspace_tools"]
+            if tool["name"] == "workspace_search"
+        )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertFalse(payload["tool"]["is_active"])
+        self.assertFalse(refreshed_tool["is_active"])
+
     def test_tools_endpoint_requires_custom_tool_risk_level(self):
         os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
         response = self.client.post(
@@ -98,7 +127,7 @@ def run(arguments):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("TOOL_RISK_LEVEL", payload["error"])
+        self.assertIn("TOOL_RISK_LEVEL", payload["error"]["message"])
 
     def test_tools_endpoint_rejects_blocked_custom_imports(self):
         os.environ["ENABLE_CUSTOM_TOOLS"] = "1"
@@ -123,7 +152,7 @@ def run(arguments):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("subprocess", payload["error"])
+        self.assertIn("subprocess", payload["error"]["message"])
 
     def test_chat_endpoint_runs_active_tool_calls(self):
         os.environ["ENABLE_CUSTOM_TOOLS"] = "1"

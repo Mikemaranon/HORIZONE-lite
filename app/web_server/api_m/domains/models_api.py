@@ -28,10 +28,8 @@ class ModelsAPI(BaseAPI):
             if request.args.get("id"):
                 return self.ok({"model": self.model_config_service.get_model(request.args.get("id"))})
             return self.ok({"models": self.model_config_service.list_models()})
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
     def create_model(self):
         auth = self.authenticate_request(request)
@@ -41,7 +39,7 @@ class ModelsAPI(BaseAPI):
         try:
             model = self.model_config_service.create_model(self.get_request_json(request))
         except RequestError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok({"model": model}, 201)
 
@@ -52,10 +50,8 @@ class ModelsAPI(BaseAPI):
 
         try:
             model = self.model_config_service.update_model(self.get_request_json(request))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"model": model})
 
@@ -66,9 +62,7 @@ class ModelsAPI(BaseAPI):
 
         try:
             payload = self.model_config_service.delete_model(request.args.get("id"))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)

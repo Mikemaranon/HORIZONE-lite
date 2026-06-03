@@ -46,6 +46,13 @@ class ToolManager:
             refresh=refresh,
         )
 
+    def list_workspace_tools(self, *, include_inactive=True):
+        if not self.workspace_tool_provider:
+            return []
+        return self.workspace_tool_provider.list_tools(
+            include_inactive=include_inactive,
+        )
+
     def refresh_catalog(self):
         return self.tool_registry.refresh_catalog()
 
@@ -72,6 +79,11 @@ class ToolManager:
         return ToolCatalog(tools).build_messages(messages)
 
     def set_tool_active(self, tool_id, is_active):
+        if self._is_runtime_tool_id(tool_id):
+            if not self.workspace_tool_provider:
+                raise LookupError("Tool not found.")
+            return self.workspace_tool_provider.set_tool_active(tool_id, is_active)
+
         tool = self.db.tools.get(tool_id)
         if not tool:
             raise LookupError("Tool not found.")
@@ -182,6 +194,9 @@ class ToolManager:
         sanitized_tool = dict(tool or {})
         sanitized_tool.pop("runner", None)
         return sanitized_tool
+
+    def _is_runtime_tool_id(self, tool_id):
+        return str(tool_id or "").startswith("runtime:")
 
     def _custom_tools_enabled(self):
         if self.custom_tools_enabled is not None:

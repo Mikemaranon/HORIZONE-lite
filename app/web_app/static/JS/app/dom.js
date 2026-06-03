@@ -14,6 +14,7 @@ export const elements = {
     chatAgentsChangeButton: document.getElementById("change-project-agent-button"),
     chatAgentsEditButton: document.getElementById("edit-project-agents-button"),
     chatToolsList: document.getElementById("chat-tools-list"),
+    chatProjectToolsList: document.getElementById("chat-project-tools-list"),
     chatModelCard: document.getElementById("chat-model-card"),
     chatProfileCard: document.getElementById("chat-profile-card"),
     settingsToolsList: document.getElementById("settings-tools-list"),

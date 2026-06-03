@@ -1,3 +1,10 @@
+import json
+import logging
+
+
+LOGGER = logging.getLogger(__name__)
+
+
 class ChatPersistenceService:
     PLACEHOLDER_TITLES = {
         "new chat",
@@ -49,7 +56,7 @@ class ChatPersistenceService:
         )
         if response.get("raw") is not None:
             response["raw"]["tool_events"] = normalized_tool_events
-        self.db.messages.create(
+        message_id = self.db.messages.create(
             conversation_id=conversation_id,
             role=assistant_message.get("role", "assistant"),
             content=assistant_message.get("content", ""),
@@ -62,6 +69,39 @@ class ChatPersistenceService:
             tool_events=normalized_tool_events,
             provider_message_id=response.get("message_id"),
         )
+        stored_message = self.db.messages.get(message_id)
+        if stored_message:
+            response["message"] = {
+                **stored_message,
+                "content": assistant_message.get("content", stored_message.get("content", "")),
+            }
+            response["message"]["tool_events"] = normalized_tool_events
+        self._confirm_matching_workspace_write_requests(conversation_id, normalized_tool_events)
+        return stored_message
+
+    def update_tool_confirmation_status(self, message_id, tool_event_index, status):
+        message = self.db.messages.get(message_id)
+        if not message:
+            raise ValueError("Message not found")
+
+        tool_events = message.get("tool_events") or []
+        if tool_event_index < 0 or tool_event_index >= len(tool_events):
+            raise ValueError("Tool event not found")
+
+        tool_event = dict(tool_events[tool_event_index])
+        if not self._is_tool_confirmation_event(tool_event):
+            raise ValueError("Tool event is not a confirmation request")
+
+        policy = dict(tool_event.get("policy") or {})
+        policy["status"] = status
+        tool_event["policy"] = policy
+
+        if status == "cancelled":
+            tool_event["error"] = "Workspace write cancelled by the user."
+
+        tool_events[tool_event_index] = tool_event
+        self.db.messages.update_tool_events(message_id, tool_events)
+        return self.db.messages.get(message_id)
 
     def _apply_assistant_message_meta(self, response, assistant_message_meta=None):
         if not assistant_message_meta:
@@ -134,6 +174,7 @@ class ChatPersistenceService:
                 ],
             )
         except Exception:
+            LOGGER.warning("Conversation title generation failed", exc_info=True)
             return ""
 
     def _get_first_user_message_content(self, messages):
@@ -214,6 +255,52 @@ class ChatPersistenceService:
             normalized_events.append(normalized_event)
 
         return normalized_events
+
+    def _is_tool_confirmation_event(self, tool_event):
+        tool_name = str(tool_event.get("tool_name") or "").strip()
+        status = str((tool_event.get("policy") or {}).get("status") or "").strip()
+        return (
+            tool_name in {"workspace_write_file", "workspace_append_file"}
+            and status in {"confirmation_required", "confirming", "confirmed", "cancelled"}
+        )
+
+    def _confirm_matching_workspace_write_requests(self, conversation_id, tool_events):
+        confirmed_signatures = {
+            self._workspace_write_signature(tool_event)
+            for tool_event in tool_events
+            if tool_event.get("ok")
+        }
+        confirmed_signatures.discard("")
+        if not confirmed_signatures:
+            return
+
+        for message in self.db.messages.for_conversation(conversation_id):
+            message_tool_events = message.get("tool_events") or []
+            updated_tool_events = []
+            did_update = False
+
+            for tool_event in message_tool_events:
+                updated_tool_event = dict(tool_event)
+                status = str((updated_tool_event.get("policy") or {}).get("status") or "").strip()
+                if (
+                    status in {"confirmation_required", "confirming"}
+                    and self._workspace_write_signature(updated_tool_event) in confirmed_signatures
+                ):
+                    policy = dict(updated_tool_event.get("policy") or {})
+                    policy["status"] = "confirmed"
+                    updated_tool_event["policy"] = policy
+                    did_update = True
+                updated_tool_events.append(updated_tool_event)
+
+            if did_update:
+                self.db.messages.update_tool_events(message["id"], updated_tool_events)
+
+    def _workspace_write_signature(self, tool_event):
+        tool_name = str(tool_event.get("tool_name") or "").strip()
+        if tool_name not in {"workspace_write_file", "workspace_append_file"}:
+            return ""
+
+        return f"{tool_name}:{json.dumps(tool_event.get('arguments') or {}, sort_keys=True)}"
 
     def _build_tool_summary(self, tool_event):
         tool_name = str(tool_event.get("tool_name") or "tool").strip()

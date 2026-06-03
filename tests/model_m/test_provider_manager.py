@@ -342,6 +342,50 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(fake_http.calls[0]["headers"]["Authorization"], "Bearer test-key")
         self.assertTrue(fake_http.calls[0]["url"].endswith("/models"))
 
+    def test_openai_provider_chat_uses_chat_completion_shape(self):
+        db = DBManager()
+        create_cloud_provider(
+            db,
+            name="OpenAI Cloud",
+            endpoint="https://api.openai.com/v1",
+            adapter="openai_compatible",
+            api_key="test-key",
+        )
+        manager = ProviderManager(ConfigManager(), db_manager=db)
+        fake_http = FakeHttpClient(
+            post_response={
+                "id": "chatcmpl-123",
+                "model": "gpt-4.1",
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "Hello from OpenAI"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 8, "completion_tokens": 4},
+            }
+        )
+        provider = manager.get_provider("cloud")
+        provider.adapters["openai_compatible"].http_client = fake_http
+
+        response = provider.chat(
+            [{"role": "user", "content": "Hello"}],
+            "gpt-4.1",
+            {"temperature": 0.2, "top_p": 0.8, "max_tokens": 128},
+        )
+
+        call = fake_http.calls[0]
+        self.assertTrue(call["url"].endswith("/chat/completions"))
+        self.assertEqual(call["headers"]["Authorization"], "Bearer test-key")
+        self.assertEqual(call["payload"]["model"], "gpt-4.1")
+        self.assertEqual(call["payload"]["messages"][0]["content"], "Hello")
+        self.assertEqual(call["payload"]["temperature"], 0.2)
+        self.assertEqual(call["payload"]["top_p"], 0.8)
+        self.assertEqual(call["payload"]["max_completion_tokens"], 128)
+        self.assertFalse(call["payload"]["stream"])
+        self.assertEqual(response["message"]["content"], "Hello from OpenAI")
+        self.assertEqual(response["message_id"], "chatcmpl-123")
+
     def test_openai_provider_stream_chat_yields_deltas_and_final_response(self):
         db = DBManager()
         create_cloud_provider(

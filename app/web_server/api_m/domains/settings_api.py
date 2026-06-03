@@ -33,7 +33,7 @@ class SettingsAPI(BaseAPI):
         try:
             self.require_fields(data, "key", "value")
         except ValueError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         self.db.settings.set(data["key"], data["value"])
         return self.ok({"setting": self._serialize_setting(self.db.settings.get(data["key"]))}, 201)

@@ -94,7 +94,8 @@ class ApiEndpointTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload["error"], "The current password is incorrect.")
+        self.assertEqual(payload["error"]["code"], "bad_request")
+        self.assertEqual(payload["error"]["message"], "The current password is incorrect.")
         self.assertIsNotNone(self.db.users.get("admin"))
 
     def test_models_endpoint_returns_configured_models(self):
@@ -1222,7 +1223,7 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("not a supported text format", response.get_json()["error"])
+        self.assertIn("not a supported text format", response.get_json()["error"]["message"])
 
     def test_chat_endpoint_assigns_generated_title_after_first_response(self):
         conversation_id = self.db.conversations.create(
@@ -1499,7 +1500,8 @@ class ApiEndpointTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("role is not supported", payload["error"])
+        self.assertEqual(payload["error"]["code"], "bad_request")
+        self.assertIn("role is not supported", payload["error"]["message"])
 
     def test_chat_endpoint_rejects_oversized_message_content(self):
         conversation_id = self.db.conversations.create(
@@ -1520,7 +1522,7 @@ class ApiEndpointTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("content must be at most", payload["error"])
+        self.assertIn("content must be at most", payload["error"]["message"])
 
     def test_chat_endpoint_streams_and_persists_assistant_message(self):
         conversation_id = self.db.conversations.create(
@@ -2013,7 +2015,7 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("maximum of 10", response.get_json()["error"])
+        self.assertIn("maximum of 10", response.get_json()["error"]["message"])
 
     def test_profile_can_be_deleted(self):
         profile_id = self.db.profiles.create(
@@ -2040,7 +2042,7 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("last profile", response.get_json()["error"])
+        self.assertIn("last profile", response.get_json()["error"]["message"])
 
     def test_conversation_can_be_deleted(self):
         conversation_id = self.db.conversations.create(
@@ -2108,4 +2110,5 @@ class ApiEndpointTests(ApiTestCase):
         response = self.client.get("/api/projects")
 
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.get_json()["error"], "Unauthorized")
+        self.assertEqual(response.get_json()["error"]["code"], "unauthorized")
+        self.assertEqual(response.get_json()["error"]["message"], "Unauthorized")

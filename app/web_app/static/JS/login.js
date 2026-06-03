@@ -18,7 +18,7 @@ async function handleLoginSubmit(event) {
             store_token(data.token);
             loadPage("/index");
         } else {
-            errorMessage.textContent = data.error || "An error occurred.";
+            errorMessage.textContent = data.error?.message || data.error || "An error occurred.";
         }
     } catch (error) {
         console.error("Error during login:", error);

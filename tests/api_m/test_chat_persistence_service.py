@@ -48,3 +48,62 @@ class ChatPersistenceServiceTests(IsolatedDatabaseTestCase):
 
         self.assertEqual(conversation["title"], "New conversation")
         self.assertEqual(messages[-1]["content"], "The title generator should not run.")
+
+    def test_persist_assistant_message_confirms_matching_workspace_write_request(self):
+        conversation_id = self.db.conversations.create(
+            title="Approval flow",
+            provider="ollama",
+            model="qwen3",
+        )
+        self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="I need approval before writing the file.",
+            tool_events=[
+                {
+                    "ok": False,
+                    "tool_name": "workspace_write_file",
+                    "arguments": {"path": "hello.java", "content": "hello"},
+                    "error": "This tool requires explicit confirmation before execution.",
+                    "policy": {
+                        "status": "confirmation_required",
+                        "risk_level": "workspace_write",
+                    },
+                },
+            ],
+        )
+        service = ChatPersistenceService(
+            self.db,
+            FailingTitleModelManager(),
+            generate_titles=False,
+        )
+
+        service.persist_assistant_message(
+            conversation_id,
+            {
+                "provider": "ollama",
+                "model": "qwen3",
+                "message": {
+                    "role": "assistant",
+                    "content": "The file has been created.",
+                },
+                "raw": {
+                    "tool_events": [
+                        {
+                            "ok": True,
+                            "tool_name": "workspace_write_file",
+                            "arguments": {"content": "hello", "path": "hello.java"},
+                            "result": {"file": {"path": "hello.java", "created": True}},
+                            "policy": {"status": "confirmed"},
+                        },
+                    ],
+                },
+            },
+        )
+
+        messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(
+            messages[0]["tool_events"][0]["policy"]["status"],
+            "confirmed",
+        )

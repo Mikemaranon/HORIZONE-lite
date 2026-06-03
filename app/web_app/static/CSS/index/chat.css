@@ -66,10 +66,6 @@
     visibility: hidden;
 }
 
-.message--assistant-continuation .message__meta {
-    display: none;
-}
-
 .message--assistant-continuation .message__card {
     padding-top: 0;
 }
@@ -328,6 +324,10 @@
     flex-wrap: wrap;
 }
 
+.message--assistant.message--assistant-continuation .message__meta {
+    display: none;
+}
+
 .message__meta-separator {
     margin: 0 18px;
     color: rgba(30, 31, 25, 0.34);
@@ -408,25 +408,36 @@
 .tool-confirmations {
     display: grid;
     gap: 10px;
-    margin-top: 14px;
+    justify-items: center;
+    margin: 16px auto 4px;
 }
 
 .tool-confirmation {
-    display: flex;
+    width: min(100%, 32rem);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 14px;
     align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    max-width: 34rem;
-    padding: 12px 14px;
-    border: 1px solid rgba(30, 31, 25, 0.1);
+    padding: 14px 16px;
+    border: 1px solid rgba(28, 139, 89, 0.18);
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.tool-confirmation__eyebrow {
+    grid-column: 1 / -1;
+    color: rgba(30, 31, 25, 0.48);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
 }
 
 .tool-confirmation__body {
     min-width: 0;
     display: grid;
-    gap: 2px;
+    gap: 4px;
 }
 
 .tool-confirmation__label {
@@ -442,6 +453,13 @@
     color: var(--text);
     font-size: 0.94rem;
     line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.tool-confirmation__reason {
+    color: var(--text-soft);
+    font-size: 0.84rem;
+    line-height: 1.4;
     overflow-wrap: anywhere;
 }
 
@@ -486,4 +504,15 @@
 .tool-confirmation__button--approve:focus-visible {
     background: var(--accent-strong);
     border-color: var(--accent-strong);
+}
+
+@media (max-width: 640px) {
+    .tool-confirmation {
+        grid-template-columns: 1fr;
+    }
+
+    .tool-confirmation__actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }

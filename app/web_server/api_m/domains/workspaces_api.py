@@ -72,10 +72,8 @@ class WorkspacesAPI(BaseAPI):
             project_id = self.parse_int(request.args.get("project_id"), "project_id")
             self.require_fields({"project_id": project_id}, "project_id")
             payload = self.workspace_service.get_project_workspace(project_id)
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except (ValueError, WorkspaceRequestError) as error:
-            return self.error(str(error), 400)
+        except (ValueError, WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -88,10 +86,8 @@ class WorkspacesAPI(BaseAPI):
             payload = self.workspace_service.connect_project_workspace(
                 self.get_request_json(request)
             )
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except WorkspaceRequestError as error:
-            return self.error(str(error), 400)
+        except (WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload, 201)
 
@@ -104,10 +100,8 @@ class WorkspacesAPI(BaseAPI):
             workspace_id = self.parse_int(request.args.get("id"), "id")
             self.require_fields({"id": workspace_id}, "id")
             payload = self.workspace_service.disconnect_workspace(workspace_id)
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except (ValueError, WorkspaceRequestError) as error:
-            return self.error(str(error), 400)
+        except (ValueError, WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -119,10 +113,8 @@ class WorkspacesAPI(BaseAPI):
         data = self.get_request_json(request)
         try:
             payload = self.workspace_service.index_workspace(data.get("workspace_id"))
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except WorkspaceRequestError as error:
-            return self.error(str(error), 400)
+        except (WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -139,10 +131,8 @@ class WorkspacesAPI(BaseAPI):
                 query=request.args.get("query"),
                 limit=request.args.get("limit", 200),
             )
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except (ValueError, WorkspaceRequestError) as error:
-            return self.error(str(error), 400)
+        except (ValueError, WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -155,10 +145,8 @@ class WorkspacesAPI(BaseAPI):
             workspace_id = self.parse_int(request.args.get("workspace_id"), "workspace_id")
             self.require_fields({"workspace_id": workspace_id}, "workspace_id")
             payload = self.workspace_service.read_file(workspace_id, request.args.get("path"))
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except (ValueError, WorkspaceRequestError) as error:
-            return self.error(str(error), 400)
+        except (ValueError, WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -169,10 +157,8 @@ class WorkspacesAPI(BaseAPI):
 
         try:
             payload = self.workspace_service.write_file(self.get_request_json(request))
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except WorkspaceRequestError as error:
-            return self.error(str(error), 400)
+        except (WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload, 201)
 
@@ -183,10 +169,8 @@ class WorkspacesAPI(BaseAPI):
 
         try:
             payload = self.workspace_service.append_file(self.get_request_json(request))
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except WorkspaceRequestError as error:
-            return self.error(str(error), 400)
+        except (WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -197,9 +181,7 @@ class WorkspacesAPI(BaseAPI):
 
         try:
             payload = self.workspace_service.search(self.get_request_json(request))
-        except WorkspaceResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except WorkspaceRequestError as error:
-            return self.error(str(error), 400)
+        except (WorkspaceRequestError, WorkspaceResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)

@@ -260,6 +260,7 @@ export function renderChatPanel() {
     renderChatPanelMode();
     renderChatAgentsList();
     renderChatToolsList();
+    renderChatProjectToolsList();
     renderChatModelCard();
     renderModelSwitchModal();
     renderProjectAgentSwitchModal();
@@ -276,18 +277,15 @@ function renderChatPanelMode() {
         model: !isProjectContext,
         profile: !isProjectContext,
         tools: true,
+        "project-tools": isProjectContext,
     };
 
     if (elements.chatSidePanelTitle) {
-        elements.chatSidePanelTitle.textContent = isProjectContext && !state.activeConversation
-            ? "Project settings"
-            : "Chat settings";
+        elements.chatSidePanelTitle.textContent = isProjectContext ? "Project settings" : "Chat settings";
     }
     if (elements.chatSidePanelSubtitle) {
         elements.chatSidePanelSubtitle.textContent = isProjectContext
-            ? (state.activeConversation
-                ? "Agent and tools for this chat."
-                : "Agent for the next project chat, plus project tools.")
+            ? "Agent for the next project chat, plus project tools."
             : "Everything that affects the current chat, grouped into sections.";
     }
 
@@ -448,6 +446,32 @@ function renderChatToolsList() {
 }
 
 
+function renderChatProjectToolsList() {
+    if (!elements.chatProjectToolsList) {
+        return;
+    }
+
+    const activeProject = getActiveProject();
+    if (!activeProject) {
+        elements.chatProjectToolsList.innerHTML = "";
+        return;
+    }
+
+    if (!state.projectWorkspace) {
+        elements.chatProjectToolsList.innerHTML = `
+            <div class="chat-profile-card__empty">
+                Connect a workspace from the project menu to enable project tools.
+            </div>
+        `;
+        return;
+    }
+
+    elements.chatProjectToolsList.innerHTML = getProjectWorkspaceTools()
+        .map(createProjectToolCardMarkup)
+        .join("");
+}
+
+
 function createProjectAgentCardMarkup(agent) {
     const model = agent.model || {};
     const profile = agent.profile || {};
@@ -474,6 +498,97 @@ function createProjectAgentCardMarkup(agent) {
             </div>
         </article>
     `;
+}
+
+
+function getProjectWorkspaceTools() {
+    const workspaceTools = state.workspaceTools || [];
+    if (workspaceTools.length) {
+        return [...workspaceTools].sort((left, right) => (
+            getProjectWorkspaceToolOrder(left.name) - getProjectWorkspaceToolOrder(right.name)
+        ));
+    }
+
+    return [
+        {
+            id: "runtime:workspace_read_file",
+            name: "workspace_read_file",
+            display_name: "Workspace read file",
+            description: "Reads a UTF-8 text file from the active project workspace using a relative path.",
+            filename: "runtime_workspace_tools.py",
+            risk_level: "read_only",
+            is_active: true,
+        },
+        {
+            id: "runtime:workspace_search",
+            name: "workspace_search",
+            display_name: "Workspace search",
+            description: "Searches indexed text files in the active project workspace.",
+            filename: "runtime_workspace_tools.py",
+            risk_level: "read_only",
+            is_active: true,
+        },
+        {
+            id: "runtime:workspace_append_file",
+            name: "workspace_append_file",
+            display_name: "Workspace append file",
+            description: "Appends UTF-8 text to an existing file in the active project workspace.",
+            filename: "runtime_workspace_tools.py",
+            risk_level: "writes_workspace",
+            is_active: true,
+        },
+        {
+            id: "runtime:workspace_write_file",
+            name: "workspace_write_file",
+            display_name: "Workspace write file",
+            description: "Creates or replaces a UTF-8 text file in the active project workspace.",
+            filename: "runtime_workspace_tools.py",
+            risk_level: "writes_workspace",
+            is_active: true,
+        },
+    ];
+}
+
+
+function createProjectToolCardMarkup(tool) {
+    const isEnabled = Boolean(tool.is_active);
+    const toolLabel = tool.display_name || tool.name;
+    const toggleActionLabel = `${isEnabled ? "Disable" : "Enable"} ${toolLabel}`;
+
+    return `
+        <article class="chat-tool-card${isEnabled ? " is-enabled" : ""}">
+            <div class="chat-tool-card__copy">
+                <div class="chat-tool-card__heading">
+                    <strong>${escapeHtml(toolLabel)}</strong>
+                </div>
+                <p>${escapeHtml(tool.description || "No description.")}</p>
+            </div>
+            <button
+                class="chat-tool-card__toggle"
+                type="button"
+                data-chat-workspace-tool-toggle="${escapeHtml(tool.id || `runtime:${tool.name}`)}"
+                aria-pressed="${isEnabled ? "true" : "false"}"
+                aria-label="${escapeHtml(toggleActionLabel)}"
+                title="${escapeHtml(toggleActionLabel)}"
+            >
+                <span class="chat-tool-card__switch" aria-hidden="true">
+                    <span class="chat-tool-card__switch-thumb"></span>
+                </span>
+            </button>
+        </article>
+    `;
+}
+
+
+function getProjectWorkspaceToolOrder(toolName) {
+    const order = [
+        "workspace_read_file",
+        "workspace_search",
+        "workspace_append_file",
+        "workspace_write_file",
+    ];
+    const index = order.indexOf(toolName);
+    return index === -1 ? order.length : index;
 }
 
 

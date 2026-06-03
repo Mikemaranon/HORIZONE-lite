@@ -131,6 +131,15 @@ export function handleToolsFilterToggle() {
 
 
 export function handleDocumentToolClick(event) {
+    const workspaceToggleButton = event.target.closest("[data-chat-workspace-tool-toggle]");
+    if (workspaceToggleButton) {
+        handleToolToggle(
+            workspaceToggleButton.dataset.chatWorkspaceToolToggle,
+            workspaceToggleButton.getAttribute("aria-pressed") !== "true",
+        );
+        return;
+    }
+
     const chatToggleButton = event.target.closest("[data-chat-tool-toggle]");
     if (chatToggleButton) {
         handleToolToggle(

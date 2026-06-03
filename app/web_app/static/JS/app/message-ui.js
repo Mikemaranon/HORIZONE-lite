@@ -30,8 +30,8 @@ export function createMessageMarkup(message, options = {}) {
     const renderedContent = isUser
         ? escapeHtml(message.content || "")
         : renderMarkdown(message.content || "");
-    const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message);
-    const toolConfirmationMarkup = isUser ? "" : createPendingToolConfirmationListMarkup(message);
+    const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message, options);
+    const toolConfirmationMarkup = isUser ? "" : createPendingToolConfirmationListMarkup(message, options);
 
     return createMessageFrameMarkup(
         message,
@@ -101,6 +101,8 @@ export function keepMessagesPinnedToBottomIfNeeded() {
 
 
 export function appendTypingMessage(message = createPendingAssistantMessage()) {
+    const previousMessage = resolvePreviousMessageForTransientAssistant(message);
+    markPreviousAssistantContinuation(previousMessage, message);
     elements.emptyState.hidden = true;
     elements.messagesContainer.hidden = false;
     elements.messagesContainer.insertAdjacentHTML(
@@ -114,6 +116,9 @@ export function appendTypingMessage(message = createPendingAssistantMessage()) {
             `,
             createMessageMetaMarkup(message),
             ` data-typing-message="true"`,
+            {
+                isContinuation: isAssistantContinuation(message, previousMessage),
+            },
         )
     );
     keepMessagesPinnedToBottomIfNeeded();
@@ -144,6 +149,8 @@ export function removeTypingMessage() {
 
 
 export function appendStreamingAssistantMessage(message = createPendingAssistantMessage()) {
+    const previousMessage = resolvePreviousMessageForTransientAssistant(message);
+    markPreviousAssistantContinuation(previousMessage, message);
     elements.emptyState.hidden = true;
     elements.messagesContainer.hidden = false;
     elements.messagesContainer.insertAdjacentHTML(
@@ -153,6 +160,9 @@ export function appendStreamingAssistantMessage(message = createPendingAssistant
             `<div class="message__content message__content--markdown" data-message-content="true"></div>`,
             createMessageMetaMarkup(message),
             ` data-streaming-message="true"`,
+            {
+                isContinuation: isAssistantContinuation(message, previousMessage),
+            },
         )
     );
     keepMessagesPinnedToBottomIfNeeded();
@@ -206,7 +216,10 @@ export function handleToolTraceMessageClick(event) {
         return;
     }
 
-    renderToolTraceModal(toolEvent);
+    renderToolTraceModal(resolveDisplayToolEvent(toolEvent, message, {
+        messages: state.activeMessages,
+        messageIndex: state.activeMessages.indexOf(message),
+    }));
     openToolTraceModal();
 }
 
@@ -263,6 +276,47 @@ function createMessageFrameMarkup(message, bodyMarkup, metaMarkup, articleAttrib
             </div>
         </article>
     `;
+}
+
+
+function resolvePreviousMessageForTransientAssistant(message) {
+    const messages = Array.isArray(state.activeMessages) ? state.activeMessages : [];
+    if (!messages.length) {
+        return null;
+    }
+
+    const currentMessageKey = getOrCreateMessageClientKey(message);
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const candidate = messages[index];
+        if (getOrCreateMessageClientKey(candidate) === currentMessageKey) {
+            continue;
+        }
+        return candidate;
+    }
+
+    return null;
+}
+
+
+function markPreviousAssistantContinuation(previousMessage, message) {
+    if (!isAssistantContinuation(message, previousMessage)) {
+        return;
+    }
+
+    const previousMessageKey = getOrCreateMessageClientKey(previousMessage);
+    document
+        .querySelector(`[data-message-key="${cssEscape(previousMessageKey)}"]`)
+        ?.classList
+        ?.add("message--assistant-continues");
+}
+
+
+function cssEscape(value) {
+    if (window.CSS?.escape) {
+        return window.CSS.escape(value);
+    }
+
+    return String(value).replace(/["\\]/g, "\\$&");
 }
 
 
@@ -374,22 +428,30 @@ function createToolStatusMarkup(toolDisplayName, options = {}) {
 }
 
 
-function createPersistentToolStatusListMarkup(message) {
+function createPersistentToolStatusListMarkup(message, options = {}) {
     const toolEvents = Array.isArray(message?.tool_events) ? message.tool_events : [];
     if (!toolEvents.length) {
         return "";
     }
 
     const messageKey = getOrCreateMessageClientKey(message);
-    const itemsMarkup = toolEvents.map((toolEvent, index) => {
-        const toolDisplayName = resolveToolDisplayName(toolEvent);
-        return createToolStatusMarkup(toolDisplayName, {
-            interactive: true,
-            messageKey,
-            toolEventIndex: index,
-            labelOverride: createToolStatusLabel(toolEvent),
-        });
-    }).join("");
+    const itemsMarkup = toolEvents
+        .map((toolEvent, index) => ({ toolEvent, index }))
+        .map(({ toolEvent, index }) => {
+            const displayToolEvent = resolveDisplayToolEvent(toolEvent, message, options);
+            const toolDisplayName = resolveToolDisplayName(displayToolEvent);
+            return createToolStatusMarkup(toolDisplayName, {
+                interactive: true,
+                messageKey,
+                toolEventIndex: index,
+                labelOverride: createToolStatusLabel(displayToolEvent),
+            });
+        })
+        .join("");
+
+    if (!itemsMarkup) {
+        return "";
+    }
 
     return `<div class="message__tool-traces">${itemsMarkup}</div>`;
 }
@@ -456,11 +518,14 @@ function createToolStatusLabel(toolEvent) {
 }
 
 
-function createPendingToolConfirmationListMarkup(message) {
+function createPendingToolConfirmationListMarkup(message, options = {}) {
     const toolEvents = Array.isArray(message?.tool_events) ? message.tool_events : [];
     const pendingEvents = toolEvents
         .map((toolEvent, index) => ({ toolEvent, index }))
-        .filter(({ toolEvent }) => isWorkspaceWriteConfirmationRequired(toolEvent));
+        .filter(({ toolEvent }) => (
+            isWorkspaceWriteConfirmationRequired(toolEvent)
+            && !isSatisfiedWorkspaceWriteConfirmation(toolEvent, message, options)
+        ));
 
     if (!pendingEvents.length) {
         return "";
@@ -482,14 +547,17 @@ function createPendingToolConfirmationListMarkup(message) {
 function createToolConfirmationMarkup(toolEvent, messageKey, toolEventIndex) {
     const toolName = String(toolEvent?.tool_name || "").trim();
     const path = String(toolEvent?.arguments?.path || "").trim();
-    const action = toolName === "workspace_append_file" ? "Append to workspace file" : "Write workspace file";
+    const action = toolName === "workspace_append_file" ? "Edit workspace file" : "Create or edit workspace file";
     const detail = path ? path : resolveToolDisplayName(toolEvent);
+    const reason = String(toolEvent?.reason || "").trim();
 
     return `
         <section class="tool-confirmation" aria-label="Workspace write approval">
+            <span class="tool-confirmation__eyebrow">File change request</span>
             <div class="tool-confirmation__body">
                 <span class="tool-confirmation__label">${escapeHtml(action)}</span>
                 <strong class="tool-confirmation__path">${escapeHtml(detail)}</strong>
+                ${reason ? `<span class="tool-confirmation__reason">${escapeHtml(reason)}</span>` : ""}
             </div>
             <div class="tool-confirmation__actions">
                 <button
@@ -521,6 +589,70 @@ function isWorkspaceWriteConfirmationRequired(toolEvent) {
 
 function isToolConfirmationRequired(toolEvent) {
     return String(toolEvent?.policy?.status || "").trim() === "confirmation_required";
+}
+
+
+function isSatisfiedWorkspaceWriteConfirmation(toolEvent, message, options = {}) {
+    if (!isWorkspaceWriteConfirmationRequired(toolEvent)) {
+        return false;
+    }
+
+    const signature = createWorkspaceWriteSignature(toolEvent);
+    if (!signature) {
+        return false;
+    }
+
+    const messages = Array.isArray(options.messages) ? options.messages : state.activeMessages;
+    const messageIndex = Number.isInteger(options.messageIndex)
+        ? options.messageIndex
+        : messages.indexOf(message);
+    const startIndex = messageIndex >= 0 ? messageIndex + 1 : 0;
+
+    return messages.slice(startIndex).some((candidate) => (
+        Array.isArray(candidate?.tool_events)
+        && candidate.tool_events.some((candidateEvent) => (
+            candidateEvent?.ok
+            && createWorkspaceWriteSignature(candidateEvent) === signature
+        ))
+    ));
+}
+
+
+function resolveDisplayToolEvent(toolEvent, message, options = {}) {
+    if (!isSatisfiedWorkspaceWriteConfirmation(toolEvent, message, options)) {
+        return toolEvent;
+    }
+
+    return {
+        ...toolEvent,
+        policy: {
+            ...(toolEvent?.policy || {}),
+            status: "confirmed",
+        },
+    };
+}
+
+
+function createWorkspaceWriteSignature(toolEvent) {
+    const toolName = String(toolEvent?.tool_name || "").trim();
+    if (!["workspace_write_file", "workspace_append_file"].includes(toolName)) {
+        return "";
+    }
+
+    return `${toolName}:${stableJsonStringify(toolEvent?.arguments || {})}`;
+}
+
+
+function stableJsonStringify(value) {
+    if (Array.isArray(value)) {
+        return `[${value.map(stableJsonStringify).join(",")}]`;
+    }
+    if (value && typeof value === "object") {
+        return `{${Object.keys(value).sort().map((key) => (
+            `${JSON.stringify(key)}:${stableJsonStringify(value[key])}`
+        )).join(",")}}`;
+    }
+    return JSON.stringify(value);
 }
 
 

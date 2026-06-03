@@ -40,6 +40,8 @@ export function renderMessages({ preserveViewport = false } = {}) {
         .map((message, index, messages) => createMessageMarkup(message, {
             previousMessage: messages[index - 1] || null,
             nextMessage: messages[index + 1] || null,
+            messages,
+            messageIndex: index,
         }))
         .join("");
     highlightMessageCodeBlocks(elements.messagesContainer);

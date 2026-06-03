@@ -131,8 +131,10 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
             {
                 "code": "streaming_internal_error",
                 "message": "Streaming failed unexpectedly.",
+                "request_id": "stream-error",
             },
         )
+        self.assertEqual(events[-1]["data"]["request_id"], "stream-error")
         self.assertNotIn("local template path leaked", str(events))
         self.assertNotIn("stream-error", service._active_streams)
 
@@ -160,3 +162,4 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
 
         self.assertEqual(events[-1]["event"], "error")
         self.assertIn("MLX offline", events[-1]["data"]["error"]["message"])
+        self.assertEqual(events[-1]["data"]["error"]["request_id"], "stream-provider-error")

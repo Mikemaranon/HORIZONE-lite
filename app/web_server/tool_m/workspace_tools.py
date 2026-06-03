@@ -1,6 +1,31 @@
 class WorkspaceToolProvider:
     def __init__(self, workspace_service):
         self.workspace_service = workspace_service
+        self.db = workspace_service.db
+
+    def list_tools(self, *, include_inactive=True):
+        tools = [
+            self._strip_runner(tool)
+            for tool in self._build_tools(workspace_id=None, conversation_id=None)
+        ]
+        if include_inactive:
+            return tools
+        return [tool for tool in tools if tool["is_active"]]
+
+    def get_tool(self, tool_id_or_name):
+        tool_name = self._normalize_tool_name(tool_id_or_name)
+        for tool in self.list_tools(include_inactive=True):
+            if tool["name"] == tool_name:
+                return tool
+        return None
+
+    def set_tool_active(self, tool_id_or_name, is_active):
+        tool = self.get_tool(tool_id_or_name)
+        if not tool:
+            raise LookupError("Tool not found.")
+
+        self.db.settings.set(self._setting_key(tool["name"]), "1" if is_active else "0")
+        return self.get_tool(tool["name"])
 
     def build_tools(self, context=None):
         context = context or {}
@@ -10,7 +35,13 @@ class WorkspaceToolProvider:
 
         workspace_id = workspace["id"]
         conversation_id = context.get("conversation_id")
+        return [
+            tool
+            for tool in self._build_tools(workspace_id, conversation_id)
+            if tool["is_active"]
+        ]
 
+    def _build_tools(self, workspace_id, conversation_id):
         return [
             self._build_read_file_tool(workspace_id),
             self._build_search_tool(workspace_id),
@@ -18,8 +49,40 @@ class WorkspaceToolProvider:
             self._build_write_file_tool(workspace_id, conversation_id),
         ]
 
-    def _build_read_file_tool(self, workspace_id):
+    def _with_active_state(self, tool):
         return {
+            **tool,
+            "is_active": self._is_tool_active(tool["name"]),
+            "is_available": True,
+        }
+
+    def _is_tool_active(self, tool_name):
+        setting = self.db.settings.get(self._setting_key(tool_name))
+        if not setting:
+            return True
+        return str(setting.get("value") or "").strip().lower() not in {
+            "0",
+            "false",
+            "no",
+            "off",
+        }
+
+    def _setting_key(self, tool_name):
+        return f"workspace_tool_active.{tool_name}"
+
+    def _normalize_tool_name(self, tool_id_or_name):
+        value = str(tool_id_or_name or "").strip()
+        if value.startswith("runtime:"):
+            return value.split(":", 1)[1]
+        return value
+
+    def _strip_runner(self, tool):
+        sanitized_tool = dict(tool or {})
+        sanitized_tool.pop("runner", None)
+        return sanitized_tool
+
+    def _build_read_file_tool(self, workspace_id):
+        return self._with_active_state({
             "id": "runtime:workspace_read_file",
             "name": "workspace_read_file",
             "display_name": "workspace read file",
@@ -43,16 +106,14 @@ class WorkspaceToolProvider:
             "filename": "runtime_workspace_tools.py",
             "module_path": "tool_m.workspace_tools",
             "is_builtin": True,
-            "is_active": True,
-            "is_available": True,
             "runner": lambda arguments: self.workspace_service.read_file(
                 workspace_id,
                 (arguments or {}).get("path"),
             ),
-        }
+        })
 
     def _build_search_tool(self, workspace_id):
-        return {
+        return self._with_active_state({
             "id": "runtime:workspace_search",
             "name": "workspace_search",
             "display_name": "workspace search",
@@ -81,17 +142,15 @@ class WorkspaceToolProvider:
             "filename": "runtime_workspace_tools.py",
             "module_path": "tool_m.workspace_tools",
             "is_builtin": True,
-            "is_active": True,
-            "is_available": True,
             "runner": lambda arguments: self.workspace_service.search({
                 "workspace_id": workspace_id,
                 "query": (arguments or {}).get("query"),
                 "limit": (arguments or {}).get("limit", 50),
             }),
-        }
+        })
 
     def _build_write_file_tool(self, workspace_id, conversation_id):
-        return {
+        return self._with_active_state({
             "id": "runtime:workspace_write_file",
             "name": "workspace_write_file",
             "display_name": "workspace write file",
@@ -134,8 +193,6 @@ class WorkspaceToolProvider:
             "filename": "runtime_workspace_tools.py",
             "module_path": "tool_m.workspace_tools",
             "is_builtin": True,
-            "is_active": True,
-            "is_available": True,
             "runner": lambda arguments: self.workspace_service.write_file(
                 {
                     "workspace_id": workspace_id,
@@ -146,10 +203,10 @@ class WorkspaceToolProvider:
                 },
                 conversation_id=conversation_id,
             ),
-        }
+        })
 
     def _build_append_file_tool(self, workspace_id, conversation_id):
-        return {
+        return self._with_active_state({
             "id": "runtime:workspace_append_file",
             "name": "workspace_append_file",
             "display_name": "workspace append file",
@@ -191,8 +248,6 @@ class WorkspaceToolProvider:
             "filename": "runtime_workspace_tools.py",
             "module_path": "tool_m.workspace_tools",
             "is_builtin": True,
-            "is_active": True,
-            "is_available": True,
             "runner": lambda arguments: self.workspace_service.append_file(
                 {
                     "workspace_id": workspace_id,
@@ -209,4 +264,4 @@ class WorkspaceToolProvider:
                 },
                 conversation_id=conversation_id,
             ),
-        }
+        })

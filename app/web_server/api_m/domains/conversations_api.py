@@ -69,10 +69,8 @@ class ConversationsAPI(BaseAPI):
                         request.args.get("project_id"),
                     )
                 }
-        except ConversationRequestError as error:
-            return self.error(str(error), 400)
-        except ConversationResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (ConversationRequestError, ConversationResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -83,10 +81,8 @@ class ConversationsAPI(BaseAPI):
 
         try:
             export_payload = self.conversation_service.export_conversation(request.args.get("id"))
-        except ConversationRequestError as error:
-            return self.error(str(error), 400)
-        except ConversationResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (ConversationRequestError, ConversationResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"export": export_payload})
 
@@ -100,7 +96,7 @@ class ConversationsAPI(BaseAPI):
                 self.get_request_json(request),
             )
         except ConversationRequestError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok({"conversation": conversation}, 201)
 
@@ -113,10 +109,8 @@ class ConversationsAPI(BaseAPI):
             conversation = self.conversation_service.update_conversation(
                 self.get_request_json(request),
             )
-        except ConversationRequestError as error:
-            return self.error(str(error), 400)
-        except ConversationResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (ConversationRequestError, ConversationResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"conversation": conversation})
 
@@ -127,10 +121,8 @@ class ConversationsAPI(BaseAPI):
 
         try:
             payload = self.conversation_service.delete_conversation(request.args.get("id"))
-        except ConversationRequestError as error:
-            return self.error(str(error), 400)
-        except ConversationResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (ConversationRequestError, ConversationResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 

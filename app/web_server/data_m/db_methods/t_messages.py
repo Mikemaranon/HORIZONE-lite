@@ -115,6 +115,19 @@ class MessagesTable:
             (conversation_id,)
         )
 
+    def update_tool_events(self, message_id, tool_events):
+        self.db.execute(
+            """
+            UPDATE messages
+            SET tool_events = ?
+            WHERE id = ?
+            """,
+            (
+                self._serialize_tool_events(tool_events),
+                message_id,
+            )
+        )
+
     def _next_position(self, conversation_id):
         _, row = self.db.execute(
             """

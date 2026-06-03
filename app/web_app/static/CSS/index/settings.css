@@ -485,6 +485,11 @@
     cursor: pointer;
 }
 
+.chat-tool-card__toggle--static {
+    cursor: default;
+    pointer-events: none;
+}
+
 .chat-tool-card__switch {
     position: relative;
     width: 46px;

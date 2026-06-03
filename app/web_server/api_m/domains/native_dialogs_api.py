@@ -34,10 +34,8 @@ class NativeDialogsAPI(BaseAPI):
                 initial_path=data.get("initial_path"),
                 title=data.get("title"),
             )
-        except NativeDialogUnavailableError as error:
-            return self.error(str(error), 503)
-        except NativeDialogError as error:
-            return self.error(str(error), 400)
+        except (NativeDialogUnavailableError, NativeDialogError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({
             "canceled": directory is None,

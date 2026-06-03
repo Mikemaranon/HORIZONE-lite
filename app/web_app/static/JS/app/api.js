@@ -281,6 +281,11 @@ export async function cancelChatStream(requestId) {
 }
 
 
+export async function updateToolConfirmation(data) {
+    return apiRequestJson("PATCH", "/api/chat/tool-confirmations", data);
+}
+
+
 export async function sendChatStream(data, handlers = {}, options = {}) {
     const response = await send_API_request("POST", "/api/chat", {
         ...data,

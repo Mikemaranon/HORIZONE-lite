@@ -5,23 +5,49 @@ const classList = {
     add() {},
     remove() {},
 };
+const messageArticleClassAdds = [];
+
+function createNode(id) {
+    return {
+        id,
+        hidden: true,
+        dataset: {},
+        textContent: "",
+        innerHTML: "",
+        scrollHeight: 0,
+        scrollTop: 0,
+        clientHeight: 0,
+        insertedHTML: [],
+        classList,
+        insertAdjacentHTML(position, html) {
+            this.insertedHTML.push({ position, html });
+            this.innerHTML += html;
+        },
+    };
+}
 
 globalThis.document = {
     body: { classList },
     getElementById(id) {
         if (!nodes[id]) {
-            nodes[id] = {
-                id,
-                hidden: true,
-                dataset: {},
-                textContent: "",
-                innerHTML: "",
-                classList,
-            };
+            nodes[id] = createNode(id);
         }
         return nodes[id];
     },
-    querySelector() {
+    querySelector(selector) {
+        const messageKeyMatch = String(selector).match(/\[data-message-key="([^"]+)"\]/);
+        if (messageKeyMatch) {
+            return {
+                classList: {
+                    add(className) {
+                        messageArticleClassAdds.push({
+                            messageKey: messageKeyMatch[1],
+                            className,
+                        });
+                    },
+                },
+            };
+        }
         return null;
     },
     querySelectorAll() {
@@ -33,6 +59,11 @@ globalThis.window = {
     requestAnimationFrame(callback) {
         callback();
     },
+    CSS: {
+        escape(value) {
+            return String(value);
+        },
+    },
 };
 
 const stateModuleUrl = new URL("../../app/web_app/static/JS/app/state.js", import.meta.url);
@@ -40,6 +71,7 @@ const messageUiModuleUrl = new URL("../../app/web_app/static/JS/app/message-ui.j
 
 const { state } = await import(stateModuleUrl);
 const {
+    appendStreamingAssistantMessage,
     createMessageMarkup,
     handleToolTraceMessageClick,
 } = await import(messageUiModuleUrl);
@@ -99,6 +131,12 @@ assert.match(
     "pending confirmation requests should not be shown as tool failures",
 );
 
+assert.match(
+    createMessageMarkup(createConfirmationMessage("confirmation_required")),
+    /data-tool-confirm-action="approve"/,
+    "pending confirmation requests should expose approval controls",
+);
+
 assert.doesNotMatch(
     createMessageMarkup(createConfirmationMessage("confirmation_required")),
     /Tool failed/,
@@ -111,10 +149,60 @@ assert.match(
     "locally approved confirmation requests should render as confirmed",
 );
 
+assert.doesNotMatch(
+    createMessageMarkup(createConfirmationMessage("confirming")),
+    /data-tool-confirm-action=/,
+    "approved confirmation requests should not expose approval controls after reload",
+);
+
 assert.match(
     createMessageMarkup(createConfirmationMessage("cancelled")),
     /Tool confirmation request: denied/,
     "cancelled confirmation requests should render as denied",
+);
+
+assert.doesNotMatch(
+    createMessageMarkup(createConfirmationMessage("cancelled")),
+    /data-tool-confirm-action=/,
+    "cancelled confirmation requests should not expose approval controls after reload",
+);
+
+const pendingConfirmationMessage = createConfirmationMessage("confirmation_required");
+const successfulWriteMessage = {
+    role: "assistant",
+    content: "The file has been created.",
+    tool_events: [
+        {
+            ok: true,
+            tool_name: "workspace_write_file",
+            arguments: { path: "random.py", content: "print(1)" },
+            result: {
+                file: {
+                    path: "random.py",
+                    created: true,
+                },
+            },
+            policy: { status: "confirmed" },
+        },
+    ],
+};
+
+assert.doesNotMatch(
+    createMessageMarkup(pendingConfirmationMessage, {
+        messages: [pendingConfirmationMessage, successfulWriteMessage],
+        messageIndex: 0,
+    }),
+    /data-tool-confirm-action=/,
+    "pending confirmation controls should disappear once a matching write succeeds later in the conversation",
+);
+
+assert.match(
+    createMessageMarkup(pendingConfirmationMessage, {
+        messages: [pendingConfirmationMessage, successfulWriteMessage],
+        messageIndex: 0,
+    }),
+    /Tool confirmation request: confirmed/,
+    "pending confirmation status should render as confirmed once a matching write succeeds later in the conversation",
 );
 
 assert.match(
@@ -172,6 +260,25 @@ assert.match(
     "the second same-agent assistant message should render as a continuation",
 );
 
+state.activeMessages = [firstAssistantMessage, secondAssistantMessage];
+nodes["messages-container"].insertedHTML = [];
+
+appendStreamingAssistantMessage(secondAssistantMessage);
+
+assert.match(
+    nodes["messages-container"].insertedHTML.at(-1).html,
+    /message--assistant-continuation/,
+    "a same-agent streaming assistant message should render as a continuation immediately",
+);
+assert.deepEqual(
+    messageArticleClassAdds.at(-1),
+    {
+        messageKey: firstAssistantMessage.__clientKey,
+        className: "message--assistant-continues",
+    },
+    "starting a same-agent stream should mark the previous assistant message as continuing",
+);
+
 const modalMessage = createConfirmationMessage("cancelled");
 state.activeMessages = [modalMessage];
 
@@ -206,6 +313,41 @@ assert.match(
     nodes["tool-trace-modal-content"].innerHTML,
     /Request status/,
     "confirmation modals should render the request status details",
+);
+
+state.activeMessages = [pendingConfirmationMessage, successfulWriteMessage];
+
+handleToolTraceMessageClick({
+    target: {
+        closest(selector) {
+            if (selector !== "[data-tool-trace-button]") {
+                return null;
+            }
+
+            return {
+                dataset: {
+                    messageKey: `message-${pendingConfirmationMessage.id}`,
+                    toolEventIndex: "0",
+                },
+            };
+        },
+    },
+});
+
+assert.equal(
+    nodes["tool-trace-modal-title"].textContent,
+    "Tool confirmation request",
+    "reconciled confirmation traces should still open the confirmation modal",
+);
+assert.match(
+    nodes["tool-trace-modal-summary"].textContent,
+    /Confirmed before running/,
+    "reconciled confirmation modals should report a confirmed request",
+);
+assert.match(
+    nodes["tool-trace-modal-content"].innerHTML,
+    /confirmed/,
+    "reconciled confirmation modal details should include the confirmed status",
 );
 
 console.log("Message UI tool confirmation tests passed.");

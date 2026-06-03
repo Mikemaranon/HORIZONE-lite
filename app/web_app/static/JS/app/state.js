@@ -5,6 +5,7 @@ export const state = {
     conversations: [],
     models: [],
     tools: [],
+    workspaceTools: [],
     settings: {},
     currentUser: null,
     workspaceMode: "home",

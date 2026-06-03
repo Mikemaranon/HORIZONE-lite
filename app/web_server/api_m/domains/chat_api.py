@@ -50,6 +50,11 @@ class ChatAPI(BaseAPI):
     def register(self):
         self.app.add_url_rule("/api/chat", view_func=self.chat, methods=["POST"])
         self.app.add_url_rule("/api/chat/cancel", view_func=self.cancel_chat, methods=["POST"])
+        self.app.add_url_rule(
+            "/api/chat/tool-confirmations",
+            view_func=self.update_tool_confirmation,
+            methods=["PATCH"],
+        )
 
     def chat(self):
         auth = self.authenticate_request(request)
@@ -64,11 +69,9 @@ class ChatAPI(BaseAPI):
                 default_provider=self.config_manager.providers.default_provider,
             )
         except ProviderError as error:
-            return self.ok({"error": error.to_dict()}, error.status_code)
-        except ChatResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except ChatRequestError as error:
-            return self.error(str(error), 400)
+            return self.provider_error(error)
+        except (ChatResourceNotFoundError, ChatRequestError) as error:
+            return self.error_from_exception(error)
 
         if hasattr(response, "mimetype"):
             return response
@@ -92,3 +95,35 @@ class ChatAPI(BaseAPI):
                 "cancelled": was_cancelled,
             }
         )
+
+    def update_tool_confirmation(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        data = self.get_request_json(request)
+        try:
+            message_id = self.parse_int(data.get("message_id"), "message_id")
+            tool_event_index = self.parse_int(data.get("tool_event_index"), "tool_event_index")
+            if message_id is None:
+                raise ValueError("Missing message_id")
+            if tool_event_index is None:
+                raise ValueError("Missing tool_event_index")
+            status = self._parse_tool_confirmation_status(data.get("status"))
+            message = self.chat_service.persistence_service.update_tool_confirmation_status(
+                message_id,
+                tool_event_index,
+                status,
+            )
+        except ValueError as error:
+            if str(error) == "Message not found":
+                return self.error(str(error), 404)
+            return self.error_from_exception(error)
+
+        return self.ok({"message": message})
+
+    def _parse_tool_confirmation_status(self, raw_status):
+        status = str(raw_status or "").strip()
+        if status not in {"confirmation_required", "confirming", "confirmed", "cancelled"}:
+            raise ValueError("Invalid status")
+        return status

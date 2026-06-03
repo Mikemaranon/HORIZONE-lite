@@ -36,10 +36,8 @@ class ProvidersAPI(BaseAPI):
                 provider = self.provider_config_service.get_provider(request.args.get("id"))
                 return self.ok({"provider": provider})
             return self.ok({"providers": self.provider_config_service.list_providers()})
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
     def handle_providers_post(self):
         auth = self.authenticate_request(request)
@@ -49,7 +47,7 @@ class ProvidersAPI(BaseAPI):
         try:
             provider = self.provider_config_service.create_provider(self.get_request_json(request))
         except RequestError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok({"provider": provider}, 201)
 
@@ -60,10 +58,8 @@ class ProvidersAPI(BaseAPI):
 
         try:
             provider = self.provider_config_service.update_provider(self.get_request_json(request))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"provider": provider})
 
@@ -74,12 +70,8 @@ class ProvidersAPI(BaseAPI):
 
         try:
             payload = self.provider_config_service.delete_provider(request.args.get("id"))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
-        except ConflictError as error:
-            return self.error(str(error), 400)
+        except (RequestError, ResourceNotFoundError, ConflictError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
 
@@ -90,10 +82,8 @@ class ProvidersAPI(BaseAPI):
 
         try:
             provider = self.provider_config_service.restore_provider(self.get_request_json(request))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"provider": provider})
 
@@ -107,6 +97,6 @@ class ProvidersAPI(BaseAPI):
                 self.get_request_json(request),
             )
         except RequestError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok(payload)

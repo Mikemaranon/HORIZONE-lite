@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from tests.test_support import ApiTestCase
@@ -78,7 +79,8 @@ class WorkspacesApiTests(ApiTestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload["error"], "Path is outside the workspace")
+        self.assertEqual(payload["error"]["code"], "bad_request")
+        self.assertEqual(payload["error"]["message"], "Path is outside the workspace")
 
     def test_workspace_file_can_be_written_through_api(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"
@@ -196,6 +198,54 @@ class WorkspacesApiTests(ApiTestCase):
         self.assertIn("created helloworld.sh", payload["response"]["raw"]["tool_events"][0]["tool_summary"])
         self.assertEqual(payload["response"]["raw"]["tool_events"][0]["policy"]["status"], "confirmed")
         self.assertIn("Created", payload["response"]["message"]["content"])
+
+    def test_disabled_workspace_tool_is_not_offered_to_chat(self):
+        workspace_root = Path(self.temp_dir.name) / "workspace"
+        workspace_root.mkdir()
+        project_id = self.db.projects.create("Agent Project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Workspace edit",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        self.client.patch(
+            "/api/tools",
+            json={"id": "runtime:workspace_search", "is_active": False},
+            headers=self.auth_headers,
+        )
+
+        def fake_chat(provider, messages, model, settings):
+            self.assertIn("workspace_read_file", messages[0]["content"])
+            self.assertNotIn("workspace_search", messages[0]["content"])
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": "I can use the remaining workspace tools.",
+                },
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "resp-workspace-tools-1",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "What can you inspect?"}],
+            },
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
 
     def test_chat_can_append_workspace_file_with_contextual_tool(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"
@@ -372,6 +422,76 @@ class WorkspacesApiTests(ApiTestCase):
         self.assertIn('"status": "confirmation_required"', payload)
         self.assertIn("approval", stored_messages[-1]["content"].lower())
         self.assertEqual(stored_messages[-1]["tool_events"][0]["policy"]["status"], "confirmation_required")
+        end_payload = self._parse_stream_event_payload(payload, "end")
+        self.assertEqual(end_payload["response"]["message"]["id"], stored_messages[-1]["id"])
+
+    def test_tool_confirmation_status_update_persists_for_reloaded_conversation(self):
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Persist confirmation decision",
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        message_id = self.db.messages.create(
+            conversation_id=conversation_id,
+            role="assistant",
+            content="I need approval before writing the file.",
+            tool_events=[
+                {
+                    "ok": False,
+                    "tool_name": "workspace_write_file",
+                    "arguments": {"path": "hello.txt", "content": "hello"},
+                    "error": "This tool requires explicit confirmation before execution.",
+                    "policy": {
+                        "status": "confirmation_required",
+                        "risk_level": "workspace_write",
+                    },
+                },
+            ],
+        )
+
+        update_response = self.client.patch(
+            "/api/chat/tool-confirmations",
+            json={
+                "message_id": message_id,
+                "tool_event_index": 0,
+                "status": "confirming",
+            },
+            headers=self.auth_headers,
+        )
+        reload_response = self.client.get(
+            f"/api/conversations?id={conversation_id}&include_messages=1",
+            headers=self.auth_headers,
+        )
+        reload_payload = reload_response.get_json()
+        reloaded_message = reload_payload["messages"][0]
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(reload_response.status_code, 200)
+        self.assertEqual(
+            reloaded_message["tool_events"][0]["policy"]["status"],
+            "confirming",
+        )
+
+    def _parse_stream_event_payload(self, payload, event_name):
+        current_event = None
+        data_lines = []
+
+        for line in payload.splitlines():
+            if line.startswith("event: "):
+                current_event = line.removeprefix("event: ").strip()
+                data_lines = []
+                continue
+            if current_event == event_name and line.startswith("data: "):
+                data_lines.append(line.removeprefix("data: "))
+                continue
+            if current_event == event_name and not line.strip() and data_lines:
+                return json.loads("\n".join(data_lines))
+
+        if current_event == event_name and data_lines:
+            return json.loads("\n".join(data_lines))
+        raise AssertionError(f"Stream event {event_name!r} was not found")
 
     def test_conversation_export_includes_contextual_workspace_tools(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"

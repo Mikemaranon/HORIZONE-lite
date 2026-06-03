@@ -1,3 +1,4 @@
+import logging
 import re
 import threading
 import time
@@ -6,6 +7,9 @@ import uuid
 from model_m import ProviderError
 from .chat_executor import ChatExecutor
 from .chat_sse_presenter import ChatSSEPresenter
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ChatStreamService:
@@ -185,11 +189,16 @@ class ChatStreamService:
             cancel_event.set()
             raise
         except ProviderError as error:
-            yield self._event("error", {"error": error.to_dict()})
+            payload = error.to_dict()
+            payload["request_id"] = request_id
+            yield self._event("error", {"error": payload, "request_id": request_id})
         except Exception:
+            LOGGER.exception("Unexpected chat stream error", extra={"request_id": request_id})
+            error_payload = dict(self.INTERNAL_ERROR_PAYLOAD)
+            error_payload["request_id"] = request_id
             yield self._event(
                 "error",
-                {"error": dict(self.INTERNAL_ERROR_PAYLOAD)},
+                {"error": error_payload, "request_id": request_id},
             )
         finally:
             self._release_stream(request_id)

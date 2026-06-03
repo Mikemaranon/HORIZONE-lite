@@ -29,7 +29,10 @@ class ToolsAPI(BaseAPI):
                 "tools": self.tool_manager.list_tools(
                     include_inactive=not active_only,
                     refresh=True,
-                )
+                ),
+                "workspace_tools": self.tool_manager.list_workspace_tools(
+                    include_inactive=not active_only,
+                ),
             }
         )
 
@@ -53,10 +56,8 @@ class ToolsAPI(BaseAPI):
                     filename=data["filename"],
                     source_text=str(data["source"]),
                 )
-        except ValueError as error:
-            return self.error(str(error), 400)
         except Exception as error:
-            return self.error(str(error), 500)
+            return self.error_from_exception(error)
 
         return self.ok({"tool": tool}, 201)
 
@@ -71,13 +72,11 @@ class ToolsAPI(BaseAPI):
         data = self.get_request_json(request)
         try:
             self.require_fields(data, "id", "is_active")
-            tool_id = self.parse_int(data.get("id"), "id")
+            tool_id = self._parse_tool_id(data.get("id"))
             is_active = self._parse_bool(data.get("is_active"))
             tool = self.tool_manager.set_tool_active(tool_id, is_active)
-        except ValueError as error:
-            return self.error(str(error), 400)
-        except LookupError as error:
-            return self.error(str(error), 404)
+        except (ValueError, LookupError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"tool": tool})
 
@@ -92,7 +91,7 @@ class ToolsAPI(BaseAPI):
         try:
             tools = self.tool_manager.refresh_catalog()
         except ValueError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok({"tools": tools})
 
@@ -108,3 +107,8 @@ class ToolsAPI(BaseAPI):
             if normalized in {"0", "false", "no", "off"}:
                 return False
         raise ValueError("Invalid boolean value")
+
+    def _parse_tool_id(self, value):
+        if isinstance(value, str) and value.strip().startswith("runtime:"):
+            return value.strip()
+        return self.parse_int(value, "id")

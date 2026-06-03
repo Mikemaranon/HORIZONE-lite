@@ -288,6 +288,7 @@ export function applyModelsPayload(data) {
 
 export function applyToolsPayload(data) {
     state.tools = data.tools || [];
+    state.workspaceTools = data.workspace_tools || [];
 }
 
 

@@ -28,10 +28,8 @@ class ProfilesAPI(BaseAPI):
             if request.args.get("id"):
                 return self.ok({"profile": self.profile_service.get_profile(request.args.get("id"))})
             return self.ok({"profiles": self.profile_service.list_profiles()})
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
     def handle_profiles_post(self):
         auth = self.authenticate_request(request)
@@ -41,7 +39,7 @@ class ProfilesAPI(BaseAPI):
         try:
             profile = self.profile_service.create_profile(self.get_request_json(request))
         except RequestError as error:
-            return self.error(str(error), 400)
+            return self.error_from_exception(error)
 
         return self.ok({"profile": profile}, 201)
 
@@ -52,10 +50,8 @@ class ProfilesAPI(BaseAPI):
 
         try:
             profile = self.profile_service.update_profile(self.get_request_json(request))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok({"profile": profile})
 
@@ -66,9 +62,7 @@ class ProfilesAPI(BaseAPI):
 
         try:
             payload = self.profile_service.delete_profile(request.args.get("id"))
-        except RequestError as error:
-            return self.error(str(error), 400)
-        except ResourceNotFoundError as error:
-            return self.error(str(error), 404)
+        except (RequestError, ResourceNotFoundError) as error:
+            return self.error_from_exception(error)
 
         return self.ok(payload)
