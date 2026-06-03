@@ -1,23 +1,21 @@
-# web_server/app_routes.py
-
 from flask import render_template, redirect, request, url_for, jsonify
 from user_m import UserManager
-from data_m import DBManager
+from data_m import DBManager as DBManagerClass
+
 
 class AppRoutes:
-    def __init__(self, app, user_manager: UserManager, DBManager: DBManager, config_manager=None):
+    def __init__(
+        self,
+        app,
+        user_manager: UserManager,
+        db_manager: DBManagerClass | None = None,
+        config_manager=None,
+        DBManager: DBManagerClass | None = None,
+    ):
         self.app = app
         self.user_manager = user_manager
-        self.DBManager = DBManager
         self.config_manager = config_manager
         self._register_routes()
-    
-    # ==================================================================================
-    #                     REGISTERING ROUTES AND APIs
-    #
-    #            [_register_routes]     instance of every basic route 
-    #            [_register_APIs]       instance of every API
-    # ================================================================================== 
 
     def _register_routes(self):
         self.app.add_url_rule("/", "home", self.get_home, methods=["GET"])
@@ -26,15 +24,6 @@ class AppRoutes:
         self.app.add_url_rule("/login", "login", self.get_login, methods=["GET", "POST"])
         self.app.add_url_rule("/logout", "logout", self.get_logout, methods=["POST"])
 
-    # ==================================================================================
-    #                           BASIC ROUTINGS URLs
-    #
-    #            [get_home]             check user and redirect to get_index
-    #            [get_index]            go to index.html
-    #            [get_login]            log user and send his token
-    #            [get_logout]           log user out, send to index.html 
-    # ================================================================================== 
-    
     def get_index(self):
         if not self.user_manager.check_user(request):
             return redirect(url_for("login"))
@@ -44,11 +33,11 @@ class AppRoutes:
         if not self.user_manager.check_user(request):
             return redirect(url_for("login"))
         return render_template("settings.html")
-    
+
     def get_home(self):
         user = self.user_manager.check_user(request)
-        if user:            
-            return redirect(url_for("index"))  # Redirect to index.html
+        if user:
+            return redirect(url_for("index"))
         return render_template("login.html")
 
     def get_login(self):
@@ -77,17 +66,16 @@ class AppRoutes:
                     max_age=60 * 60,
                 )
                 return response
-            
+
             error_message = "incorrect user data, try again"
 
         return render_template("login.html", error_message=error_message)
 
     def get_logout(self):
-        
         token = self.user_manager.get_token_from_cookie(request)
         if not token:
             token = self.user_manager.get_request_token(request)
-        
+
         if token:
             self.user_manager.logout(token)
         response = redirect(url_for("login"))
@@ -100,4 +88,3 @@ class AppRoutes:
     def _should_return_token_in_body(self):
         runtime = getattr(self.config_manager, "runtime", None)
         return bool(getattr(runtime, "return_token_in_login_response", False))
-    

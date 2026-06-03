@@ -36,6 +36,39 @@ def read_ast(file_path):
 
 
 class ArchitectureBoundaryTests(unittest.TestCase):
+    def test_bootstrap_uses_init_naming(self):
+        offenders = []
+        bootstrap_files = [
+            APP_SERVER_ROOT / "server.py",
+            APP_SERVER_ROOT / "app_routes.py",
+            APP_SERVER_ROOT / "api_m" / "api_manager.py",
+        ]
+        for file_path in bootstrap_files:
+            tree = read_ast(file_path)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name.startswith("ini_"):
+                    offenders.append(f"{file_path.relative_to(REPO_ROOT)}:{node.name}")
+
+        self.assertEqual(offenders, [])
+
+    def test_bootstrap_does_not_expose_legacy_dbmanager_attribute(self):
+        offenders = []
+        bootstrap_files = [
+            APP_SERVER_ROOT / "server.py",
+            APP_SERVER_ROOT / "app_routes.py",
+            APP_SERVER_ROOT / "api_m" / "api_manager.py",
+        ]
+        for file_path in bootstrap_files:
+            tree = read_ast(file_path)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assign):
+                    continue
+                for target in node.targets:
+                    if isinstance(target, ast.Attribute) and target.attr == "DBManager":
+                        offenders.append(str(file_path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(offenders, [])
+
     def test_api_domains_do_not_import_sqlite(self):
         offenders = []
         for file_path in iter_python_files(APP_SERVER_ROOT / "api_m" / "domains"):

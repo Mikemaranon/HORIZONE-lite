@@ -1,5 +1,3 @@
-# web_server/server.py
-
 from flask import Flask
 
 from config_m import ConfigManager
@@ -15,53 +13,53 @@ class Server:
     def __init__(self, app: Flask):
         self.app = app
 
-        self.config_manager = self.ini_config_manager()
+        self.config_manager = self.init_config_manager()
         self.app.secret_key = self.config_manager.runtime.secret_key
 
-        self.DBManager = self.ini_DBManager()
-        self.user_manager = self.ini_user_manager()
-        self.model_manager = self.ini_model_manager()
-        self.services = self.ini_service_registry()
-        self.app_routes = self.ini_app_routes()
-        self.api_manager = self.ini_api_manager()
+        self.db_manager = self.init_db_manager()
+        self.user_manager = self.init_user_manager()
+        self.model_manager = self.init_model_manager()
+        self.services = self.init_service_registry()
+        self.app_routes = self.init_app_routes()
+        self.api_manager = self.init_api_manager()
 
         self.run()
 
-    def ini_config_manager(self):
+    def init_config_manager(self):
         return ConfigManager()
 
-    def ini_DBManager(self):
+    def init_db_manager(self):
         return DBManager()
 
-    def ini_user_manager(self):
+    def init_user_manager(self):
         runtime = self.config_manager.runtime
         return UserManager(
-            db_manager=self.DBManager,
+            db_manager=self.db_manager,
             secret_key=runtime.secret_key,
             bootstrap_admin_password=runtime.bootstrap_admin_password,
             allow_insecure_default_admin=runtime.allow_insecure_default_admin,
         )
 
-    def ini_model_manager(self):
-        return ModelManager(self.config_manager, self.DBManager)
+    def init_model_manager(self):
+        return ModelManager(self.config_manager, self.db_manager)
 
-    def ini_service_registry(self):
+    def init_service_registry(self):
         return ServiceRegistry(
             config_manager=self.config_manager,
-            db_manager=self.DBManager,
+            db_manager=self.db_manager,
             user_manager=self.user_manager,
             model_manager=self.model_manager,
         )
 
-    def ini_app_routes(self):
+    def init_app_routes(self):
         return AppRoutes(
             self.app,
             self.user_manager,
-            self.DBManager,
+            self.db_manager,
             self.config_manager,
         )
 
-    def ini_api_manager(self):
+    def init_api_manager(self):
         return ApiManager(self.app, services=self.services)
 
     def run(self):

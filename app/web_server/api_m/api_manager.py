@@ -1,59 +1,48 @@
-# web_server/api_m/api_manager.py
-
 import pkgutil
 import importlib
 
 from flask import jsonify
 from user_m import UserManager
-from data_m import DBManager
+from data_m import DBManager as DBManagerClass
 from model_m import ModelManager
 from config_m import ConfigManager
 
 from service_registry import ServiceRegistry
+
 
 class ApiManager:
     def __init__(
         self,
         app,
         user_manager: UserManager | None = None,
-        DBManager: DBManager | None = None,
+        db_manager: DBManagerClass | None = None,
         model_manager: ModelManager | None = None,
         services: ServiceRegistry | None = None,
+        DBManager: DBManagerClass | None = None,
     ):
         self.app = app
+        resolved_db_manager = db_manager or DBManager
         self.services = services or self._build_services(
             user_manager=user_manager,
-            db_manager=DBManager,
+            db_manager=resolved_db_manager,
             model_manager=model_manager,
         )
         self.user_manager = self.services.user_manager
-        self.DBManager = self.services.db_manager
+        self.db_manager = self.services.db_manager
         self.model_manager = self.services.model_manager
-        self._register_APIs()
+        self._register_apis()
         self._autoload_domains()
 
-    # ============================================================
-    #                     REGISTERING APIs
-    # ============================================================
-
-    def _register_APIs(self):
+    def _register_apis(self):
         self.app.add_url_rule("/api/check", "check", self.API_check, methods=["GET"])
 
-    # ============================================================
-    #     AUTOLOAD OF ALL API CLASSES INSIDE api_m/domains/
-    # ============================================================
-
     def _autoload_domains(self):
-
         import api_m.domains as domains_package
 
-        # Iterate through every module inside api_m/domains/
         for _, module_name, _ in pkgutil.iter_modules(domains_package.__path__):
-
             full_module = f"{domains_package.__name__}.{module_name}"
             module = importlib.import_module(full_module)
 
-            # Inspect module members
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
 
@@ -66,11 +55,6 @@ class ApiManager:
                     api_instance.register()
                     self.app.logger.debug("Loaded API: %s", attr.__name__)
 
-    # =========================================
-    #       API protocols start from here
-    # =========================================
-        
-    # endpoint to check if the API is working
     def API_check(self):
         return jsonify({"status": "ok"}), 200
 
