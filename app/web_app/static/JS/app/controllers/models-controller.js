@@ -1,16 +1,27 @@
-import { createModel, deleteModel, updateConversation, updateModel } from "../api.js";
+import {
+    cancelRuntimeModelDownload,
+    createModel,
+    deleteModel,
+    startRuntimeModelDownload,
+    updateConversation,
+    updateModel,
+} from "../api.js";
 import { confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
 import {
     closeModelModal,
     closeModelSwitchModal,
+    closeRuntimeModelCatalogModal,
     openModelModal,
     openModelSwitchModal,
+    openRuntimeModelCatalogModal,
 } from "../modal-ui.js";
 import {
     renderChatPanel,
     renderConversationHeader,
+    renderRuntimeModelCatalogSearchResults,
     renderSettingsModelsManager,
+    updateRuntimeModelCatalogCard,
 } from "../render.js";
 import { getProviderTypeDisplayName } from "../provider-helpers.js";
 import {
@@ -21,14 +32,17 @@ import {
 import {
     applyConversationsPayload,
     applyModelsPayload,
+    applyRuntimeModelCatalogPayload,
     patchActiveConversation,
     setModelModalState,
     setPendingModelConfigId,
+    setRuntimeModelCatalogSearchState,
     setSelectedSettingsModelId,
 } from "../state-actions.js";
 import { state } from "../state.js";
 import { showStatus } from "../status-ui.js";
-import { loadConversations, loadModels } from "../store.js";
+import { loadConversations, loadModels, loadRuntimeModelCatalog, searchRuntimeModelCatalog } from "../store.js";
+import { requiresProviderSelection } from "../model-form-validation.js";
 
 const ALLOWED_MODEL_ICON_TYPES = new Set([
     "image/png",
@@ -37,6 +51,9 @@ const ALLOWED_MODEL_ICON_TYPES = new Set([
     "image/gif",
 ]);
 const MAX_MODEL_ICON_SIZE_BYTES = 512 * 1024;
+let runtimeDownloadPollTimer = null;
+let runtimeCatalogSearchTimer = null;
+let runtimeCatalogSearchRequestId = 0;
 
 
 export async function handleModelSubmit(event) {
@@ -48,7 +65,7 @@ export async function handleModelSubmit(event) {
             showStatus("The model needs a technical name.", true);
             return;
         }
-        if (!modelPayload.provider_id) {
+        if (requiresProviderSelection(modelPayload, state.models) && !modelPayload.provider_id) {
             showStatus("Select a provider for this model.", true);
             return;
         }
@@ -181,6 +198,89 @@ export async function handleModelDelete(modelConfigId) {
 }
 
 
+export async function handleRuntimeModelDownload(catalogKey) {
+    if (!catalogKey) {
+        return;
+    }
+
+    try {
+        await startRuntimeModelDownload(catalogKey);
+        await refreshRuntimeModelState();
+        syncRuntimeSearchResultsFromCatalog();
+        updateRuntimeModelCards([catalogKey]);
+        renderSettingsModelsManager();
+        showStatus("Runtime model download started.");
+        scheduleRuntimeDownloadPolling();
+    } catch (error) {
+        showStatus(error.message || "The runtime model download could not start.", true);
+    }
+}
+
+
+export async function handleRuntimeModelDownloadCancel(downloadId) {
+    if (!downloadId) {
+        return;
+    }
+
+    const confirmed = await confirmAction({
+        eyebrow: "Runtime model",
+        title: "Cancel download",
+        message: "The partial model file will be removed and you can start the download again later.",
+        confirmLabel: "Cancel download",
+        confirmVariant: "danger",
+    });
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const payload = await cancelRuntimeModelDownload(downloadId);
+        const catalogKey = payload.download?.catalog_key;
+        await refreshRuntimeModelState();
+        syncRuntimeSearchResultsFromCatalog();
+        updateRuntimeModelCards(catalogKey ? [catalogKey] : getActiveRuntimeDownloadKeys());
+        renderSettingsModelsManager();
+        renderChatPanel();
+        renderConversationHeader();
+        showStatus("Runtime model download cancelled.");
+    } catch (error) {
+        showStatus(error.message || "The runtime model download could not be cancelled.", true);
+    }
+}
+
+
+export function openRuntimeModelCatalog() {
+    closeModelSwitchModal();
+    setRuntimeModelCatalogSearchState({
+        query: "",
+        results: [],
+        isSearching: false,
+    });
+    if (elements.runtimeModelCatalogSearchInput) {
+        elements.runtimeModelCatalogSearchInput.value = "";
+    }
+    renderRuntimeModelCatalogSearchResults();
+    openRuntimeModelCatalogModal();
+    elements.runtimeModelCatalogSearchInput?.focus({ preventScroll: true });
+}
+
+
+export function closeRuntimeModelCatalog() {
+    closeRuntimeModelCatalogModal();
+}
+
+
+export function handleRuntimeModelCatalogSearchInput(event) {
+    if (event.target.id !== "runtime-model-catalog-search") {
+        return;
+    }
+
+    const query = event.target.value || "";
+    queueRuntimeModelCatalogSearch(query);
+}
+
+
 export function handleActiveChatModelEdit() {
     const activeModelId = getSelectedModelConfigId();
     if (!activeModelId) {
@@ -255,10 +355,37 @@ export function handleModelIconClear() {
 
 
 export function getModelProviderOptionsMarkup(selectedProviderId = null) {
-    return (state.providers || []).map((provider) => {
+    return (state.providers || []).filter((provider) => !provider.is_system_managed).map((provider) => {
         const selected = Number(selectedProviderId) === provider.id ? " selected" : "";
         return `<option value="${provider.id}"${selected}>${provider.name} · ${getProviderTypeDisplayName(provider.provider_type)}</option>`;
     }).join("");
+}
+
+
+export function scheduleRuntimeDownloadPolling() {
+    if (runtimeDownloadPollTimer) {
+        window.clearTimeout(runtimeDownloadPollTimer);
+    }
+
+    runtimeDownloadPollTimer = window.setTimeout(async () => {
+        runtimeDownloadPollTimer = null;
+        try {
+            const updateKeys = new Set(getActiveRuntimeDownloadKeys());
+            await refreshRuntimeModelState();
+            getActiveRuntimeDownloadKeys().forEach((catalogKey) => updateKeys.add(catalogKey));
+            syncRuntimeSearchResultsFromCatalog();
+            updateRuntimeModelCards(updateKeys);
+            renderSettingsModelsManager();
+            renderChatPanel();
+            renderConversationHeader();
+
+            if (hasActiveRuntimeDownloads()) {
+                scheduleRuntimeDownloadPolling();
+            }
+        } catch (error) {
+            showStatus(error.message || "Runtime model download status could not be refreshed.", true);
+        }
+    }, 1000);
 }
 
 
@@ -311,6 +438,137 @@ async function assignModelToCurrentChat(modelConfigId) {
 }
 
 
+async function refreshRuntimeModelState() {
+    applyRuntimeModelCatalogPayload(await loadRuntimeModelCatalog());
+    applyModelsPayload(await loadModels());
+}
+
+
+function syncRuntimeSearchResultsFromCatalog() {
+    const results = state.runtimeModelCatalogSearchResults || [];
+    if (!results.length) {
+        return;
+    }
+
+    const catalogByKey = new Map(
+        (state.runtimeModelCatalog || []).map((entry) => [entry.catalog_key, entry])
+    );
+
+    setRuntimeModelCatalogSearchState({
+        results: results.map((entry) => {
+            const current = catalogByKey.get(entry.catalog_key);
+            if (!current) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                is_installed: current.is_installed,
+                model_config_id: current.model_config_id,
+                download: current.download,
+            };
+        }),
+    });
+}
+
+
+function updateRuntimeModelCards(catalogKeys) {
+    if (!elements.runtimeModelCatalogModal || elements.runtimeModelCatalogModal.hidden) {
+        return;
+    }
+
+    for (const catalogKey of catalogKeys || []) {
+        updateRuntimeModelCatalogCard(catalogKey);
+    }
+}
+
+
+function queueRuntimeModelCatalogSearch(query) {
+    const normalizedQuery = String(query || "").trim();
+    window.clearTimeout(runtimeCatalogSearchTimer);
+
+    setRuntimeModelCatalogSearchState({
+        query: normalizedQuery,
+        results: normalizedQuery ? state.runtimeModelCatalogSearchResults : [],
+        isSearching: Boolean(normalizedQuery),
+    });
+    renderRuntimeModelCatalogSearchResults();
+
+    if (!normalizedQuery) {
+        return;
+    }
+
+    runtimeCatalogSearchTimer = window.setTimeout(() => {
+        performRuntimeModelCatalogSearch(normalizedQuery);
+    }, 350);
+}
+
+
+async function performRuntimeModelCatalogSearch(query) {
+    const requestId = runtimeCatalogSearchRequestId + 1;
+    runtimeCatalogSearchRequestId = requestId;
+    const normalizedQuery = String(query || "").trim();
+    if (!normalizedQuery) {
+        setRuntimeModelCatalogSearchState({
+            query: "",
+            results: [],
+            isSearching: false,
+        });
+        renderRuntimeModelCatalogSearchResults();
+        return;
+    }
+
+    setRuntimeModelCatalogSearchState({
+        query: normalizedQuery,
+        isSearching: true,
+    });
+    renderRuntimeModelCatalogSearchResults();
+
+    try {
+        const payload = await searchRuntimeModelCatalog(normalizedQuery);
+        if (requestId !== runtimeCatalogSearchRequestId) {
+            return;
+        }
+        setRuntimeModelCatalogSearchState({
+            query: normalizedQuery,
+            results: payload.catalog || [],
+            isSearching: false,
+        });
+    } catch (error) {
+        if (requestId !== runtimeCatalogSearchRequestId) {
+            return;
+        }
+        setRuntimeModelCatalogSearchState({
+            query: normalizedQuery,
+            results: [],
+            isSearching: false,
+        });
+        showStatus(error.message || "The model catalog search failed.", true);
+    }
+
+    renderRuntimeModelCatalogSearchResults();
+}
+
+
+function hasActiveRuntimeDownloads() {
+    return (state.runtimeModelCatalog || []).some((entry) => (
+        isActiveRuntimeDownload(entry)
+    ));
+}
+
+
+function getActiveRuntimeDownloadKeys() {
+    return (state.runtimeModelCatalog || [])
+        .filter(isActiveRuntimeDownload)
+        .map((entry) => entry.catalog_key);
+}
+
+
+function isActiveRuntimeDownload(entry) {
+    return ["queued", "downloading", "verifying"].includes(entry?.download?.status);
+}
+
+
 async function readModelFormValues() {
     const iconImage = await readModelIconFromInput();
     if (iconImage || !elements.modelIconDataInput?.value) {
@@ -331,9 +589,10 @@ async function readModelFormValues() {
 
 function populateModelModal(model = null) {
     const isEditing = Boolean(model);
+    const isRuntimeModel = model?.provider === "llama_cpp";
     const modelLabel = model?.display_name || model?.name || "";
 
-    elements.modelModalEyebrow.textContent = isEditing ? "Edit model" : "Model";
+    elements.modelModalEyebrow.textContent = isRuntimeModel ? "HORIZONE runtime" : (isEditing ? "Edit model" : "Model");
     elements.modelModalTitle.textContent = isEditing ? modelLabel : "Create model";
     elements.modelSubmitButton.textContent = isEditing ? "Save changes" : "Create model";
     elements.modelIdInput.value = isEditing ? String(model.id) : "";
@@ -343,10 +602,31 @@ function populateModelModal(model = null) {
     elements.modelProviderSelect.innerHTML = getModelProviderOptionsMarkup(model?.provider_id || state.providers[0]?.id || null);
     elements.modelProviderSelect.value = String(model?.provider_id || state.providers[0]?.id || "");
     elements.modelDefaultInput.checked = Boolean(model?.is_default);
+    syncRuntimeModelModalFields(isRuntimeModel);
     if (elements.modelIconInput) {
         elements.modelIconInput.value = "";
     }
     setModelIconValue(model?.icon_image || "");
+}
+
+
+function syncRuntimeModelModalFields(isRuntimeModel) {
+    const technicalNameField = elements.modelNameInput?.closest(".field");
+    const providerField = elements.modelProviderSelect?.closest(".field");
+
+    if (technicalNameField) {
+        technicalNameField.hidden = Boolean(isRuntimeModel);
+    }
+    if (providerField) {
+        providerField.hidden = Boolean(isRuntimeModel);
+    }
+
+    if (elements.modelNameInput) {
+        elements.modelNameInput.disabled = Boolean(isRuntimeModel);
+    }
+    if (elements.modelProviderSelect) {
+        elements.modelProviderSelect.disabled = Boolean(isRuntimeModel);
+    }
 }
 
 

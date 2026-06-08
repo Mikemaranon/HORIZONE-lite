@@ -21,12 +21,16 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         _, conversation_indexes = database.execute("PRAGMA index_list(conversations)", fetchall=True)
         _, model_indexes = database.execute("PRAGMA index_list(models)", fetchall=True)
         _, provider_indexes = database.execute("PRAGMA index_list(providers)", fetchall=True)
+        _, runtime_catalog_columns = database.execute("PRAGMA table_info(runtime_model_catalog)", fetchall=True)
+        _, runtime_download_columns = database.execute("PRAGMA table_info(runtime_model_downloads)", fetchall=True)
 
         migration_names = [row[1] for row in migration_rows]
         message_index_names = {index[1] for index in message_indexes}
         conversation_index_names = {index[1] for index in conversation_indexes}
         model_index_names = {index[1] for index in model_indexes}
         provider_index_names = {index[1] for index in provider_indexes}
+        runtime_catalog_column_names = {column[1] for column in runtime_catalog_columns}
+        runtime_download_column_names = {column[1] for column in runtime_download_columns}
 
         self.assertEqual(
             migration_names,
@@ -36,6 +40,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
                 "project_model_defaults",
                 "chat_integrity_indexes",
                 "hot_path_indexes",
+                "llama_cpp_runtime_foundation",
             ],
         )
         self.assertIn("idx_messages_conversation_position", message_index_names)
@@ -44,6 +49,10 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("idx_models_provider_config", model_index_names)
         self.assertIn("idx_models_provider_name", model_index_names)
         self.assertIn("idx_providers_provider_type", provider_index_names)
+        self.assertIn("catalog_key", runtime_catalog_column_names)
+        self.assertIn("checksum_sha256", runtime_catalog_column_names)
+        self.assertIn("bytes_downloaded", runtime_download_column_names)
+        self.assertIn("finished_at", runtime_download_column_names)
 
     def test_legacy_tables_receive_expected_columns_on_boot(self):
         connection = sqlite3.connect(self.db_path)
@@ -91,6 +100,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         _, message_columns = database.execute("PRAGMA table_info(messages)", fetchall=True)
         _, message_indexes = database.execute("PRAGMA index_list(messages)", fetchall=True)
         _, tool_columns = database.execute("PRAGMA table_info(tools)", fetchall=True)
+        _, provider_columns = database.execute("PRAGMA table_info(providers)", fetchall=True)
 
         project_column_names = {column[1] for column in project_columns}
         project_document_column_names = {column[1] for column in project_document_columns}
@@ -103,6 +113,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         message_column_names = {column[1] for column in message_columns}
         message_index_names = {index[1] for index in message_indexes}
         tool_column_names = {column[1] for column in tool_columns}
+        provider_column_names = {column[1] for column in provider_columns}
 
         self.assertIn("system_prompt", project_column_names)
         self.assertIn("folder_id", project_document_column_names)
@@ -128,3 +139,4 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("tool_events", message_column_names)
         self.assertIn("idx_messages_conversation_position", message_index_names)
         self.assertIn("display_name", tool_column_names)
+        self.assertIn("is_system_managed", provider_column_names)

@@ -6,10 +6,14 @@ from .provider_registry import ProviderRegistry
 
 
 class ProviderManager:
-    def __init__(self, config_manager: ConfigManager, db_manager=None):
+    def __init__(self, config_manager: ConfigManager, db_manager=None, runtime_manager=None):
         self.config_manager = config_manager
         self.db_manager = db_manager
-        self.provider_registry = ProviderRegistry(config_manager, db_manager=db_manager)
+        self.provider_registry = ProviderRegistry(
+            config_manager,
+            db_manager=db_manager,
+            runtime_manager=runtime_manager,
+        )
         self.model_catalog_service = ModelCatalogService(db_manager=db_manager)
         self.conversation_title_service = ConversationTitleService()
         self.providers = self.provider_registry.providers

@@ -74,6 +74,16 @@ class FakeHttpClient:
             yield line
 
 
+class FakeRuntimeManager:
+    def __init__(self, snapshot):
+        self.snapshot = snapshot
+        self.start_calls = 0
+
+    def start_if_available(self):
+        self.start_calls += 1
+        return self.snapshot
+
+
 def create_cloud_provider(
     db,
     *,
@@ -116,6 +126,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
             manager.get_registered_providers(),
             list(REGISTERED_PROVIDER_NAMES),
         )
+        self.assertIn("llama_cpp", manager.get_registered_providers())
         self.assertEqual(LEGACY_DIRECT_PROVIDER_NAMES, ("openai", "anthropic", "google"))
 
     def test_raises_for_unsupported_provider(self):
@@ -602,6 +613,132 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
             )
 
         self.assertIn("local runner stopped", str(error.exception))
+
+    def test_llama_cpp_provider_lists_models_via_openai_compatible_endpoint(self):
+        manager = ProviderManager(ConfigManager())
+        fake_http = FakeHttpClient(
+            get_response={
+                "data": [
+                    {
+                        "id": "gemma-3-1b-it-q4",
+                        "object": "model",
+                        "owned_by": "horizone",
+                    },
+                ]
+            }
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        models = provider.list_models()
+
+        self.assertEqual(models[0]["id"], "gemma-3-1b-it-q4")
+        self.assertEqual(models[0]["source"], "horizone_runtime")
+        self.assertTrue(fake_http.calls[0]["url"].endswith("/v1/models"))
+        self.assertEqual(fake_http.calls[0]["provider_name"], "llama_cpp")
+
+    def test_llama_cpp_provider_chat_uses_chat_completion_shape(self):
+        runtime_manager = FakeRuntimeManager({"status": "ready"})
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(
+            post_response={
+                "id": "chatcmpl-runtime",
+                "model": "gemma-3-1b-it-q4",
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": "Hola desde llama.cpp"},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 5, "completion_tokens": 3},
+            }
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        response = provider.chat(
+            [{"role": "user", "content": "Hola"}],
+            "gemma-3-1b-it-q4",
+            {"temperature": 0.2, "top_p": 0.8, "max_tokens": 128},
+        )
+
+        self.assertEqual(runtime_manager.start_calls, 1)
+        payload = fake_http.calls[0]["payload"]
+        self.assertTrue(fake_http.calls[0]["url"].endswith("/v1/chat/completions"))
+        self.assertEqual(payload["model"], "gemma-3-1b-it-q4")
+        self.assertEqual(payload["messages"][0]["content"], "Hola")
+        self.assertEqual(payload["temperature"], 0.2)
+        self.assertEqual(payload["top_p"], 0.8)
+        self.assertEqual(payload["max_tokens"], 128)
+        self.assertFalse(payload["stream"])
+        self.assertEqual(response["message"]["content"], "Hola desde llama.cpp")
+        self.assertEqual(response["message_id"], "chatcmpl-runtime")
+
+    def test_llama_cpp_provider_raises_when_runtime_cannot_start(self):
+        runtime_manager = FakeRuntimeManager(
+            {
+                "status": "error",
+                "error_message": "HORIZONE runtime needs llama-server or llama-cpp-python.",
+                "base_url": "http://127.0.0.1:8080",
+                "active_model": None,
+            }
+        )
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(post_response={"unexpected": True})
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        with self.assertRaises(ProviderUnavailableError) as error:
+            provider.chat([{"role": "user", "content": "Hola"}], "tiny-runtime")
+
+        self.assertIn("llama-server", str(error.exception))
+        self.assertEqual(runtime_manager.start_calls, 1)
+        self.assertEqual(fake_http.calls, [])
+
+    def test_llama_cpp_provider_stream_chat_yields_deltas_and_final_response(self):
+        manager = ProviderManager(ConfigManager())
+        fake_http = FakeHttpClient(
+            sse_events=[
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "gemma-3-1b-it-q4",
+                    "choices": [
+                        {
+                            "delta": {"content": "Ho"},
+                            "finish_reason": None,
+                        }
+                    ],
+                },
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "gemma-3-1b-it-q4",
+                    "choices": [
+                        {
+                            "delta": {"content": "la"},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"completion_tokens": 2},
+                },
+            ]
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        events = list(
+            provider.stream_chat(
+                [{"role": "user", "content": "Hola"}],
+                "gemma-3-1b-it-q4",
+            )
+        )
+
+        self.assertEqual(events[0]["delta"], "Ho")
+        self.assertEqual(events[1]["delta"], "la")
+        self.assertEqual(events[2]["response"]["message"]["content"], "Hola")
+        self.assertEqual(events[2]["response"]["finish_reason"], "stop")
+        self.assertEqual(events[2]["response"]["usage"]["completion_tokens"], 2)
+        self.assertTrue(fake_http.calls[0]["payload"]["stream"])
+        self.assertEqual(fake_http.calls[0]["payload"]["stream_options"]["include_usage"], True)
 
     def test_anthropic_provider_chat_uses_messages_api_shape(self):
         db = DBManager()

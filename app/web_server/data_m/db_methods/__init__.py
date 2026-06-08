@@ -13,6 +13,8 @@ from .t_conversations import ConversationsTable
 from .t_messages import MessagesTable
 from .t_models import ModelsTable
 from .t_providers import ProvidersTable
+from .t_runtime_model_catalog import RuntimeModelCatalogTable
+from .t_runtime_model_downloads import RuntimeModelDownloadsTable
 from .t_settings import SettingsTable
 from .t_models_cache import ModelsCacheTable
 from .t_tools import ToolsTable
@@ -35,6 +37,8 @@ __all__ = [
     "MessagesTable",
     "ModelsTable",
     "ProvidersTable",
+    "RuntimeModelCatalogTable",
+    "RuntimeModelDownloadsTable",
     "SettingsTable",
     "ModelsCacheTable",
     "ToolsTable",

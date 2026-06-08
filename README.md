@@ -3,9 +3,14 @@
 </p>
 
 <p align="center">
+  <a href="https://mikemaranon.github.io/HORIZONE/">
+    <img src="https://img.shields.io/badge/View%20Website-HORIZONE-00BFFF?style=for-the-badge&logo=github&logoColor=white" alt="View Website">
+  </a>
+</p>
+
+<p align="center">
   A local-first AI chat app built for working with different models, keeping conversations organized, and offering a simple, lightweight, pleasant experience.
 </p>
-<br>
 
 ## AI That Feels Close, Fast, and Yours
 

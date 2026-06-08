@@ -5,7 +5,13 @@ import { closeProfileModal, closeProfileSwitchModal, openProfileModal, openProfi
 import { MAX_PROFILE_TAGS } from "../profile-helpers.js";
 import { renderChatPanel, renderConversationHeader, renderSettingsProfilesManager } from "../render.js";
 import { getDefaultProfileId } from "../selectors.js";
-import { handleModelDelete, handleModelEdit, handleModelOptionSelect } from "./models-controller.js";
+import {
+    handleModelDelete,
+    handleModelEdit,
+    handleModelOptionSelect,
+    handleRuntimeModelDownload,
+    handleRuntimeModelDownloadCancel,
+} from "./models-controller.js";
 import { handleProviderDelete, handleProviderEdit, handleProviderRestore } from "./providers-controller.js";
 import {
     applyConversationsPayload,
@@ -226,6 +232,20 @@ export function handleDocumentClick(event, { handleProjectDocumentDelete }) {
     const deleteModelButton = event.target.closest("[data-delete-model-id]");
     if (deleteModelButton) {
         handleModelDelete(Number(deleteModelButton.dataset.deleteModelId));
+        return;
+    }
+
+    const runtimeModelDownloadButton = event.target.closest("[data-runtime-model-download]");
+    if (runtimeModelDownloadButton) {
+        handleRuntimeModelDownload(runtimeModelDownloadButton.dataset.runtimeModelDownload);
+        return;
+    }
+
+    const runtimeModelDownloadCancelButton = event.target.closest("[data-runtime-model-download-cancel]");
+    if (runtimeModelDownloadCancelButton) {
+        handleRuntimeModelDownloadCancel(
+            Number(runtimeModelDownloadCancelButton.dataset.runtimeModelDownloadCancel)
+        );
         return;
     }
 

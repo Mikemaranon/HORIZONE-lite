@@ -76,6 +76,76 @@ class DBManagerTests(IsolatedDatabaseTestCase):
 
         self.assertIn("mlx", provider_types)
         self.assertIn("ollama", provider_types)
+        self.assertIn("llama_cpp", provider_types)
+
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        self.assertEqual(runtime_provider["name"], "HORIZONE runtime")
+        self.assertTrue(runtime_provider["is_builtin"])
+        self.assertTrue(runtime_provider["is_system_managed"])
+        self.assertEqual(runtime_provider["endpoint"], "")
+
+    def test_system_managed_runtime_provider_is_repaired_on_boot(self):
+        db = DBManager()
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        db.providers.update(
+            provider_id=runtime_provider["id"],
+            name="Broken runtime",
+            provider_type="ollama",
+            endpoint="http://example.test",
+            api_key="secret",
+            is_builtin=False,
+            is_system_managed=False,
+            builtin_key="horizone_runtime",
+        )
+
+        db.providers.ensure_seed_providers()
+        repaired_provider = db.providers.get_by_builtin_key("horizone_runtime")
+
+        self.assertEqual(repaired_provider["name"], "HORIZONE runtime")
+        self.assertEqual(repaired_provider["provider_type"], "llama_cpp")
+        self.assertEqual(repaired_provider["endpoint"], "")
+        self.assertEqual(repaired_provider["api_key"], "")
+        self.assertTrue(repaired_provider["is_builtin"])
+        self.assertTrue(repaired_provider["is_system_managed"])
+
+    def test_runtime_model_catalog_and_downloads_roundtrip(self):
+        db = DBManager()
+        catalog_entry = db.runtime_model_catalog.upsert(
+            catalog_key="gemma-3-1b-it-q4",
+            display_name="Gemma 3 1B Instruct",
+            description="Small local model",
+            source_url="https://example.test/gemma.gguf",
+            filename="gemma.gguf",
+            size_bytes=1024,
+            quantization="Q4_K_M",
+            is_featured=True,
+            sort_order=10,
+        )
+        download_id = db.runtime_model_downloads.create(
+            catalog_key=catalog_entry["catalog_key"],
+            status="queued",
+            source_url=catalog_entry["source_url"],
+            filename=catalog_entry["filename"],
+            total_bytes=1024,
+        )
+
+        db.runtime_model_downloads.update_progress(
+            download_id,
+            status="downloading",
+            bytes_downloaded=512,
+        )
+        download = db.runtime_model_downloads.finish(
+            download_id,
+            status="ready",
+            local_path="/tmp/gemma.gguf",
+        )
+
+        self.assertEqual(catalog_entry["provider_type"], "llama_cpp")
+        self.assertTrue(catalog_entry["is_featured"])
+        self.assertEqual(download["status"], "ready")
+        self.assertEqual(download["bytes_downloaded"], 512)
+        self.assertEqual(download["total_bytes"], 1024)
+        self.assertEqual(download["local_path"], "/tmp/gemma.gguf")
 
     def test_projects_conversations_and_messages_roundtrip(self):
         db = DBManager()

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from .service_errors import RequestError, ResourceNotFoundError
 
 
@@ -10,8 +12,9 @@ ALLOWED_MODEL_ICON_MIME_TYPES = {
 
 
 class ModelConfigService:
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, runtime_config=None):
         self.db = db_manager
+        self.runtime_config = runtime_config
 
     def list_models(self):
         return self.db.models.all()
@@ -34,7 +37,10 @@ class ModelConfigService:
         if not current_model:
             raise ResourceNotFoundError("Model not found")
 
-        model_data = self._parse_model_payload(data)
+        if current_model.get("provider") == "llama_cpp":
+            model_data = self._parse_runtime_model_update_payload(data, current_model)
+        else:
+            model_data = self._parse_model_payload(data)
         if current_model.get("is_builtin"):
             model_data["is_builtin"] = True
 
@@ -46,12 +52,22 @@ class ModelConfigService:
 
     def delete_model(self, model_id):
         parsed_id = self._parse_required_id(model_id, "id")
-        if not self.db.models.get(parsed_id):
+        model = self.db.models.get(parsed_id)
+        if not model:
             raise ResourceNotFoundError("Model not found")
         if self.db.models.count() <= 1:
             raise RequestError("The last model cannot be deleted.")
 
-        self.db.models.delete(parsed_id)
+        runtime_downloads = []
+        if model.get("provider") == "llama_cpp":
+            runtime_downloads = self.db.runtime_model_downloads.for_model(parsed_id)
+
+        with self.db.transaction():
+            if runtime_downloads:
+                self.db.runtime_model_downloads.delete_for_model(parsed_id)
+            self.db.models.delete(parsed_id)
+
+        self._delete_runtime_model_files(runtime_downloads)
         return {"deleted": True, "model_id": parsed_id}
 
     def _parse_model_payload(self, data):
@@ -66,6 +82,9 @@ class ModelConfigService:
             raise RequestError("Missing provider_id")
         if not self.db.providers.get(provider_config_id):
             raise RequestError("Provider not found")
+        provider = self.db.providers.get(provider_config_id)
+        if provider.get("is_system_managed"):
+            raise RequestError("System-managed providers install models through the runtime catalog.")
 
         return {
             "name": name,
@@ -74,6 +93,18 @@ class ModelConfigService:
             "icon_image": self._parse_icon_image(data.get("icon_image")),
             "is_default": bool(data.get("is_default", False)),
             "is_builtin": bool(data.get("is_builtin", False)),
+        }
+
+    def _parse_runtime_model_update_payload(self, data, current_model):
+        display_name = str(data.get("display_name", "")).strip()
+
+        return {
+            "name": current_model["name"],
+            "display_name": display_name or current_model["name"],
+            "provider_config_id": current_model["provider_id"],
+            "icon_image": self._parse_icon_image(data.get("icon_image")),
+            "is_default": bool(data.get("is_default", False)),
+            "is_builtin": True,
         }
 
     def _sync_conversations_for_model(self, model):
@@ -113,6 +144,37 @@ class ModelConfigService:
         if len(icon_image) > 700_000:
             raise RequestError("icon_image is too large")
         return icon_image
+
+    def _delete_runtime_model_files(self, downloads):
+        if not downloads or not self.runtime_config:
+            return
+
+        runtime_root = Path(self.runtime_config.runtime_models_dir).expanduser().resolve()
+        for download in downloads:
+            local_path = str(download.get("local_path") or "").strip()
+            if not local_path:
+                continue
+
+            path = Path(local_path).expanduser()
+            try:
+                resolved_path = path.resolve()
+            except OSError:
+                continue
+
+            if not resolved_path.is_file() or not self._is_relative_to(resolved_path, runtime_root):
+                continue
+
+            try:
+                resolved_path.unlink()
+            except OSError:
+                continue
+
+    def _is_relative_to(self, path, parent):
+        try:
+            path.relative_to(parent)
+            return True
+        except ValueError:
+            return False
 
     def _parse_required_id(self, value, field_name):
         parsed_id = self._parse_optional_int(value, field_name)

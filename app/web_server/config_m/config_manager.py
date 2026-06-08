@@ -1,5 +1,6 @@
 import os
 import secrets
+from pathlib import Path
 
 from .app_config import ProviderConfig, RuntimeConfig
 
@@ -15,6 +16,10 @@ class ConfigManager:
             host=os.environ.get("HOST", "0.0.0.0"),
             port=self._get_env_int("PORT", 5050),
             debug=self._get_env_bool("FLASK_DEBUG", False),
+            llama_cpp_binary=os.environ.get("HORIZONE_LLAMA_CPP_BINARY", ""),
+            llama_cpp_port=self._get_env_int("HORIZONE_LLAMA_CPP_PORT", 8080),
+            runtime_models_dir=self._load_runtime_models_dir(),
+            runtime_disabled=self._get_env_bool("HORIZONE_RUNTIME_DISABLED", False),
             bootstrap_admin_password=os.environ.get("POLAR_BOOTSTRAP_ADMIN_PASSWORD"),
             allow_insecure_default_admin=self._get_env_bool(
                 "POLAR_ALLOW_INSECURE_DEFAULT_ADMIN",
@@ -37,6 +42,7 @@ class ConfigManager:
                 "OLLAMA_BASE_URL", "http://localhost:11434/api"
             ).rstrip("/"),
             ollama_api_key=os.environ.get("OLLAMA_API_KEY"),
+            llama_cpp_base_url=self._load_llama_cpp_base_url(),
             openai_base_url=os.environ.get(
                 "OPENAI_BASE_URL", "https://api.openai.com/v1"
             ).rstrip("/"),
@@ -64,10 +70,14 @@ class ConfigManager:
                 "port": self.runtime.port,
                 "debug": self.runtime.debug,
                 "allow_public_registration": self.runtime.allow_public_registration,
+                "llama_cpp_port": self.runtime.llama_cpp_port,
+                "runtime_models_dir": self.runtime.runtime_models_dir,
+                "runtime_disabled": self.runtime.runtime_disabled,
             },
             "providers": {
                 "default_provider": self.providers.default_provider,
                 "ollama_base_url": self.providers.ollama_base_url,
+                "llama_cpp_base_url": self.providers.llama_cpp_base_url,
                 "openai_base_url": self.providers.openai_base_url,
                 "anthropic_base_url": self.providers.anthropic_base_url,
                 "google_base_url": self.providers.google_base_url,
@@ -97,6 +107,24 @@ class ConfigManager:
         raw_value = os.environ.get(key, "")
         values = [item.strip() for item in raw_value.split(",") if item.strip()]
         return tuple(values)
+
+    def _load_llama_cpp_base_url(self) -> str:
+        configured = os.environ.get("HORIZONE_LLAMA_CPP_BASE_URL")
+        if configured:
+            return configured.rstrip("/")
+
+        port = self.runtime.llama_cpp_port if hasattr(self, "runtime") else self._get_env_int(
+            "HORIZONE_LLAMA_CPP_PORT",
+            8080,
+        )
+        return f"http://127.0.0.1:{port}/v1"
+
+    def _load_runtime_models_dir(self) -> str:
+        configured = os.environ.get("HORIZONE_RUNTIME_MODELS_DIR")
+        if configured:
+            return configured
+
+        return str(Path.home() / ".horizone" / "runtime" / "models")
 
     def _load_secret_key(self) -> str:
         configured = os.environ.get("SECRET_KEY") or os.environ.get("POLAR_SECRET_KEY")

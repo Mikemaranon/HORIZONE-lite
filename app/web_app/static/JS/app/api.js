@@ -92,6 +92,38 @@ export async function loadModelsData() {
 }
 
 
+export async function loadRuntimeModelCatalogData() {
+    return apiRequestJson("GET", "/api/runtime/models/catalog");
+}
+
+
+export async function searchRuntimeModelCatalogData(query) {
+    return apiRequestJson(
+        "GET",
+        `/api/runtime/models/catalog/search?query=${encodeURIComponent(query || "")}`
+    );
+}
+
+
+export async function loadRuntimeModelDownloadsData() {
+    return apiRequestJson("GET", "/api/runtime/models/downloads");
+}
+
+
+export async function startRuntimeModelDownload(catalogKey) {
+    return apiRequestJson("POST", "/api/runtime/models/downloads", {
+        catalog_key: catalogKey,
+    });
+}
+
+
+export async function cancelRuntimeModelDownload(downloadId) {
+    return apiRequestJson("POST", "/api/runtime/models/downloads/cancel", {
+        id: downloadId,
+    });
+}
+
+
 export async function loadToolsData() {
     return apiRequestJson("GET", "/api/tools");
 }

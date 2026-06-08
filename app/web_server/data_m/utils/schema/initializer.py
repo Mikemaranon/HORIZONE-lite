@@ -45,6 +45,7 @@ class DatabaseSchemaInitializer:
             "project_model_defaults": self.ensure_project_model_defaults,
             "chat_integrity_indexes": self.ensure_chat_integrity_indexes,
             "hot_path_indexes": self.ensure_hot_path_indexes,
+            "llama_cpp_runtime_foundation": self.ensure_llama_cpp_runtime_foundation,
         }
 
         for migration in self.versioned_migrations:
@@ -255,3 +256,55 @@ class DatabaseSchemaInitializer:
         ]
         for statement in statements:
             database.execute(statement)
+
+    def ensure_llama_cpp_runtime_foundation(self, database):
+        self.ensure_column(
+            database,
+            "providers",
+            "is_system_managed",
+            "INTEGER DEFAULT 0",
+        )
+        database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runtime_model_catalog (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                catalog_key TEXT UNIQUE NOT NULL,
+                display_name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                provider_type TEXT NOT NULL DEFAULT 'llama_cpp',
+                source_url TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                size_bytes INTEGER DEFAULT 0,
+                checksum_sha256 TEXT DEFAULT '',
+                architecture TEXT DEFAULT '',
+                quantization TEXT DEFAULT '',
+                context_length INTEGER DEFAULT 0,
+                recommended_ram_gb INTEGER DEFAULT 0,
+                license TEXT DEFAULT '',
+                is_featured INTEGER DEFAULT 0,
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS runtime_model_downloads (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                catalog_key TEXT NOT NULL,
+                model_config_id INTEGER,
+                status TEXT NOT NULL,
+                source_url TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                local_path TEXT DEFAULT '',
+                bytes_downloaded INTEGER DEFAULT 0,
+                total_bytes INTEGER DEFAULT 0,
+                error_message TEXT DEFAULT '',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                finished_at TEXT,
+                FOREIGN KEY (model_config_id) REFERENCES models(id) ON DELETE SET NULL
+            )
+            """
+        )

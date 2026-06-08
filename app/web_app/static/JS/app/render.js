@@ -18,9 +18,11 @@ import {
     renderSettingsProvidersManager,
     renderSettingsModelsManager,
     renderSettingsProfilesManager,
+    renderRuntimeModelCatalogSearchResults,
     renderSettingsSession,
     renderSettingsToolsManager,
     renderSettingsSpace,
+    updateRuntimeModelCatalogCard,
 } from "./render/settings-render.js";
 import { renderConversations, renderProjects } from "./render/sidebar-render.js";
 
@@ -62,6 +64,8 @@ export {
     renderSettingsProvidersManager,
     renderSettingsModelsManager,
     renderSettingsProfilesManager,
+    renderRuntimeModelCatalogSearchResults,
+    updateRuntimeModelCatalogCard,
     renderSettingsSession,
     renderSettingsToolsManager,
     renderSettingsSpace,

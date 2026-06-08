@@ -1,6 +1,7 @@
 import io
 import threading
 from http.cookies import SimpleCookie
+from pathlib import Path
 
 from tests.test_support import ApiTestCase
 from model_m import ProviderUnavailableError
@@ -108,6 +109,88 @@ class ApiEndpointTests(ApiTestCase):
         self.assertIn(payload["models"][0]["provider"], {"mlx", "ollama"})
         self.assertIn("name", payload["models"][0])
         self.assertIn("display_name", payload["models"][0])
+
+    def test_runtime_model_catalog_endpoint_returns_curated_models(self):
+        response = self.client.get("/api/runtime/models/catalog", headers=self.auth_headers)
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("catalog", payload)
+        self.assertGreaterEqual(len(payload["catalog"]), 1)
+        self.assertEqual(payload["catalog"][0]["provider_type"], "llama_cpp")
+        self.assertIn("download", payload["catalog"][0])
+
+    def test_runtime_model_catalog_search_endpoint_returns_matching_models(self):
+        calls = []
+
+        def fake_search(query):
+            calls.append(query)
+            return [
+                {
+                    "catalog_key": "hf-qwen",
+                    "display_name": "Qwen 7B",
+                    "provider_type": "llama_cpp",
+                    "source_url": "https://huggingface.co/Qwen/Qwen-GGUF/resolve/main/qwen.gguf",
+                    "filename": "qwen.gguf",
+                    "is_installed": False,
+                    "download": None,
+                }
+            ]
+
+        self.api_manager.services.runtime_model_catalog_service.search_huggingface_catalog = fake_search
+
+        response = self.client.get(
+            "/api/runtime/models/catalog/search?query=qwen-7b",
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls, ["qwen-7b"])
+        self.assertEqual(payload["catalog"][0]["catalog_key"], "hf-qwen")
+
+    def test_runtime_model_download_rejects_unknown_catalog_key(self):
+        response = self.client.post(
+            "/api/runtime/models/downloads",
+            json={"catalog_key": "unknown-model"},
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(payload["error"]["code"], "not_found")
+
+    def test_runtime_model_download_cancel_endpoint_removes_partial_file(self):
+        models_dir = Path(self.temp_dir.name) / "runtime-models"
+        models_dir.mkdir()
+        partial_path = models_dir / "Kimi-K2.6-BF16-00001-of-00046.gguf.part"
+        partial_path.write_bytes(b"partial")
+        runtime_config = self.config_manager.runtime.__class__(
+            **{
+                **self.config_manager.runtime.__dict__,
+                "runtime_models_dir": str(models_dir),
+            }
+        )
+        self.api_manager.services.runtime_model_download_service.runtime_config = runtime_config
+        download_id = self.db.runtime_model_downloads.create(
+            catalog_key="kimi-runtime",
+            status="downloading",
+            source_url="https://example.test/Kimi-K2.6-BF16-00001-of-00046.gguf",
+            filename="Kimi-K2.6-BF16-00001-of-00046.gguf",
+            bytes_downloaded=7,
+            total_bytes=46332327264,
+        )
+
+        response = self.client.post(
+            "/api/runtime/models/downloads/cancel",
+            json={"id": download_id},
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["download"]["status"], "cancelled")
+        self.assertFalse(partial_path.exists())
 
     def test_projects_profiles_and_conversations_can_be_created(self):
         provider_response = self.client.post(

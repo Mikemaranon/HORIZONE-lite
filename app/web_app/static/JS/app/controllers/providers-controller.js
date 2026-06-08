@@ -77,6 +77,10 @@ export function handleProviderEdit(providerId) {
         showStatus("The selected provider was not found.", true);
         return;
     }
+    if (provider.is_system_managed) {
+        showStatus("HORIZONE runtime is managed automatically.", true);
+        return;
+    }
 
     setSelectedSettingsProviderId(provider.id);
     setProviderModalState({
@@ -97,6 +101,10 @@ export async function handleProviderDelete(providerId) {
     const provider = getProviderConfigById(providerId);
     if (!provider) {
         showStatus("The selected provider was not found.", true);
+        return;
+    }
+    if (provider.is_system_managed) {
+        showStatus("HORIZONE runtime is managed automatically.", true);
         return;
     }
 
@@ -132,6 +140,11 @@ export async function handleProviderRestore(providerId) {
     }
 
     try {
+        const provider = getProviderConfigById(providerId);
+        if (provider?.is_system_managed) {
+            showStatus("HORIZONE runtime is restored automatically.", true);
+            return;
+        }
         await restoreProvider(providerId);
         await refreshProviderDependentState();
         renderSettingsProvidersManager();

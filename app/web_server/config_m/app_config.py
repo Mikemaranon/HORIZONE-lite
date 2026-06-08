@@ -7,6 +7,10 @@ class RuntimeConfig:
     host: str = "0.0.0.0"
     port: int = 5050
     debug: bool = False
+    llama_cpp_binary: str = ""
+    llama_cpp_port: int = 8080
+    runtime_models_dir: str = ""
+    runtime_disabled: bool = False
     bootstrap_admin_password: str | None = None
     allow_insecure_default_admin: bool = False
     return_token_in_login_response: bool = False
@@ -18,6 +22,7 @@ class ProviderConfig:
     default_provider: str = "mlx"
     ollama_base_url: str = "http://localhost:11434/api"
     ollama_api_key: str | None = None
+    llama_cpp_base_url: str = "http://127.0.0.1:8080/v1"
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str | None = None
     anthropic_base_url: str = "https://api.anthropic.com"

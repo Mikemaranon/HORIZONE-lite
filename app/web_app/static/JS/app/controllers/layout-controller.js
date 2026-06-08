@@ -6,6 +6,7 @@ import {
     closeDocumentsModal,
     closeModelModal,
     closeModelSwitchModal,
+    closeRuntimeModelCatalogModal,
     closeProviderModal,
     closeProfileModal,
     closeProfileSwitchModal,
@@ -232,6 +233,11 @@ export function handleDocumentKeyDown(event) {
     }
     if (elements.modelSwitchModal && !elements.modelSwitchModal.hidden) {
         closeModelSwitchModal();
+        event.stopPropagation();
+        return;
+    }
+    if (elements.runtimeModelCatalogModal && !elements.runtimeModelCatalogModal.hidden) {
+        closeRuntimeModelCatalogModal();
         event.stopPropagation();
         return;
     }

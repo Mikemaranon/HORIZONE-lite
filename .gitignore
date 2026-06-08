@@ -1,9 +1,10 @@
 __pycache__
 .venv
 .horizone-lite/
+doc/
 agents.md
 TODO
 mini-TODO
 audit.md
-src-zertan
+llama.md
 .DS_Store

@@ -12,6 +12,8 @@ from .db_methods import (
     ProjectModelsTable,
     ProfilesTable,
     ProvidersTable,
+    RuntimeModelCatalogTable,
+    RuntimeModelDownloadsTable,
     ConversationsTable,
     MessagesTable,
     ModelsTable,
@@ -52,6 +54,8 @@ class DBManager:
         self.project_models = ProjectModelsTable(self.db)
         self.profiles = ProfilesTable(self.db)
         self.providers = ProvidersTable(self.db)
+        self.runtime_model_catalog = RuntimeModelCatalogTable(self.db)
+        self.runtime_model_downloads = RuntimeModelDownloadsTable(self.db)
         self.conversations = ConversationsTable(self.db)
         self.messages = MessagesTable(self.db)
         self.models = ModelsTable(self.db)

@@ -15,6 +15,13 @@ class ProvidersTable:
             "endpoint": "http://localhost:11434/api",
             "api_key": "",
         },
+        "horizone_runtime": {
+            "name": "HORIZONE runtime",
+            "provider_type": "llama_cpp",
+            "endpoint": "",
+            "api_key": "",
+            "is_system_managed": True,
+        },
     }
 
     def __init__(self, db):
@@ -29,14 +36,16 @@ class ProvidersTable:
         resolved_adapter="",
         resolved_metadata=None,
         is_builtin=False,
+        is_system_managed=False,
         builtin_key=None,
     ):
         _, provider_id = self.db.execute(
             """
             INSERT INTO providers (
-                name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata, is_builtin, builtin_key
+                name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata,
+                is_builtin, is_system_managed, builtin_key
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 name,
@@ -46,6 +55,7 @@ class ProvidersTable:
                 resolved_adapter or "",
                 self._dump_metadata(resolved_metadata),
                 int(is_builtin),
+                int(is_system_managed),
                 builtin_key or "",
             ),
             lastrowid=True,
@@ -56,7 +66,7 @@ class ProvidersTable:
         _, row = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata,
-                   is_builtin, builtin_key,
+                   is_builtin, is_system_managed, builtin_key,
                    created_at, updated_at
             FROM providers
             WHERE id = ?
@@ -70,7 +80,7 @@ class ProvidersTable:
         _, row = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata,
-                   is_builtin, builtin_key,
+                   is_builtin, is_system_managed, builtin_key,
                    created_at, updated_at
             FROM providers
             WHERE builtin_key = ?
@@ -86,7 +96,7 @@ class ProvidersTable:
         _, row = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata,
-                   is_builtin, builtin_key,
+                   is_builtin, is_system_managed, builtin_key,
                    created_at, updated_at
             FROM providers
             WHERE provider_type = ?
@@ -102,7 +112,7 @@ class ProvidersTable:
         _, rows = self.db.execute(
             """
             SELECT id, name, provider_type, endpoint, api_key, resolved_adapter, resolved_metadata,
-                   is_builtin, builtin_key,
+                   is_builtin, is_system_managed, builtin_key,
                    created_at, updated_at
             FROM providers
             ORDER BY is_builtin DESC, updated_at DESC, id DESC
@@ -121,6 +131,7 @@ class ProvidersTable:
         resolved_adapter="",
         resolved_metadata=None,
         is_builtin=False,
+        is_system_managed=False,
         builtin_key=None,
     ):
         self.db.execute(
@@ -133,6 +144,7 @@ class ProvidersTable:
                 resolved_adapter = ?,
                 resolved_metadata = ?,
                 is_builtin = ?,
+                is_system_managed = ?,
                 builtin_key = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -145,6 +157,7 @@ class ProvidersTable:
                 resolved_adapter or "",
                 self._dump_metadata(resolved_metadata),
                 int(is_builtin),
+                int(is_system_managed),
                 builtin_key or "",
                 provider_id,
             ),
@@ -180,6 +193,7 @@ class ProvidersTable:
             endpoint=defaults["endpoint"],
             api_key=defaults["api_key"],
             is_builtin=True,
+            is_system_managed=defaults.get("is_system_managed", False),
             builtin_key=provider["builtin_key"],
         )
         return self.get(provider_id)
@@ -189,6 +203,7 @@ class ProvidersTable:
         for builtin_key, defaults in self.BUILTIN_DEFAULTS.items():
             existing_provider = self.get_by_builtin_key(builtin_key)
             if existing_provider:
+                self._repair_system_managed_provider(existing_provider, defaults)
                 continue
 
             self.create(
@@ -199,6 +214,7 @@ class ProvidersTable:
                 resolved_adapter="",
                 resolved_metadata={},
                 is_builtin=True,
+                is_system_managed=defaults.get("is_system_managed", False),
                 builtin_key=builtin_key,
             )
 
@@ -215,10 +231,40 @@ class ProvidersTable:
             "resolved_adapter": row[5] or "",
             "resolved_metadata": self._load_metadata(row[6]),
             "is_builtin": bool(row[7]),
-            "builtin_key": row[8] or "",
-            "created_at": row[9],
-            "updated_at": row[10],
+            "is_system_managed": bool(row[8]),
+            "builtin_key": row[9] or "",
+            "created_at": row[10],
+            "updated_at": row[11],
         }
+
+    def _repair_system_managed_provider(self, provider, defaults):
+        if not defaults.get("is_system_managed"):
+            return
+
+        expected = {
+            "name": defaults["name"],
+            "provider_type": defaults["provider_type"],
+            "endpoint": defaults["endpoint"],
+            "api_key": defaults["api_key"],
+            "is_builtin": True,
+            "is_system_managed": True,
+        }
+        needs_repair = any(provider.get(key) != value for key, value in expected.items())
+        if not needs_repair:
+            return
+
+        self.update(
+            provider_id=provider["id"],
+            name=defaults["name"],
+            provider_type=defaults["provider_type"],
+            endpoint=defaults["endpoint"],
+            api_key=defaults["api_key"],
+            resolved_adapter=provider.get("resolved_adapter", ""),
+            resolved_metadata=provider.get("resolved_metadata", {}),
+            is_builtin=True,
+            is_system_managed=True,
+            builtin_key=provider["builtin_key"],
+        )
 
     def _migrate_legacy_cloud_providers(self):
         legacy_adapters = {

@@ -50,8 +50,10 @@ import {
     handleModelSearchClear,
     handleModelSearchInput,
     handleModelSubmit,
+    handleRuntimeModelCatalogSearchInput,
     openCreateModelModal,
     openModelSwitcher,
+    openRuntimeModelCatalog,
     syncChatModelActions,
 } from "./controllers/models-controller.js";
 import {
@@ -131,6 +133,7 @@ import {
     closeDocumentsModal,
     closeModelModal,
     closeModelSwitchModal,
+    closeRuntimeModelCatalogModal,
     closeProjectAgentSwitchModal,
     closeProjectModelsModal,
     closeProfileModal,
@@ -149,6 +152,7 @@ import {
     applyProfilesPayload,
     applyProjectsPayload,
     applyProvidersPayload,
+    applyRuntimeModelCatalogPayload,
     applySettingsPayload,
     applyToolsPayload,
     enterHomeWorkspace,
@@ -160,6 +164,7 @@ import {
     loadProfiles,
     loadProjects,
     loadProviders,
+    loadRuntimeModelCatalog,
     loadSettings,
     loadTools,
 } from "./store.js";
@@ -185,12 +190,13 @@ registerChatCallbacks({
 
 
 export async function bootApp() {
-    const [settingsData, providersData, profilesData, projectsData, modelsData, toolsData, conversationsData, currentUserData] = await Promise.all([
+    const [settingsData, providersData, profilesData, projectsData, modelsData, runtimeCatalogData, toolsData, conversationsData, currentUserData] = await Promise.all([
         loadSettings(),
         loadProviders(),
         loadProfiles(),
         loadProjects(),
         loadModels(),
+        loadRuntimeModelCatalog(),
         loadTools(),
         loadConversations(),
         loadCurrentUser(),
@@ -201,6 +207,7 @@ export async function bootApp() {
     applyProfilesPayload(profilesData);
     applyProjectsPayload(projectsData);
     applyModelsPayload(modelsData);
+    applyRuntimeModelCatalogPayload(runtimeCatalogData);
     applyToolsPayload(toolsData);
     applyConversationsPayload(conversationsData);
     applyCurrentUserPayload(currentUserData);
@@ -237,6 +244,10 @@ export function bindUI() {
         closeSidebarOnMobile,
     }));
     elements.newProjectButton.addEventListener("click", () => handleNewProject({ closeSidebarOnMobile }));
+    elements.runtimeModelCatalogButton?.addEventListener("click", () => {
+        openRuntimeModelCatalog();
+        closeSidebarOnMobile();
+    });
     elements.newProjectChatButton?.addEventListener("click", () => handleNewProjectChat({
         handleConversationSelect: onConversationSelect,
         closeSidebarOnMobile,
@@ -268,6 +279,7 @@ export function bindUI() {
     elements.changeProfileButton?.addEventListener("click", openProfileSwitcher);
     elements.editProfileButton?.addEventListener("click", handleActiveChatProfileEdit);
     elements.settingsNewProviderButton?.addEventListener("click", openCreateProviderModal);
+    elements.settingsAddRuntimeModelButton?.addEventListener("click", openRuntimeModelCatalog);
     elements.settingsNewModelButton?.addEventListener("click", () => openCreateModelModal("settings"));
     elements.settingsNewToolButton?.addEventListener("click", handleToolUploadButtonClick);
     elements.settingsFilterToolsButton?.addEventListener("click", handleToolsFilterToggle);
@@ -281,6 +293,7 @@ export function bindUI() {
     elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
     elements.closeModelSwitchButton?.addEventListener("click", closeModelSwitchModal);
+    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalogModal);
     elements.closeProjectAgentSwitchButton?.addEventListener("click", closeProjectAgentSwitchModal);
     elements.closeProjectModelsButton?.addEventListener("click", closeProjectModelsModal);
     elements.closeChatExportButton?.addEventListener("click", closeChatExportModal);
@@ -333,6 +346,7 @@ export function bindUI() {
     }), { passive: true });
     elements.logoutButton.addEventListener("click", handleLogout);
     elements.modelSwitchModal?.addEventListener("click", handleModelSwitchModalClick);
+    elements.runtimeModelCatalogModal?.addEventListener("click", handleRuntimeModelCatalogModalClick);
     elements.projectAgentSwitchModal?.addEventListener("click", handleProjectAgentSwitchModalClick);
     elements.projectModelsModal?.addEventListener("click", handleProjectModelsModalClick);
     elements.modelModal?.addEventListener("click", handleModelModalClick);
@@ -346,6 +360,7 @@ export function bindUI() {
     elements.toolUploadModal?.addEventListener("click", handleToolUploadModalClick);
     elements.toolTraceModal?.addEventListener("click", handleToolTraceModalClick);
     elements.modelSwitchSearchInput?.addEventListener("input", handleModelSearchInput);
+    elements.runtimeModelCatalogSearchInput?.addEventListener("input", handleRuntimeModelCatalogSearchInput);
     elements.modelSwitchSearchClearButton?.addEventListener("click", handleModelSearchClear);
     elements.projectAgentSwitchSearchInput?.addEventListener("input", handleProjectAgentSearchInput);
     elements.projectAgentSwitchSearchClearButton?.addEventListener("click", handleProjectAgentSearchClear);
@@ -378,6 +393,13 @@ export { ensureAuthenticated };
 function handleModelSwitchModalClick(event) {
     if (event.target.dataset.closeModelSwitchModal === "true") {
         closeModelSwitchModal();
+    }
+}
+
+
+function handleRuntimeModelCatalogModalClick(event) {
+    if (event.target.dataset.closeRuntimeModelCatalogModal === "true") {
+        closeRuntimeModelCatalogModal();
     }
 }
 

@@ -112,11 +112,16 @@ select:disabled {
 }
 
 .ghost-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 11px 14px;
     background: transparent;
     color: var(--text-soft);
     border: 1px solid var(--line);
     font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
     border-radius: var(--radius-pill);
 }
 

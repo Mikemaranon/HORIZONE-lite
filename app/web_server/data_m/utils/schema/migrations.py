@@ -33,6 +33,7 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("messages", "tool_events", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_adapter", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
+    ColumnMigration("providers", "is_system_managed", "INTEGER DEFAULT 0"),
     ColumnMigration("tools", "display_name", "TEXT DEFAULT ''"),
     ColumnMigration("project_documents", "folder_id", "INTEGER"),
     ColumnMigration("project_models", "color", "TEXT DEFAULT '#1c8b59'"),
@@ -47,4 +48,5 @@ VERSIONED_SCHEMA_MIGRATIONS = [
     SchemaMigration(3, "project_model_defaults"),
     SchemaMigration(4, "chat_integrity_indexes"),
     SchemaMigration(5, "hot_path_indexes"),
+    SchemaMigration(6, "llama_cpp_runtime_foundation"),
 ]

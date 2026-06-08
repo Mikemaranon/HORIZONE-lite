@@ -36,7 +36,7 @@ class ProvidersAPI(BaseAPI):
                 provider = self.provider_config_service.get_provider(request.args.get("id"))
                 return self.ok({"provider": provider})
             return self.ok({"providers": self.provider_config_service.list_providers()})
-        except (RequestError, ResourceNotFoundError) as error:
+        except (RequestError, ResourceNotFoundError, ConflictError) as error:
             return self.error_from_exception(error)
 
     def handle_providers_post(self):
@@ -58,7 +58,7 @@ class ProvidersAPI(BaseAPI):
 
         try:
             provider = self.provider_config_service.update_provider(self.get_request_json(request))
-        except (RequestError, ResourceNotFoundError) as error:
+        except (RequestError, ResourceNotFoundError, ConflictError) as error:
             return self.error_from_exception(error)
 
         return self.ok({"provider": provider})

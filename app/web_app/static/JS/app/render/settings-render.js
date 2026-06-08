@@ -51,11 +51,17 @@ export function renderSettingsProvidersManager() {
     elements.settingsProvidersList.innerHTML = providers.length
         ? providers.map((provider) => {
             const typeBadge = `<span class="profile-summary-card__tag">${escapeHtml(getProviderTypeDisplayName(provider.provider_type))}</span>`;
-            const builtinBadge = provider.is_builtin
+            const builtinBadge = provider.is_system_managed
+                ? `<span class="profile-summary-card__badge">Managed by HORIZONE</span>`
+                : provider.is_builtin
                 ? `<span class="profile-summary-card__badge">Built in</span>`
                 : "";
-            const endpoint = provider.endpoint || "No endpoint configured";
-            const actions = provider.is_builtin
+            const endpoint = provider.is_system_managed
+                ? "Managed by HORIZONE"
+                : (provider.endpoint || "No endpoint configured");
+            const actions = provider.is_system_managed
+                ? ""
+                : provider.is_builtin
                 ? `
                     <button
                         class="ghost-button ghost-button--compact"
@@ -119,13 +125,33 @@ export function renderSettingsModelsManager() {
     }
 
     const models = state.models || [];
-    elements.settingsModelsList.innerHTML = models.length
+    const modelCards = models.length
         ? models.map((model) => {
             const defaultBadge = model.is_default
                 ? `<span class="profile-summary-card__badge">Default</span>`
                 : "";
+            const isRuntimeModel = model.provider === "llama_cpp";
             const modelLabel = model.display_name || model.name;
             const avatar = createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar");
+            const runtimeBadge = isRuntimeModel
+                ? `<span class="profile-summary-card__tag profile-summary-card__tag--muted">Managed by HORIZONE</span>`
+                : "";
+            const actions = `
+                    <button
+                        class="ghost-button ghost-button--compact"
+                        type="button"
+                        data-edit-model-id="${model.id}"
+                    >
+                        Edit
+                    </button>
+                    <button
+                        class="action-button action-button--danger action-button--compact"
+                        type="button"
+                        data-delete-model-id="${model.id}"
+                    >
+                        Delete
+                    </button>
+                `;
             return `
                 <article class="profile-summary-card">
                     <div class="profile-summary-card__top">
@@ -143,28 +169,213 @@ export function renderSettingsModelsManager() {
                     <div class="profile-summary-card__footer">
                         <div class="profile-summary-card__tags">
                             <span class="profile-summary-card__tag">${escapeHtml(getProviderTypeDisplayName(model.provider_type || model.provider))}</span>
+                            ${runtimeBadge}
                         </div>
                         <div class="profile-summary-card__actions">
-                            <button
-                                class="ghost-button ghost-button--compact"
-                                type="button"
-                                data-edit-model-id="${model.id}"
-                            >
-                                Edit
-                            </button>
-                            <button
-                                class="action-button action-button--danger action-button--compact"
-                                type="button"
-                                data-delete-model-id="${model.id}"
-                            >
-                                Delete
-                            </button>
+                            ${actions}
                         </div>
                     </div>
                 </article>
             `;
         }).join("")
         : `<div class="profiles-manager__empty">There are no saved models yet.</div>`;
+
+    elements.settingsModelsList.innerHTML = modelCards;
+}
+
+
+export function renderRuntimeModelCatalogSearchResults() {
+    if (!elements.runtimeModelCatalogResults) {
+        return;
+    }
+
+    const query = String(state.runtimeModelCatalogSearchQuery || "").trim();
+    const catalog = state.runtimeModelCatalogSearchResults || [];
+
+    if (!query) {
+        elements.runtimeModelCatalogResults.innerHTML = "";
+        return;
+    }
+
+    if (state.isRuntimeModelCatalogSearching) {
+        elements.runtimeModelCatalogResults.innerHTML = `<div class="profiles-manager__empty">Searching Hugging Face...</div>`;
+        return;
+    }
+
+    elements.runtimeModelCatalogResults.innerHTML = catalog.length
+        ? catalog.map(createRuntimeCatalogCardMarkup).join("")
+        : `<div class="profiles-manager__empty">No matching GGUF models were found.</div>`;
+}
+
+
+export function updateRuntimeModelCatalogCard(catalogKey) {
+    if (!elements.runtimeModelCatalogResults || !catalogKey) {
+        return false;
+    }
+
+    const entry = findRuntimeCatalogEntry(catalogKey);
+    if (!entry) {
+        return false;
+    }
+
+    const card = Array.from(
+        elements.runtimeModelCatalogResults.querySelectorAll("[data-runtime-model-card]")
+    ).find((node) => node.dataset.runtimeModelCard === String(catalogKey));
+
+    if (!card) {
+        return false;
+    }
+
+    card.outerHTML = createRuntimeCatalogCardMarkup(entry);
+    return true;
+}
+
+
+function createRuntimeCatalogCardMarkup(entry) {
+    const download = entry.download || {};
+    const status = download.status || (entry.is_installed ? "ready" : "not_installed");
+    const active = ["queued", "downloading", "verifying"].includes(status);
+    const hasError = status === "error";
+    const ready = entry.is_installed || status === "ready";
+    const progress = getDownloadProgress(download);
+    const statusLabel = getRuntimeDownloadStatusLabel(status, ready);
+    const actionMarkup = ready
+        ? `<span class="profile-summary-card__badge">Ready</span>`
+        : active
+        ? `
+            <button
+                class="action-button action-button--danger action-button--compact"
+                type="button"
+                data-runtime-model-download-cancel="${Number(download.id || 0)}"
+                aria-label="Cancel download"
+                ${download.id ? "" : "disabled"}
+            >
+                Cancel
+            </button>
+        `
+        : `
+            <button
+                class="action-button action-button--compact ${hasError ? "" : "runtime-model-card__download-button"}"
+                type="button"
+                data-runtime-model-download="${escapeHtml(entry.catalog_key)}"
+                aria-label="${hasError ? "Retry download" : "Download model"}"
+            >
+                ${hasError ? "Retry" : `<img src="/static/assets/icons/download-chat.png" alt="">`}
+            </button>
+        `;
+    const huggingFaceUrl = getHuggingFaceModelUrl(entry.source_url);
+    const linkMarkup = huggingFaceUrl
+        ? `
+            <a
+                class="ghost-button ghost-button--compact"
+                href="${escapeHtml(huggingFaceUrl)}"
+                target="_blank"
+                rel="noreferrer"
+            >
+                View in HF
+            </a>
+        `
+        : "";
+    const detailTags = [
+        entry.quantization,
+        entry.recommended_ram_gb ? `${entry.recommended_ram_gb} GB RAM` : "",
+        entry.context_length ? `${entry.context_length.toLocaleString()} ctx` : "",
+        entry.license,
+    ].filter(Boolean).map((label) => (
+        `<span class="profile-summary-card__tag">${escapeHtml(label)}</span>`
+    )).join("");
+
+    return `
+        <article class="runtime-model-card" data-runtime-model-card="${escapeHtml(entry.catalog_key)}">
+            <div class="runtime-model-card__top">
+                <div>
+                    <strong>${escapeHtml(entry.display_name)}</strong>
+                    <p>${escapeHtml(entry.description || entry.filename)}</p>
+                </div>
+                <div class="runtime-model-card__actions">
+                    ${linkMarkup}
+                    ${actionMarkup}
+                </div>
+            </div>
+            <div class="profile-summary-card__tags">${detailTags}</div>
+            <div class="runtime-model-card__progress" aria-label="${escapeHtml(statusLabel)}">
+                <span style="width: ${progress.percent}%"></span>
+            </div>
+            <div class="runtime-model-card__meta">
+                <span>${escapeHtml(statusLabel)}</span>
+                <span>${escapeHtml(progress.label)}</span>
+            </div>
+            ${download.error_message ? `<p class="runtime-model-card__error">${escapeHtml(download.error_message)}</p>` : ""}
+        </article>
+    `;
+}
+
+
+function findRuntimeCatalogEntry(catalogKey) {
+    const key = String(catalogKey || "");
+    return (state.runtimeModelCatalogSearchResults || []).find((entry) => entry.catalog_key === key)
+        || (state.runtimeModelCatalog || []).find((entry) => entry.catalog_key === key)
+        || null;
+}
+
+
+function getHuggingFaceModelUrl(sourceUrl) {
+    const value = String(sourceUrl || "");
+    if (!value.startsWith("https://huggingface.co/")) {
+        return "";
+    }
+    return value.replace(/\/resolve\/.*$/, "");
+}
+
+
+function getRuntimeDownloadStatusLabel(status, ready) {
+    if (ready) {
+        return "Ready";
+    }
+    const labels = {
+        queued: "Queued",
+        downloading: "Downloading",
+        verifying: "Verifying",
+        error: "Error",
+        cancelled: "Cancelled",
+        not_installed: "Not installed",
+    };
+    return labels[status] || "Not installed";
+}
+
+
+function getDownloadProgress(download) {
+    const downloaded = Number(download.bytes_downloaded || 0);
+    const total = Number(download.total_bytes || 0);
+    if (!download.status || download.status === "ready") {
+        return { percent: download.status === "ready" ? 100 : 0, label: "" };
+    }
+    if (!total) {
+        return {
+            percent: download.status === "verifying" ? 100 : 0,
+            label: downloaded ? formatBytes(downloaded) : "",
+        };
+    }
+    return {
+        percent: Math.max(0, Math.min(100, Math.round((downloaded / total) * 100))),
+        label: `${formatBytes(downloaded)} / ${formatBytes(total)}`,
+    };
+}
+
+
+function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (!value) {
+        return "";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    let unitIndex = 0;
+    let normalized = value;
+    while (normalized >= 1024 && unitIndex < units.length - 1) {
+        normalized /= 1024;
+        unitIndex += 1;
+    }
+    return `${normalized.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 

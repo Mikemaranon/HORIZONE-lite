@@ -5,6 +5,9 @@ import {
     loadModelsData,
     loadProfilesData,
     loadProvidersData,
+    loadRuntimeModelCatalogData,
+    loadRuntimeModelDownloadsData,
+    searchRuntimeModelCatalogData,
     loadProjectDocumentsData,
     loadProjectModelsData,
     loadProjectWorkspaceData,
@@ -68,6 +71,25 @@ export async function loadConversationDetail(conversationId) {
 
 export async function loadModels() {
     return loadModelsData();
+}
+
+
+export async function loadRuntimeModelCatalog() {
+    return loadRuntimeModelCatalogData();
+}
+
+
+export async function searchRuntimeModelCatalog(query) {
+    if (!String(query || "").trim()) {
+        return { catalog: [] };
+    }
+
+    return searchRuntimeModelCatalogData(query);
+}
+
+
+export async function loadRuntimeModelDownloads() {
+    return loadRuntimeModelDownloadsData();
 }
 
 

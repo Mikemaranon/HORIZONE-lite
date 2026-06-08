@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from config_m import ConfigManager
 from tests.test_support import IsolatedDatabaseTestCase
 
 from api_m.services import (
@@ -90,6 +93,75 @@ class ModelConfigServiceTests(IsolatedDatabaseTestCase):
         with self.assertRaises(ResourceNotFoundError):
             self.service.delete_model(999)
 
+    def test_manual_model_creation_rejects_system_managed_provider(self):
+        provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+
+        with self.assertRaises(RequestError):
+            self.service.create_model(
+                {
+                    "name": "manual-runtime-model",
+                    "provider_id": provider["id"],
+                }
+            )
+
+    def test_runtime_model_update_preserves_technical_name_and_provider(self):
+        runtime_provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+        ollama_provider = self.db.providers.get_by_builtin_key("ollama")
+        model_id = self.db.models.create(
+            name="tiny-runtime",
+            display_name="Tiny Runtime",
+            provider_config_id=runtime_provider["id"],
+            is_builtin=True,
+        )
+
+        updated = self.service.update_model(
+            {
+                "id": model_id,
+                "name": "tampered-name",
+                "display_name": "Personal Tiny",
+                "provider_id": ollama_provider["id"],
+                "icon_image": "",
+            }
+        )
+
+        self.assertEqual(updated["name"], "tiny-runtime")
+        self.assertEqual(updated["display_name"], "Personal Tiny")
+        self.assertEqual(updated["provider"], "llama_cpp")
+        self.assertEqual(updated["provider_id"], runtime_provider["id"])
+
+    def test_runtime_model_delete_removes_download_record_and_file(self):
+        runtime_provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+        model_path = Path(self.temp_dir.name) / "tiny.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        config = ConfigManager()
+        runtime_config = config.runtime.__class__(
+            **{
+                **config.runtime.__dict__,
+                "runtime_models_dir": self.temp_dir.name,
+            }
+        )
+        service = ModelConfigService(self.db, runtime_config=runtime_config)
+        model_id = self.db.models.create(
+            name="tiny-runtime",
+            display_name="Tiny Runtime",
+            provider_config_id=runtime_provider["id"],
+            is_builtin=True,
+        )
+        self.db.runtime_model_downloads.create(
+            catalog_key="tiny-runtime",
+            status="ready",
+            source_url="https://example.test/tiny.gguf",
+            filename="tiny.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+
+        payload = service.delete_model(model_id)
+
+        self.assertTrue(payload["deleted"])
+        self.assertFalse(model_path.exists())
+        self.assertEqual(self.db.runtime_model_downloads.for_model(model_id), [])
+
 
 class ProviderConfigServiceTests(IsolatedDatabaseTestCase):
     def setUp(self):
@@ -152,6 +224,54 @@ class ProviderConfigServiceTests(IsolatedDatabaseTestCase):
 
         with self.assertRaises(ConflictError):
             self.service.delete_provider(provider["id"])
+
+    def test_builtin_provider_restore_keeps_working_for_user_editable_builtins(self):
+        provider = self.db.providers.get_by_builtin_key("ollama")
+        self.service.update_provider(
+            {
+                "id": provider["id"],
+                "name": "Local Ollama",
+                "provider_type": "ollama",
+                "endpoint": "http://127.0.0.1:9999/api",
+            }
+        )
+
+        restored = self.service.restore_provider({"id": provider["id"]})
+
+        self.assertEqual(restored["name"], "Ollama")
+        self.assertEqual(restored["endpoint"], "http://localhost:11434/api")
+
+    def test_llama_cpp_provider_cannot_be_created_manually(self):
+        with self.assertRaises(RequestError):
+            self.service.create_provider(
+                {
+                    "name": "Manual runtime",
+                    "provider_type": "llama_cpp",
+                }
+            )
+
+    def test_system_managed_provider_cannot_be_edited_deleted_or_restored(self):
+        provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+
+        with self.assertRaises(ConflictError):
+            self.service.update_provider(
+                {
+                    "id": provider["id"],
+                    "name": "Runtime renamed",
+                    "provider_type": "llama_cpp",
+                }
+            )
+        with self.assertRaises(ConflictError):
+            self.service.delete_provider(provider["id"])
+        with self.assertRaises(ConflictError):
+            self.service.restore_provider({"id": provider["id"]})
+
+    def test_public_provider_serializes_system_managed_flag(self):
+        provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+        payload = self.service.get_provider(provider["id"])
+
+        self.assertTrue(payload["is_system_managed"])
+        self.assertEqual(payload["provider_type"], "llama_cpp")
 
 
 class ProfileServiceTests(IsolatedDatabaseTestCase):

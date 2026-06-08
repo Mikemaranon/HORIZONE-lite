@@ -292,6 +292,27 @@ export function applyToolsPayload(data) {
 }
 
 
+export function applyRuntimeModelCatalogPayload(data) {
+    state.runtimeModelCatalog = data.catalog || [];
+}
+
+
+export function setRuntimeModelCatalogSearchState({
+    query = state.runtimeModelCatalogSearchQuery,
+    results = state.runtimeModelCatalogSearchResults,
+    isSearching = state.isRuntimeModelCatalogSearching,
+} = {}) {
+    state.runtimeModelCatalogSearchQuery = query;
+    state.runtimeModelCatalogSearchResults = results || [];
+    state.isRuntimeModelCatalogSearching = Boolean(isSearching);
+}
+
+
+export function applyRuntimeModelDownloadsPayload(data) {
+    state.runtimeModelDownloads = data.downloads || [];
+}
+
+
 export function applySettingsPayload(data) {
     const settings = {};
 

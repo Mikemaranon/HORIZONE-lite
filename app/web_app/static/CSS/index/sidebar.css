@@ -67,11 +67,13 @@
     width: 100%;
     min-height: 42px;
     padding: 10px 8px;
+    font: inherit;
     text-decoration: none;
     color: inherit;
     border: none;
     border-radius: 10px;
     background: transparent;
+    cursor: pointer;
     transition: background 0.18s ease, color 0.18s ease;
 }
 

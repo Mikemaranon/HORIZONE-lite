@@ -4,10 +4,14 @@ from .provider_manager import ProviderManager
 
 
 class ModelManager:
-    def __init__(self, config_manager: ConfigManager, db_manager=None):
+    def __init__(self, config_manager: ConfigManager, db_manager=None, runtime_manager=None):
         self.config_manager = config_manager
         self.db_manager = db_manager
-        self.provider_manager = ProviderManager(config_manager, db_manager=db_manager)
+        self.provider_manager = ProviderManager(
+            config_manager,
+            db_manager=db_manager,
+            runtime_manager=runtime_manager,
+        )
 
     def list_models(self, provider_name: str | None = None) -> dict:
         return self.provider_manager.list_models(provider_name)

@@ -21,6 +21,11 @@ class ConfigManagerTests(unittest.TestCase):
             "ANTHROPIC_BASE_URL",
             "GOOGLE_API_KEY",
             "GOOGLE_BASE_URL",
+            "HORIZONE_LLAMA_CPP_BASE_URL",
+            "HORIZONE_LLAMA_CPP_BINARY",
+            "HORIZONE_LLAMA_CPP_PORT",
+            "HORIZONE_RUNTIME_DISABLED",
+            "HORIZONE_RUNTIME_MODELS_DIR",
             "OLLAMA_API_KEY",
             "OPENAI_API_KEY",
             "OPENAI_BASE_URL",
@@ -50,6 +55,10 @@ class ConfigManagerTests(unittest.TestCase):
         os.environ["POLAR_ALLOW_INSECURE_DEFAULT_ADMIN"] = "true"
         os.environ["POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE"] = "true"
         os.environ["POLAR_ALLOW_PUBLIC_REGISTRATION"] = "true"
+        os.environ["HORIZONE_LLAMA_CPP_BINARY"] = "/usr/local/bin/llama-server"
+        os.environ["HORIZONE_LLAMA_CPP_PORT"] = "9091"
+        os.environ["HORIZONE_RUNTIME_MODELS_DIR"] = "/tmp/horizone-models"
+        os.environ["HORIZONE_RUNTIME_DISABLED"] = "true"
 
         config = ConfigManager()
 
@@ -61,6 +70,10 @@ class ConfigManagerTests(unittest.TestCase):
         self.assertTrue(config.runtime.allow_insecure_default_admin)
         self.assertTrue(config.runtime.return_token_in_login_response)
         self.assertTrue(config.runtime.allow_public_registration)
+        self.assertEqual(config.runtime.llama_cpp_binary, "/usr/local/bin/llama-server")
+        self.assertEqual(config.runtime.llama_cpp_port, 9091)
+        self.assertEqual(config.runtime.runtime_models_dir, "/tmp/horizone-models")
+        self.assertTrue(config.runtime.runtime_disabled)
 
     def test_provider_values_can_be_overridden(self):
         os.environ["DEFAULT_PROVIDER"] = "ollama"
@@ -69,6 +82,7 @@ class ConfigManagerTests(unittest.TestCase):
         os.environ["GOOGLE_API_KEY"] = "test-google-key"
         os.environ["MODEL_REQUEST_TIMEOUT"] = "30"
         os.environ["MLX_MODEL_PATHS"] = "/tmp/model-a, /tmp/model-b"
+        os.environ["HORIZONE_LLAMA_CPP_PORT"] = "9092"
 
         config = ConfigManager()
 
@@ -76,6 +90,7 @@ class ConfigManagerTests(unittest.TestCase):
         self.assertEqual(config.providers.openai_api_key, "test-key")
         self.assertEqual(config.providers.anthropic_api_key, "test-anthropic-key")
         self.assertEqual(config.providers.google_api_key, "test-google-key")
+        self.assertEqual(config.providers.llama_cpp_base_url, "http://127.0.0.1:9092/v1")
         self.assertEqual(config.providers.request_timeout_seconds, 30)
         self.assertEqual(
             config.providers.mlx_model_paths,

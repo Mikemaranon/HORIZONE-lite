@@ -62,6 +62,16 @@ export function closeModelSwitchModal() {
 }
 
 
+export function openRuntimeModelCatalogModal() {
+    openModal(elements.runtimeModelCatalogModal);
+}
+
+
+export function closeRuntimeModelCatalogModal() {
+    closeModal(elements.runtimeModelCatalogModal);
+}
+
+
 export function openProjectAgentSwitchModal() {
     openModal(elements.projectAgentSwitchModal);
 }

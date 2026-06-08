@@ -20,6 +20,7 @@ from api_m.services import (
 )
 from tool_m import ToolExecutor, ToolLoader, ToolManager, ToolRegistry
 from tool_m import WorkspaceToolProvider
+from runtime_m import RuntimeModelCatalogService, RuntimeModelDownloadService
 
 
 class ServiceRegistry:
@@ -73,7 +74,18 @@ class ServiceRegistry:
             config_manager,
             export_service=self.chat_export_service,
         )
-        self.model_config_service = ModelConfigService(db_manager)
+        self.model_config_service = ModelConfigService(
+            db_manager,
+            runtime_config=config_manager.runtime,
+        )
+        self.runtime_model_catalog_service = RuntimeModelCatalogService(
+            db_manager=db_manager,
+        )
+        self.runtime_model_download_service = RuntimeModelDownloadService(
+            db_manager=db_manager,
+            catalog_service=self.runtime_model_catalog_service,
+            runtime_config=config_manager.runtime,
+        )
         self.provider_config_service = ProviderConfigService(
             db_manager,
             model_manager,

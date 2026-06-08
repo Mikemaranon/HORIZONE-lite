@@ -2,7 +2,9 @@ import {
     handleModelIconClear,
     handleModelIconInputChange,
     handleModelSubmit,
+    handleRuntimeModelCatalogSearchInput,
     openCreateModelModal,
+    openRuntimeModelCatalog,
 } from "../app/controllers/models-controller.js";
 import { dismissStatusBanner } from "../app/controllers/layout-controller.js";
 import {
@@ -34,6 +36,7 @@ import {
 import { elements } from "../app/dom.js";
 import {
     closeModelModal,
+    closeRuntimeModelCatalogModal,
     closeProfileModal,
     closeProviderModal,
     closeSessionProfileModal,
@@ -134,6 +137,7 @@ function bindSettingsUI() {
     syncSettingsSidebarVisibility();
 
     elements.settingsNewProviderButton?.addEventListener("click", openCreateProviderModal);
+    elements.settingsAddRuntimeModelButton?.addEventListener("click", openRuntimeModelCatalog);
     elements.settingsNewModelButton?.addEventListener("click", () => openCreateModelModal("settings"));
     elements.settingsNewProfileButton?.addEventListener("click", () => openCreateProfileModal("settings"));
     elements.settingsNewToolButton?.addEventListener("click", handleToolUploadButtonClick);
@@ -158,6 +162,7 @@ function bindSettingsUI() {
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
 
     elements.modelCancelButton?.addEventListener("click", closeModelModal);
+    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalogModal);
     elements.providerCancelButton?.addEventListener("click", closeProviderModal);
     elements.profileCancelButton?.addEventListener("click", closeProfileModal);
     elements.closeSessionProfileButton?.addEventListener("click", closeSessionProfileModal);
@@ -170,12 +175,14 @@ function bindSettingsUI() {
     elements.closeProfileButton?.addEventListener("click", closeProfileModal);
 
     elements.modelModal?.addEventListener("click", handleModalBackdropClick("closeModelModal", closeModelModal));
+    elements.runtimeModelCatalogModal?.addEventListener("click", handleModalBackdropClick("closeRuntimeModelCatalogModal", closeRuntimeModelCatalogModal));
     elements.providerModal?.addEventListener("click", handleModalBackdropClick("closeProviderModal", closeProviderModal));
     elements.profileModal?.addEventListener("click", handleModalBackdropClick("closeProfileModal", closeProfileModal));
     elements.sessionProfileModal?.addEventListener("click", handleModalBackdropClick("closeSessionProfileModal", closeSessionProfileModal));
     elements.toolUploadModal?.addEventListener("click", handleModalBackdropClick("closeToolUploadModal", closeToolUploadModal));
     document.getElementById("settings-sidebar-toggle")?.addEventListener("click", toggleSettingsSidebar);
     document.getElementById("settings-sidebar-backdrop")?.addEventListener("click", closeSettingsSidebar);
+    elements.runtimeModelCatalogSearchInput?.addEventListener("input", handleRuntimeModelCatalogSearchInput);
 
     document.addEventListener("click", handleSettingsDocumentClick);
     document.addEventListener("keydown", handleSettingsEscape);
@@ -208,6 +215,12 @@ function handleSettingsEscape(event) {
 
     if (elements.modelModal && !elements.modelModal.hidden) {
         closeModelModal();
+        event.stopPropagation();
+        return;
+    }
+
+    if (elements.runtimeModelCatalogModal && !elements.runtimeModelCatalogModal.hidden) {
+        closeRuntimeModelCatalogModal();
         event.stopPropagation();
         return;
     }

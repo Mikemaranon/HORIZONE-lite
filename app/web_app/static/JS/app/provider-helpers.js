@@ -3,6 +3,7 @@ import { state } from "./state.js";
 
 const PROVIDER_TYPE_LABELS = {
     cloud: "Cloud",
+    llama_cpp: "llama.cpp",
     mlx: "MLX",
     ollama: "Ollama",
 };

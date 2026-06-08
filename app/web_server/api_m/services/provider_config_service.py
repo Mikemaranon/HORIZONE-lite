@@ -2,7 +2,8 @@ from .service_errors import ConflictError, RequestError, ResourceNotFoundError
 
 
 class ProviderConfigService:
-    SUPPORTED_PROVIDER_TYPES = {"mlx", "ollama", "cloud"}
+    SUPPORTED_PROVIDER_TYPES = {"mlx", "ollama", "cloud", "llama_cpp"}
+    USER_CREATABLE_PROVIDER_TYPES = {"mlx", "ollama", "cloud"}
 
     def __init__(self, db_manager, model_manager):
         self.db = db_manager
@@ -19,6 +20,10 @@ class ProviderConfigService:
         return self.serialize_public_provider(provider)
 
     def create_provider(self, data):
+        provider_type = str(data.get("provider_type", "")).strip().lower()
+        if provider_type not in self.USER_CREATABLE_PROVIDER_TYPES:
+            raise RequestError("Provider type must be one of: mlx, ollama, cloud")
+
         provider_data = self._parse_provider_payload(data)
         provider_id = self.db.providers.create(**provider_data)
         return self.serialize_public_provider(self.db.providers.get(provider_id))
@@ -28,6 +33,11 @@ class ProviderConfigService:
         current_provider = self.db.providers.get(provider_id)
         if not current_provider:
             raise ResourceNotFoundError("Provider not found")
+        if current_provider.get("is_system_managed"):
+            raise ConflictError("System-managed providers cannot be edited.")
+        provider_type = str(data.get("provider_type", "")).strip().lower()
+        if provider_type not in self.USER_CREATABLE_PROVIDER_TYPES:
+            raise RequestError("Provider type must be one of: mlx, ollama, cloud")
 
         provider_data = self._parse_provider_payload(
             data,
@@ -48,6 +58,8 @@ class ProviderConfigService:
             raise ResourceNotFoundError("Provider not found")
         if provider.get("is_builtin"):
             raise ConflictError("Built-in providers cannot be deleted.")
+        if provider.get("is_system_managed"):
+            raise ConflictError("System-managed providers cannot be deleted.")
         if self.db.providers.models_count(parsed_id) > 0:
             raise ConflictError("A provider with assigned models cannot be deleted.")
 
@@ -56,6 +68,10 @@ class ProviderConfigService:
 
     def restore_provider(self, data):
         provider_id = self._parse_required_id(data.get("id"), "id")
+        current_provider = self.db.providers.get(provider_id)
+        if current_provider and current_provider.get("is_system_managed"):
+            raise ConflictError("System-managed providers are restored automatically.")
+
         provider = self.db.providers.restore(provider_id)
         if not provider:
             raise ResourceNotFoundError("Provider not found or not restorable")
@@ -96,6 +112,7 @@ class ProviderConfigService:
             "endpoint": provider["endpoint"],
             "has_api_key": bool(provider.get("api_key")),
             "is_builtin": provider["is_builtin"],
+            "is_system_managed": provider.get("is_system_managed", False),
             "builtin_key": provider["builtin_key"],
             "created_at": provider["created_at"],
             "updated_at": provider["updated_at"],
@@ -113,7 +130,7 @@ class ProviderConfigService:
         if not name:
             raise RequestError("Missing name")
         if provider_type not in self.SUPPORTED_PROVIDER_TYPES:
-            raise RequestError("Provider type must be one of: mlx, ollama, cloud")
+            raise RequestError("Provider type must be one of: mlx, ollama, cloud, llama_cpp")
         if provider_type in {"ollama", "cloud"} and not endpoint:
             raise RequestError("Missing endpoint")
 
@@ -131,6 +148,7 @@ class ProviderConfigService:
             "resolved_adapter": resolved["resolved_adapter"],
             "resolved_metadata": resolved["resolved_metadata"],
             "is_builtin": bool(data.get("is_builtin", False)),
+            "is_system_managed": bool(data.get("is_system_managed", False)),
             "builtin_key": str(data.get("builtin_key", "")).strip().lower() or None,
         }
 
