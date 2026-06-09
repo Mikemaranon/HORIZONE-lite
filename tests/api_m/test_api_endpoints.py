@@ -580,6 +580,54 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(stored_messages[1]["project_model_id"], agent_id)
         self.assertEqual(stored_messages[1]["project_model_name"], "default")
 
+    def test_chat_endpoint_uses_context_messages_without_changing_persisted_message(self):
+        conversation_id = self.db.conversations.create(
+            title="Agent routing",
+            provider="openai",
+            model="gpt-4.1",
+        )
+        captured = {}
+
+        def fake_chat(provider_name, messages, model_name, settings):
+            captured["messages"] = messages
+            return {
+                "provider": provider_name,
+                "model": model_name,
+                "message": {
+                    "role": "assistant",
+                    "content": "Review only.",
+                },
+                "message_id": "agent-routing-response",
+                "usage": {},
+                "finish_reason": "stop",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "@Reviewer review this. @Yapper tell a joke.",
+                    },
+                ],
+                "context_messages": [
+                    {"role": "user", "content": "review this."},
+                ],
+            },
+            headers=self.auth_headers,
+        )
+        stored_messages = self.db.messages.for_conversation(conversation_id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["messages"][-1]["content"], "review this.")
+        self.assertEqual(stored_messages[0]["content"], "@Reviewer review this. @Yapper tell a joke.")
+        self.assertEqual(stored_messages[1]["content"], "Review only.")
+
     def test_updating_model_refreshes_visible_message_label(self):
         provider = self.db.providers.get_first_by_type("ollama")
         profile = self.db.profiles.get_default()

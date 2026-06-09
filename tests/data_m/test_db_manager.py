@@ -173,6 +173,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
             model_name=default_model["name"] if default_model else "gemma-3",
             profile_id=profile["id"],
             profile_name=profile["name"],
+            reasoning_content="I considered the greeting.",
         )
 
         project = db.projects.get(project_id)
@@ -190,6 +191,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
             default_model["display_name"] if default_model else "gemma-3",
         )
         self.assertEqual(messages[1]["tool_events"], [])
+        self.assertEqual(messages[1]["reasoning_content"], "I considered the greeting.")
 
         db.conversations.rename(conversation_id, "Workspace kickoff")
         renamed_conversation = db.conversations.get(conversation_id)

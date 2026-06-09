@@ -61,4 +61,8 @@ class ChatServiceReasoningFilterTests(unittest.TestCase):
             payload["response"]["message"]["content"],
             "Respuesta visible",
         )
+        self.assertEqual(
+            payload["response"]["message"]["reasoning_content"],
+            "private notes",
+        )
         self.assertTrue(payload["response"]["raw"]["reasoning_content_hidden"])

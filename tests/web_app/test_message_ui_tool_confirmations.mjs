@@ -227,6 +227,31 @@ assert.match(
     "executed confirmed tools should still render their workspace result",
 );
 
+const reasoningMarkup = createMessageMarkup({
+    role: "assistant",
+    content: "Visible answer",
+    reasoning_content: "Hidden reasoning trace",
+    model_name: "Reasoning Model",
+});
+
+assert.match(
+    reasoningMarkup,
+    /data-reasoning-trace-button="true"/,
+    "assistant messages with captured reasoning should expose a reasoning trace button",
+);
+
+assert.match(
+    reasoningMarkup,
+    /<span>Reasoning<\/span>[\s\S]*Visible answer/,
+    "reasoning trace controls should render above the assistant answer",
+);
+
+assert.doesNotMatch(
+    reasoningMarkup,
+    /Hidden reasoning trace/,
+    "captured reasoning should not be injected into the visible message body",
+);
+
 const firstAssistantMessage = {
     role: "assistant",
     content: "I need approval.",

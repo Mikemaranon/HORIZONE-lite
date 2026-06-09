@@ -133,9 +133,9 @@ export function renderSettingsModelsManager() {
             const isRuntimeModel = model.provider === "llama_cpp";
             const modelLabel = model.display_name || model.name;
             const avatar = createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar");
-            const runtimeBadge = isRuntimeModel
-                ? `<span class="profile-summary-card__tag profile-summary-card__tag--muted">Managed by HORIZONE</span>`
-                : "";
+            const providerLabel = isRuntimeModel
+                ? "HORIZONE"
+                : getProviderTypeDisplayName(model.provider_type || model.provider);
             const actions = `
                     <button
                         class="ghost-button ghost-button--compact"
@@ -162,14 +162,11 @@ export function renderSettingsModelsManager() {
                             </div>
                             <p class="profile-summary-card__personality">${escapeHtml(model.name)}</p>
                         </div>
-                        <div class="profile-summary-card__status">
-                            ${defaultBadge}
-                        </div>
                     </div>
                     <div class="profile-summary-card__footer">
                         <div class="profile-summary-card__tags">
-                            <span class="profile-summary-card__tag">${escapeHtml(getProviderTypeDisplayName(model.provider_type || model.provider))}</span>
-                            ${runtimeBadge}
+                            <span class="profile-summary-card__tag">${escapeHtml(providerLabel)}</span>
+                            ${defaultBadge}
                         </div>
                         <div class="profile-summary-card__actions">
                             ${actions}

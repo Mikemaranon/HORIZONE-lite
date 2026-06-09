@@ -46,6 +46,7 @@ class DatabaseSchemaInitializer:
             "chat_integrity_indexes": self.ensure_chat_integrity_indexes,
             "hot_path_indexes": self.ensure_hot_path_indexes,
             "llama_cpp_runtime_foundation": self.ensure_llama_cpp_runtime_foundation,
+            "message_reasoning_content": self.ensure_message_reasoning_content,
         }
 
         for migration in self.versioned_migrations:
@@ -287,6 +288,14 @@ class DatabaseSchemaInitializer:
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
             """
+        )
+
+    def ensure_message_reasoning_content(self, database):
+        self.ensure_column(
+            database,
+            "messages",
+            "reasoning_content",
+            "TEXT DEFAULT ''",
         )
         database.execute(
             """

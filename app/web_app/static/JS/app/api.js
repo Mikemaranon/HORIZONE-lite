@@ -498,6 +498,16 @@ function handleStreamEvent(event, handlers) {
         return null;
     }
 
+    if (event.event === "reasoning_start") {
+        handlers.onReasoningStart?.(event.payload, event.payload);
+        return null;
+    }
+
+    if (event.event === "reasoning_end") {
+        handlers.onReasoningEnd?.(event.payload, event.payload);
+        return null;
+    }
+
     if (event.event === "end") {
         handlers.onEnd?.(event.payload.response, event.payload);
         return event.payload.response;

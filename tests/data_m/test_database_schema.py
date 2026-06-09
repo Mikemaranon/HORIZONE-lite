@@ -41,6 +41,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
                 "chat_integrity_indexes",
                 "hot_path_indexes",
                 "llama_cpp_runtime_foundation",
+                "message_reasoning_content",
             ],
         )
         self.assertIn("idx_messages_conversation_position", message_index_names)
@@ -136,7 +137,73 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("model_name", message_column_names)
         self.assertIn("profile_id", message_column_names)
         self.assertIn("profile_name", message_column_names)
+        self.assertIn("reasoning_content", message_column_names)
         self.assertIn("tool_events", message_column_names)
         self.assertIn("idx_messages_conversation_position", message_index_names)
         self.assertIn("display_name", tool_column_names)
         self.assertIn("is_system_managed", provider_column_names)
+
+    def test_existing_migrated_database_receives_reasoning_content_column(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            for version, name in [
+                (1, "legacy_column_backfills"),
+                (2, "project_models_shape"),
+                (3, "project_model_defaults"),
+                (4, "chat_integrity_indexes"),
+                (5, "hot_path_indexes"),
+                (6, "llama_cpp_runtime_foundation"),
+            ]:
+                connection.execute(
+                    "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
+                    (version, name),
+                )
+            connection.execute(
+                """
+                CREATE TABLE messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    position INTEGER NOT NULL,
+                    project_model_id INTEGER,
+                    project_model_name TEXT DEFAULT '',
+                    model_config_id INTEGER,
+                    model_name TEXT DEFAULT '',
+                    profile_id INTEGER,
+                    profile_name TEXT DEFAULT '',
+                    tool_events TEXT DEFAULT '',
+                    provider_message_id TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        database = Database()
+
+        _, message_columns = database.execute("PRAGMA table_info(messages)", fetchall=True)
+        _, migration_rows = database.execute(
+            """
+            SELECT version, name
+            FROM schema_migrations
+            ORDER BY version ASC
+            """,
+            fetchall=True,
+        )
+        message_column_names = {column[1] for column in message_columns}
+        migration_names = [row[1] for row in migration_rows]
+
+        self.assertIn("reasoning_content", message_column_names)
+        self.assertIn("message_reasoning_content", migration_names)

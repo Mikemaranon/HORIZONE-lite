@@ -30,12 +30,14 @@ export function createMessageMarkup(message, options = {}) {
     const renderedContent = isUser
         ? escapeHtml(message.content || "")
         : renderMarkdown(message.content || "");
+    const reasoningTraceMarkup = isUser ? "" : createPersistentReasoningStatusMarkup(message);
     const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message, options);
     const toolConfirmationMarkup = isUser ? "" : createPendingToolConfirmationListMarkup(message, options);
 
     return createMessageFrameMarkup(
         message,
         `
+            ${reasoningTraceMarkup}
             <div class="message__content ${contentClass}" data-message-content="true">${renderedContent}</div>
             ${persistentToolStatusMarkup}
             ${toolConfirmationMarkup}
@@ -143,6 +145,23 @@ export function showToolStatusMessage(toolDisplayName, message = createPendingAs
 }
 
 
+export function showReasoningStatusMessage(message = createPendingAssistantMessage()) {
+    if (!document.querySelector("[data-typing-message='true']")) {
+        appendTypingMessage(message);
+    }
+
+    const pendingBody = document.querySelector(
+        "[data-typing-message='true'] [data-pending-message-body='true']"
+    );
+    if (!pendingBody) {
+        return;
+    }
+
+    pendingBody.innerHTML = createReasoningStatusMarkup();
+    keepMessagesPinnedToBottomIfNeeded();
+}
+
+
 export function removeTypingMessage() {
     document.querySelector("[data-typing-message='true']")?.remove();
 }
@@ -220,6 +239,22 @@ export function handleToolTraceMessageClick(event) {
         messages: state.activeMessages,
         messageIndex: state.activeMessages.indexOf(message),
     }));
+    openToolTraceModal();
+}
+
+
+export function handleReasoningTraceMessageClick(event) {
+    const traceButton = event.target.closest("[data-reasoning-trace-button]");
+    if (!traceButton) {
+        return;
+    }
+
+    const message = findMessageByKey(traceButton.dataset.messageKey || "");
+    if (!message?.reasoning_content) {
+        return;
+    }
+
+    renderReasoningTraceModal(message);
     openToolTraceModal();
 }
 
@@ -424,6 +459,53 @@ function createToolStatusMarkup(toolDisplayName, options = {}) {
             <span class="tool-status__dot" aria-hidden="true"></span>
             <span>${label}</span>
         </button>
+    `;
+}
+
+
+function createReasoningStatusMarkup(options = {}) {
+    const {
+        interactive = false,
+        messageKey = "",
+    } = options;
+    const label = interactive ? "Reasoning" : "Reasoning";
+
+    if (!interactive) {
+        return `
+            <p class="tool-status tool-status--reasoning" aria-live="polite">
+                <span class="tool-status__dot" aria-hidden="true"></span>
+                <span>${label}</span>
+            </p>
+        `;
+    }
+
+    return `
+        <button
+            class="tool-status tool-status--interactive tool-status--reasoning"
+            type="button"
+            data-reasoning-trace-button="true"
+            data-message-key="${escapeHtml(messageKey)}"
+        >
+            <span class="tool-status__dot" aria-hidden="true"></span>
+            <span>${label}</span>
+        </button>
+    `;
+}
+
+
+function createPersistentReasoningStatusMarkup(message) {
+    const reasoningContent = String(message?.reasoning_content || "").trim();
+    if (!reasoningContent) {
+        return "";
+    }
+
+    return `
+        <div class="message__reasoning-traces">
+            ${createReasoningStatusMarkup({
+                interactive: true,
+                messageKey: getOrCreateMessageClientKey(message),
+            })}
+        </div>
     `;
 }
 
@@ -702,6 +784,32 @@ function renderToolTraceModal(toolEvent) {
     }
     if (elements.toolTraceModalContent) {
         elements.toolTraceModalContent.innerHTML = createToolTraceContentMarkup(toolName, toolEvent);
+    }
+}
+
+
+function renderReasoningTraceModal(message) {
+    const reasoningContent = String(message?.reasoning_content || "").trim();
+    const modelName = resolveAssistantModelName(message);
+
+    if (elements.toolTraceModalEyebrow) {
+        elements.toolTraceModalEyebrow.textContent = "Reasoning";
+    }
+    if (elements.toolTraceModalTitle) {
+        elements.toolTraceModalTitle.textContent = "Reasoning";
+    }
+    if (elements.toolTraceModalSummary) {
+        elements.toolTraceModalSummary.textContent = modelName
+            ? `${modelName} reasoning process for this response.`
+            : "Reasoning process for this response.";
+    }
+    if (elements.toolTraceModalContent) {
+        elements.toolTraceModalContent.innerHTML = `
+            <div class="tool-trace__group">
+                <h4>Process</h4>
+                <pre class="tool-trace__pre">${escapeHtml(reasoningContent || "No reasoning content was captured.")}</pre>
+            </div>
+        `;
     }
 }
 

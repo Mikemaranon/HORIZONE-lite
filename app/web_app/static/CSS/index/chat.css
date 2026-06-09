@@ -372,6 +372,13 @@
     margin-top: 12px;
 }
 
+.message__reasoning-traces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 0 10px;
+}
+
 .tool-status--interactive {
     padding: 0;
     border: 0;

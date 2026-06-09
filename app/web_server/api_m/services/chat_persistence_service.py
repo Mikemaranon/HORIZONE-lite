@@ -66,6 +66,7 @@ class ChatPersistenceService:
             model_name=assistant_message.get("model_name", ""),
             profile_id=assistant_message.get("profile_id"),
             profile_name=assistant_message.get("profile_name", ""),
+            reasoning_content=assistant_message.get("reasoning_content", ""),
             tool_events=normalized_tool_events,
             provider_message_id=response.get("message_id"),
         )
@@ -74,6 +75,10 @@ class ChatPersistenceService:
             response["message"] = {
                 **stored_message,
                 "content": assistant_message.get("content", stored_message.get("content", "")),
+                "reasoning_content": assistant_message.get(
+                    "reasoning_content",
+                    stored_message.get("reasoning_content", ""),
+                ),
             }
             response["message"]["tool_events"] = normalized_tool_events
         self._confirm_matching_workspace_write_requests(conversation_id, normalized_tool_events)

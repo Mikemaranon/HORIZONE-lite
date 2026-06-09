@@ -1,5 +1,6 @@
 .app-body--settings {
-    overflow: auto;
+    height: 100dvh;
+    overflow: hidden;
 }
 
 .app-body--settings.is-settings-sidebar-open {
@@ -12,12 +13,14 @@
 
 .settings-page {
     width: min(100%, 1520px);
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 0;
     margin: 0 auto;
     display: grid;
     grid-template-columns: minmax(248px, 292px) minmax(0, 1fr);
     gap: 46px;
     padding: 34px 40px 48px;
+    overflow: hidden;
     background:
         radial-gradient(circle at top left, rgba(28, 139, 89, 0.05), transparent 22%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 18%),
@@ -26,10 +29,15 @@
 
 .settings-page__sidebar {
     min-width: 0;
+    min-height: 0;
+    max-height: calc(100dvh - 82px);
     display: grid;
     align-content: start;
     gap: 24px;
     padding-top: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 .settings-page__sidebar-toggle {
@@ -192,12 +200,22 @@
 
 .settings-page__main {
     min-width: 0;
+    min-height: 0;
     display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
     align-content: start;
     gap: 22px;
 }
 
+.settings-page__scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
 .settings-page__header {
+    position: relative;
     padding-top: 4px;
     padding-bottom: 22px;
     border-bottom: 1px solid var(--line-strong);
@@ -277,7 +295,7 @@
     display: flex;
     align-items: flex-end;
     justify-content: flex-end;
-    min-height: 100%;
+    min-height: 0;
     flex: none;
     min-width: 150px;
 }
@@ -421,6 +439,7 @@
         bottom: 0;
         z-index: 40;
         width: min(320px, calc(100vw - 36px));
+        max-height: none;
         padding: 24px 18px 28px;
         background:
             linear-gradient(180deg, rgba(250, 248, 241, 0.98), rgba(243, 241, 234, 0.98)),
@@ -463,5 +482,89 @@
 
     .settings-page__nav-group {
         padding-bottom: 14px;
+    }
+}
+
+@media (max-width: 760px) {
+    .settings-page {
+        padding: 24px 20px 32px;
+    }
+
+    .settings-page__hero-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .settings-page__hero-actions,
+    .settings-page__category-actions {
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .settings-page__hero-actions {
+        align-self: start;
+        position: static;
+        margin-top: 2px;
+        z-index: 0;
+    }
+
+    .settings-page__category-actions {
+        position: static;
+        align-self: start;
+    }
+
+    .settings-page__header-row {
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        padding-right: clamp(180px, 46vw, 250px);
+    }
+
+    .settings-page__header-actions {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: auto;
+        min-width: 0;
+        justify-content: flex-end;
+    }
+
+    .settings-page__back-link {
+        align-self: flex-start;
+    }
+}
+
+@media (max-width: 520px) {
+    .settings-page {
+        padding: 20px 16px 28px;
+    }
+
+    .settings-page__content,
+    .settings-page__main {
+        gap: 18px;
+    }
+
+    .settings-page__hero-actions,
+    .settings-page__category-actions {
+        flex-wrap: wrap;
+    }
+
+    .settings-page__category-actions--tools {
+        align-items: flex-start;
+    }
+
+    .settings-page__category-actions--tools .ghost-button,
+    .settings-page__category-actions--tools .action-button {
+        width: auto;
+    }
+
+    .settings-page__category-actions .ghost-button,
+    .settings-page__category-actions .action-button {
+        min-width: 0;
     }
 }

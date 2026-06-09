@@ -7,7 +7,7 @@ import {
     handleComposerMentionMenuClick,
 } from "./agent-mentions.js";
 import { autoResizeComposer } from "./composer-ui.js";
-import { handleToolTraceMessageClick } from "./message-ui.js";
+import { handleReasoningTraceMessageClick, handleToolTraceMessageClick } from "./message-ui.js";
 import {
     disableMessagesAutoScroll,
     ensureActiveConversation,
@@ -340,6 +340,7 @@ export function bindUI() {
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
     elements.messagesContainer?.addEventListener("scroll", syncMessagesAutoScrollState, { passive: true });
     elements.messagesContainer?.addEventListener("click", handleToolConfirmationClick);
+    elements.messagesContainer?.addEventListener("click", handleReasoningTraceMessageClick);
     elements.messagesContainer?.addEventListener("click", handleToolTraceMessageClick);
     elements.messagesContainer?.addEventListener("wheel", (event) => handleMessagesWheel(event, {
         disableMessagesAutoScroll,

@@ -19,10 +19,11 @@
     height: 100%;
     overflow-y: auto;
     padding: 4px 0 24px;
+    overscroll-behavior: contain;
 }
 
 .settings-space__grid {
-    width: min(100%, var(--content-width));
+    width: min(100%, 1100px);
     margin: 0 auto;
 }
 
@@ -116,6 +117,102 @@
     max-height: 300px;
     overflow-y: auto;
     padding-right: 4px;
+}
+
+.settings-space #settings-providers-list,
+.settings-space #settings-models-list,
+.settings-space #settings-profiles-list,
+.settings-space #settings-tools-list,
+.settings-page__panel #settings-providers-list,
+.settings-page__panel #settings-models-list,
+.settings-page__panel #settings-profiles-list,
+.settings-page__panel #settings-tools-list {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+    align-items: stretch;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+}
+
+.settings-space #settings-models-list,
+.settings-page__panel #settings-models-list {
+    grid-auto-rows: 176px;
+}
+
+.settings-space .profile-summary-card,
+.settings-page__panel .profile-summary-card,
+.settings-space .chat-tool-card,
+.settings-page__panel .chat-tool-card {
+    min-width: 0;
+    height: 100%;
+}
+
+.settings-space #settings-models-list .profile-summary-card,
+.settings-page__panel #settings-models-list .profile-summary-card {
+    height: 176px;
+    grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.settings-space .profile-summary-card__top,
+.settings-page__panel .profile-summary-card__top {
+    flex-wrap: wrap;
+}
+
+.settings-space .profile-summary-card__heading,
+.settings-page__panel .profile-summary-card__heading,
+.settings-space .profile-summary-card__identity,
+.settings-page__panel .profile-summary-card__identity {
+    min-width: 0;
+}
+
+.settings-space .profile-summary-card__name,
+.settings-page__panel .profile-summary-card__name,
+.settings-space .profile-summary-card__personality,
+.settings-page__panel .profile-summary-card__personality {
+    overflow-wrap: anywhere;
+}
+
+.settings-space #settings-models-list .profile-summary-card__personality,
+.settings-page__panel #settings-models-list .profile-summary-card__personality {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-space #settings-models-list .profile-summary-card__name,
+.settings-page__panel #settings-models-list .profile-summary-card__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-space .profile-summary-card__status,
+.settings-page__panel .profile-summary-card__status {
+    justify-content: flex-start;
+    max-width: 100%;
+}
+
+.settings-space .profile-summary-card__actions,
+.settings-page__panel .profile-summary-card__actions {
+    justify-content: flex-start;
+    margin-left: 0;
+}
+
+.settings-space #settings-models-list .profile-summary-card__footer,
+.settings-page__panel #settings-models-list .profile-summary-card__footer {
+    align-items: flex-end;
+}
+
+.settings-space #settings-models-list .profile-summary-card__tags,
+.settings-page__panel #settings-models-list .profile-summary-card__tags {
+    min-width: 0;
+}
+
+.settings-space .profiles-manager__empty,
+.settings-page__panel .profiles-manager__empty {
+    grid-column: 1 / -1;
 }
 
 .profiles-manager__empty {

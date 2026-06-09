@@ -8,7 +8,7 @@ import {
 } from "../api.js";
 import { renderApp } from "../app-runtime.js";
 import { closeComposerMentionMenu } from "../agent-mentions.js";
-import { extractMentionedAgents } from "../agent-mention-utils.js";
+import { extractAgentMentionTurns } from "../agent-mention-utils.js";
 import { setLoading, syncComposerAvailability } from "../composer-ui.js";
 import { confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
@@ -22,6 +22,7 @@ import {
     findMessageByKey,
     removeStreamingAssistantMessage,
     removeTypingMessage,
+    showReasoningStatusMessage,
     showToolStatusMessage,
     syncMessagesAutoScrollState,
     updateStreamingAssistantMessage,
@@ -107,6 +108,8 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         return;
     }
 
+    let activeTurnMessageCount = null;
+
     try {
         setLoading(true);
         setGenerationStopRequested(false);
@@ -114,9 +117,19 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         const conversationId = await ensureActiveConversation();
         const requestId = createRequestId();
         setActiveGenerationRequestId(requestId);
-        const requestMessages = [...state.activeMessages, { role: "user", content }];
-        const mentionedAgents = extractMentionedAgents(content, getMentionableProjectAgents());
-        const responderAgents = mentionedAgents.length ? mentionedAgents : [null];
+        const previousMessages = [...state.activeMessages];
+        const visibleUserMessage = { role: "user", content };
+        const requestMessages = [...previousMessages, visibleUserMessage];
+        const mentionTurns = extractAgentMentionTurns(content, getMentionableProjectAgents());
+        const responderTurns = mentionTurns.length
+            ? mentionTurns.map((turn) => ({
+                responderAgent: turn.agent,
+                contextMessages: [
+                    ...previousMessages,
+                    { role: "user", content: turn.content },
+                ],
+            }))
+            : [{ responderAgent: null, contextMessages: null }];
 
         setActiveMessages(requestMessages);
         enableMessagesAutoScroll();
@@ -126,12 +139,15 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         autoResizeComposerHeight();
 
         let payload = null;
-        for (const responderAgent of responderAgents) {
+        for (const responderTurn of responderTurns) {
+            activeTurnMessageCount = state.activeMessages.length;
             payload = await sendChatTurn({
                 conversationId,
-                requestId: responderAgents.length === 1 ? requestId : createRequestId(),
-                responderAgent,
+                requestId: responderTurns.length === 1 ? requestId : createRequestId(),
+                responderAgent: responderTurn.responderAgent,
+                contextMessages: responderTurn.contextMessages,
             });
+            activeTurnMessageCount = null;
 
             if (payload.finish_reason === "cancelled") {
                 showStatus("Response stopped.", false);
@@ -168,11 +184,18 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         removeTypingMessage();
         if (error.name === "AbortError") {
             const lastMessage = state.activeMessages[state.activeMessages.length - 1];
-            if (lastMessage?.role === "assistant" && lastMessage.content) {
+            if (
+                lastMessage?.role === "assistant"
+                && lastMessage.content
+                && shouldCleanActiveTurnAssistantMessage(activeTurnMessageCount)
+            ) {
                 finalizeStreamingAssistantMessage(lastMessage.content);
                 showStatus("Response stopped.", false);
             } else {
-                if (lastMessage?.role === "assistant") {
+                if (
+                    lastMessage?.role === "assistant"
+                    && shouldCleanActiveTurnAssistantMessage(activeTurnMessageCount)
+                ) {
                     state.activeMessages.pop();
                 }
                 removeStreamingAssistantMessage();
@@ -180,7 +203,10 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
             }
             return;
         }
-        if (state.activeMessages[state.activeMessages.length - 1]?.role === "assistant") {
+        if (
+            state.activeMessages[state.activeMessages.length - 1]?.role === "assistant"
+            && shouldCleanActiveTurnAssistantMessage(activeTurnMessageCount)
+        ) {
             state.activeMessages.pop();
         }
         removeStreamingAssistantMessage();
@@ -194,7 +220,13 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
 }
 
 
-async function sendChatTurn({ conversationId, requestId, responderAgent = null, toolConfirmation = null }) {
+async function sendChatTurn({
+    conversationId,
+    requestId,
+    responderAgent = null,
+    contextMessages = null,
+    toolConfirmation = null,
+}) {
     setActiveGenerationRequestId(requestId);
     let assistantMessageMeta = createPendingAssistantMessage(responderAgent);
     appendTypingMessage(assistantMessageMeta);
@@ -204,6 +236,7 @@ async function sendChatTurn({ conversationId, requestId, responderAgent = null, 
         conversationId,
         requestId,
         responderAgent,
+        contextMessages,
         toolConfirmation,
     }), {
         onStart(payloadData) {
@@ -238,6 +271,9 @@ async function sendChatTurn({ conversationId, requestId, responderAgent = null, 
                 assistantMessageMeta,
             );
         },
+        onReasoningStart() {
+            showReasoningStatusMessage(assistantMessageMeta);
+        },
     });
     payload.message.tool_events = payload.raw?.tool_events || [];
 
@@ -262,11 +298,18 @@ async function sendChatTurn({ conversationId, requestId, responderAgent = null, 
 }
 
 
-function buildChatPayload({ conversationId, requestId, responderAgent = null, toolConfirmation = null }) {
+function buildChatPayload({
+    conversationId,
+    requestId,
+    responderAgent = null,
+    contextMessages = null,
+    toolConfirmation = null,
+}) {
     if (!responderAgent) {
         return {
             conversation_id: conversationId,
             messages: [...state.activeMessages],
+            ...(contextMessages ? { context_messages: contextMessages } : {}),
             provider: getActualProvider(),
             model: getSelectedModel(),
             project_model_id: state.activeConversation?.project_model_id || getSelectedProjectAgent()?.id || null,
@@ -281,6 +324,7 @@ function buildChatPayload({ conversationId, requestId, responderAgent = null, to
     return {
         conversation_id: conversationId,
         messages: [...state.activeMessages],
+        ...(contextMessages ? { context_messages: contextMessages } : {}),
         provider: model.provider || getActualProvider(),
         model: model.name || getSelectedModel(),
         project_model_id: responderAgent.id,
@@ -289,6 +333,15 @@ function buildChatPayload({ conversationId, requestId, responderAgent = null, to
         request_id: requestId,
         ...(toolConfirmation ? { tool_confirmation: toolConfirmation } : {}),
     };
+}
+
+
+function shouldCleanActiveTurnAssistantMessage(activeTurnMessageCount) {
+    if (activeTurnMessageCount === null || activeTurnMessageCount === undefined) {
+        return false;
+    }
+
+    return state.activeMessages.length > activeTurnMessageCount;
 }
 
 

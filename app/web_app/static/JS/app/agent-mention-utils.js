@@ -84,13 +84,38 @@ export function replaceActiveMention(value, cursorPosition, agent) {
 
 
 export function extractMentionedAgents(content, agents) {
+    return extractAgentMentionTurns(content, agents).map((turn) => turn.agent);
+}
+
+
+export function extractAgentMentionTurns(content, agents) {
     const text = String(content || "");
-    const mentionableAgents = [...(agents || [])]
-        .filter((agent) => getAgentMentionLabel(agent))
-        .sort((left, right) => (
-            getAgentMentionLabel(right).length - getAgentMentionLabel(left).length
-        ));
-    const matchedAgents = [];
+    const matches = findMentionMatches(text, agents);
+    const turns = [];
+
+    for (let index = 0; index < matches.length; index += 1) {
+        const match = matches[index];
+        const nextMatch = matches[index + 1] || null;
+        const turnContent = text.slice(match.end, nextMatch?.start ?? text.length).trim();
+        if (!turnContent) {
+            continue;
+        }
+
+        turns.push({
+            agent: match.agent,
+            content: turnContent,
+            start: match.start,
+            end: nextMatch?.start ?? text.length,
+        });
+    }
+
+    return turns;
+}
+
+
+function findMentionMatches(text, agents) {
+    const mentionableAgents = getMentionableAgents(agents);
+    const matches = [];
 
     for (let index = 0; index < text.length; index += 1) {
         if (text[index] !== "@") {
@@ -116,12 +141,25 @@ export function extractMentionedAgents(content, agents) {
                 continue;
             }
 
-            matchedAgents.push(agent);
+            matches.push({
+                agent,
+                start: index,
+                end: index + 1 + label.length,
+            });
             break;
         }
     }
 
-    return matchedAgents;
+    return matches;
+}
+
+
+function getMentionableAgents(agents) {
+    return [...(agents || [])]
+        .filter((agent) => getAgentMentionLabel(agent))
+        .sort((left, right) => (
+            getAgentMentionLabel(right).length - getAgentMentionLabel(left).length
+        ));
 }
 
 

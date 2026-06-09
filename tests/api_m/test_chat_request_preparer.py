@@ -66,6 +66,38 @@ class ChatRequestPreparerTests(IsolatedDatabaseTestCase):
         )
         self.assertEqual(prepared.input_messages[-1]["content"], "What should you remember?")
 
+    def test_prepare_uses_context_messages_for_model_input_only(self):
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Prepared",
+            profile_id=profile["id"],
+            provider="openai",
+            model="gpt-4.1",
+        )
+
+        prepared = self.preparer.prepare(
+            {
+                "conversation_id": conversation_id,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "@Reviewer review this. @Yapper tell a joke.",
+                    },
+                ],
+                "context_messages": [
+                    {"role": "user", "content": "review this."},
+                ],
+            },
+            default_profile=profile,
+            default_provider="mlx",
+        )
+
+        self.assertEqual(
+            prepared.request_messages[-1]["content"],
+            "@Reviewer review this. @Yapper tell a joke.",
+        )
+        self.assertEqual(prepared.input_messages[-1]["content"], "review this.")
+
     def test_prepare_accepts_structured_tool_confirmation(self):
         profile = self.db.profiles.get_default()
 

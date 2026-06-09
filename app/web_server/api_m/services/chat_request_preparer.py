@@ -40,6 +40,7 @@ class ChatRequestPreparer:
 
     def prepare(self, data, default_profile, default_provider):
         self._validate_messages(data)
+        self._validate_context_messages(data)
         conversation_id = self._parse_conversation_id(data)
         conversation = self._get_conversation(conversation_id)
         project = self.context_builder.resolve_project(
@@ -94,6 +95,10 @@ class ChatRequestPreparer:
             conversation,
             data["messages"],
         )
+        input_request_messages = self._build_input_request_messages(
+            data,
+            request_messages,
+        )
 
         return PreparedChatRequest(
             conversation_id=conversation_id,
@@ -106,7 +111,7 @@ class ChatRequestPreparer:
             input_messages=self.context_builder.build_input_messages(
                 project,
                 profile,
-                request_messages,
+                input_request_messages,
                 project_model=project_model,
             ),
             generation_settings=generation_settings,
@@ -147,6 +152,33 @@ class ChatRequestPreparer:
             if len(content) > self.MAX_MESSAGE_CONTENT_CHARS:
                 raise ChatRequestError(
                     f"messages[{index}].content must be at most "
+                    f"{self.MAX_MESSAGE_CONTENT_CHARS} characters"
+                )
+
+    def _validate_context_messages(self, data):
+        if "context_messages" not in data:
+            return
+
+        if not isinstance(data.get("context_messages"), list):
+            raise ChatRequestError("context_messages must be a list")
+
+        if len(data["context_messages"]) > self.MAX_MESSAGES_PER_REQUEST:
+            raise ChatRequestError(
+                f"context_messages must include at most {self.MAX_MESSAGES_PER_REQUEST} items"
+            )
+
+        for index, message in enumerate(data["context_messages"]):
+            if not isinstance(message, dict):
+                raise ChatRequestError(f"context_messages[{index}] must be an object")
+
+            role = str(message.get("role") or "").strip()
+            if role not in self.ALLOWED_MESSAGE_ROLES:
+                raise ChatRequestError(f"context_messages[{index}].role is not supported")
+
+            content = self._normalize_message_content(message.get("content"))
+            if len(content) > self.MAX_MESSAGE_CONTENT_CHARS:
+                raise ChatRequestError(
+                    f"context_messages[{index}].content must be at most "
                     f"{self.MAX_MESSAGE_CONTENT_CHARS} characters"
                 )
 
@@ -209,6 +241,16 @@ class ChatRequestPreparer:
             normalized_incoming_messages,
         )
         return stored_messages + new_messages
+
+    def _build_input_request_messages(self, data, request_messages):
+        if "context_messages" not in data:
+            return request_messages
+
+        return [
+            self._normalize_request_message(message)
+            for message in data.get("context_messages", [])
+            if self._is_supported_context_message(message)
+        ]
 
     def _stored_message_to_request_message(self, message):
         return {

@@ -30,6 +30,7 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("messages", "project_model_name", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "profile_id", "INTEGER"),
     ColumnMigration("messages", "profile_name", "TEXT DEFAULT ''"),
+    ColumnMigration("messages", "reasoning_content", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "tool_events", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_adapter", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
@@ -49,4 +50,5 @@ VERSIONED_SCHEMA_MIGRATIONS = [
     SchemaMigration(4, "chat_integrity_indexes"),
     SchemaMigration(5, "hot_path_indexes"),
     SchemaMigration(6, "llama_cpp_runtime_foundation"),
+    SchemaMigration(7, "message_reasoning_content"),
 ]

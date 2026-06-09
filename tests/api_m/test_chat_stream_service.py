@@ -121,10 +121,16 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
             )
         )
 
-        self.assertEqual([event["event"] for event in events], ["start", "delta", "end"])
-        self.assertEqual(events[1]["data"], {"delta": "Visible answer"})
+        self.assertEqual(
+            [event["event"] for event in events],
+            ["start", "reasoning_start", "reasoning_end", "delta", "end"],
+        )
+        self.assertEqual(events[3]["data"], {"delta": "Visible answer"})
         self.assertEqual(events[-1]["data"]["response"]["message"]["content"], "Visible answer")
-        self.assertNotIn("private notes", str(events))
+        self.assertEqual(
+            events[-1]["data"]["response"]["message"]["reasoning_content"],
+            "private notes",
+        )
         self.assertTrue(events[-1]["data"]["response"]["raw"]["reasoning_content_hidden"])
 
     def test_iter_stream_events_hides_unopened_reasoning_prefix(self):
@@ -167,9 +173,58 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
             )
         )
 
+        self.assertEqual(
+            [event["event"] for event in events],
+            ["start", "reasoning_start", "reasoning_end", "delta", "end"],
+        )
+        self.assertEqual(events[3]["data"], {"delta": "Visible answer"})
+        self.assertEqual(
+            events[-1]["data"]["response"]["message"]["reasoning_content"],
+            "private notes",
+        )
+
+    def test_iter_stream_events_keeps_unmarked_qwen_content_visible(self):
+        service = ChatStreamService(
+            db_manager=None,
+            model_manager=None,
+            persistence_service=FakePersistenceService(),
+            executor=FakeStreamExecutor(
+                [
+                    {"type": "delta", "delta": "Visible answer"},
+                    {
+                        "type": "response",
+                        "response": {
+                            "provider": "llama_cpp",
+                            "model": "qwen-reasoning",
+                            "message": {
+                                "role": "assistant",
+                                "content": "Visible answer",
+                            },
+                            "usage": {},
+                            "finish_reason": "stop",
+                            "raw": {},
+                        },
+                    },
+                ]
+            ),
+            display_delta_delay_seconds=0,
+        )
+
+        events = list(
+            service.iter_stream_events(
+                conversation_id=None,
+                provider="llama_cpp",
+                input_messages=[{"role": "user", "content": "Hi"}],
+                model="qwen-reasoning",
+                generation_settings={},
+                request_id="stream-unmarked-qwen",
+                assistant_message_meta={},
+            )
+        )
+
         self.assertEqual([event["event"] for event in events], ["start", "delta", "end"])
         self.assertEqual(events[1]["data"], {"delta": "Visible answer"})
-        self.assertNotIn("private notes", str(events))
+        self.assertEqual(events[-1]["data"]["response"]["message"]["content"], "Visible answer")
 
     def test_iter_stream_events_persists_sanitized_reasoning_response(self):
         db = DBManager()
@@ -218,8 +273,9 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
 
         finalized_response = persistence.finalized[0][1]
         self.assertEqual(events[-1]["data"]["response"]["message"]["content"], "Visible")
+        self.assertEqual(events[-1]["data"]["response"]["message"]["reasoning_content"], "private")
         self.assertEqual(finalized_response["message"]["content"], "Visible")
-        self.assertNotIn("private", str(events))
+        self.assertEqual(finalized_response["message"]["reasoning_content"], "private")
 
     def test_iter_stream_events_releases_cancelled_stream_and_reconstructs_partial_response(self):
         persistence = FakePersistenceService()

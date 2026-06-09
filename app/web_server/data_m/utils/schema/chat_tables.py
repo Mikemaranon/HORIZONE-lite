@@ -46,6 +46,7 @@ CHAT_SCHEMA_STATEMENTS = [
         model_name TEXT DEFAULT '',
         profile_id INTEGER,
         profile_name TEXT DEFAULT '',
+        reasoning_content TEXT DEFAULT '',
         tool_events TEXT DEFAULT '',
         provider_message_id TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,

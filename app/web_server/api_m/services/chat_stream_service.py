@@ -134,6 +134,8 @@ class ChatStreamService:
                     delta = event.get("delta") or ""
                     if delta:
                         visible_delta = reasoning_filter.feed(delta)
+                        for reasoning_event in reasoning_filter.pop_events():
+                            yield self._event(f"reasoning_{reasoning_event['type']}", {})
                         if visible_delta:
                             for display_delta in self._iter_display_deltas(visible_delta):
                                 streamed_text_parts.append(display_delta)
@@ -166,6 +168,8 @@ class ChatStreamService:
                     final_response = event.get("response")
 
             remaining_delta = reasoning_filter.flush()
+            for reasoning_event in reasoning_filter.pop_events():
+                yield self._event(f"reasoning_{reasoning_event['type']}", {})
             if remaining_delta:
                 for display_delta in self._iter_display_deltas(remaining_delta):
                     streamed_text_parts.append(display_delta)
@@ -178,6 +182,7 @@ class ChatStreamService:
                 provider,
                 model,
                 was_cancelled,
+                reasoning_filter.reasoning_content,
             )
 
             if conversation_id:
@@ -256,6 +261,10 @@ class ChatStreamService:
         )
 
         response = sanitize_chat_response(response)
+        reasoning_content = ((response.get("message") or {}).get("reasoning_content") or "")
+        if reasoning_content:
+            yield self._event("reasoning_start", {})
+            yield self._event("reasoning_end", {})
         content = ((response.get("message") or {}).get("content") or "")
         if content:
             for display_delta in self._iter_display_deltas(content):
@@ -279,7 +288,15 @@ class ChatStreamService:
 
         yield self._event("end", payload)
 
-    def _resolve_final_response(self, final_response, streamed_text_parts, provider, model, was_cancelled):
+    def _resolve_final_response(
+        self,
+        final_response,
+        streamed_text_parts,
+        provider,
+        model,
+        was_cancelled,
+        reasoning_content="",
+    ):
         if not final_response:
             return {
                 "provider": provider,
@@ -287,6 +304,7 @@ class ChatStreamService:
                 "message": {
                     "role": "assistant",
                     "content": "".join(streamed_text_parts),
+                    "reasoning_content": reasoning_content or "",
                 },
                 "usage": {},
                 "finish_reason": "cancelled" if was_cancelled else None,
@@ -299,6 +317,9 @@ class ChatStreamService:
             }
 
         final_response = sanitize_chat_response(final_response)
+        if reasoning_content:
+            message = final_response.setdefault("message", {})
+            message.setdefault("reasoning_content", reasoning_content)
         if was_cancelled:
             final_response["finish_reason"] = "cancelled"
             raw_response = final_response.get("raw") or {}

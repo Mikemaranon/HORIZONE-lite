@@ -17,6 +17,7 @@ class MessagesTable:
         model_name="",
         profile_id=None,
         profile_name="",
+        reasoning_content="",
         tool_events=None,
         provider_message_id=None,
     ):
@@ -28,9 +29,10 @@ class MessagesTable:
             """
             INSERT INTO messages (
                 conversation_id, role, content, position, project_model_id, project_model_name,
-                model_config_id, model_name, profile_id, profile_name, tool_events, provider_message_id
+                model_config_id, model_name, profile_id, profile_name, reasoning_content,
+                tool_events, provider_message_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 conversation_id,
@@ -43,6 +45,7 @@ class MessagesTable:
                 model_name,
                 profile_id,
                 profile_name,
+                reasoning_content or "",
                 self._serialize_tool_events(tool_events),
                 provider_message_id,
             ),
@@ -65,6 +68,7 @@ class MessagesTable:
                     model_name=message.get("model_name", ""),
                     profile_id=message.get("profile_id"),
                     profile_name=message.get("profile_name", ""),
+                    reasoning_content=message.get("reasoning_content", ""),
                     tool_events=message.get("tool_events"),
                     provider_message_id=message.get("provider_message_id"),
                 )
@@ -78,7 +82,7 @@ class MessagesTable:
             SELECT id, conversation_id, role, content, position,
                    project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
-                   tool_events, provider_message_id, created_at
+                   reasoning_content, tool_events, provider_message_id, created_at
             FROM messages
             WHERE id = ?
             """,
@@ -93,7 +97,7 @@ class MessagesTable:
             SELECT id, conversation_id, role, content, position,
                    project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
-                   tool_events, provider_message_id, created_at
+                   reasoning_content, tool_events, provider_message_id, created_at
             FROM messages
             WHERE conversation_id = ?
             ORDER BY position ASC, id ASC
@@ -180,9 +184,10 @@ class MessagesTable:
             "model_name": row[8] or "",
             "profile_id": row[9],
             "profile_name": row[10] or "",
-            "tool_events": self._parse_tool_events(row[11]),
-            "provider_message_id": row[12],
-            "created_at": row[13],
+            "reasoning_content": row[11] or "",
+            "tool_events": self._parse_tool_events(row[12]),
+            "provider_message_id": row[13],
+            "created_at": row[14],
         }
 
     def _serialize_tool_events(self, tool_events):

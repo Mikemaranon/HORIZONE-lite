@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 const utilsModuleUrl = new URL("../../app/web_app/static/JS/app/agent-mention-utils.js", import.meta.url);
 
 const {
+    extractAgentMentionTurns,
     extractMentionedAgents,
     filterMentionAgents,
     getActiveMentionQuery,
@@ -58,6 +59,30 @@ assert.deepEqual(
     extractMentionedAgents("Ask @Long Name before @Coder.", agents).map((agent) => agent.id),
     [3, 1],
     "mentions with spaces should match full agent names",
+);
+
+assert.deepEqual(
+    extractAgentMentionTurns(
+        "@Reviewer is the code alright? @Coder refactor only the parser.",
+        agents,
+    ).map((turn) => [turn.agent.id, turn.content]),
+    [
+        [2, "is the code alright?"],
+        [1, "refactor only the parser."],
+    ],
+    "each mentioned agent should receive only the text after its own mention",
+);
+
+assert.deepEqual(
+    extractAgentMentionTurns(
+        "Context before the call. @Reviewer review this file. @Long Name summarize it.",
+        agents,
+    ).map((turn) => [turn.agent.id, turn.content]),
+    [
+        [2, "review this file."],
+        [3, "summarize it."],
+    ],
+    "text before the first mention should not be routed to an agent segment",
 );
 
 console.log("Agent mention utility tests passed.");

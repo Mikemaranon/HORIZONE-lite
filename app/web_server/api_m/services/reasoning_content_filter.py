@@ -5,20 +5,54 @@ THINK_OPEN_TAG_PREFIX = "<think"
 THINK_CLOSE_TAG = "</think>"
 
 
-def strip_reasoning_content(content):
+def extract_reasoning_content(content):
     text = str(content or "")
     if not text:
+        return "", ""
+
+    reasoning_parts = []
+
+    def replace_complete_match(match):
+        reasoning_parts.append(match.group(1))
         return ""
 
-    sanitized = re.sub(r"(?is)<think\b[^>]*>.*?</think>\s*", "", text)
-    sanitized = re.sub(r"(?is)^\s*(?:(?!<think\b).)*?</think>\s*", "", sanitized, count=1)
-    sanitized = re.sub(r"(?is)<think\b[^>]*>.*$", "", sanitized)
+    sanitized = re.sub(
+        r"(?is)<think\b[^>]*>(.*?)</think>\s*",
+        replace_complete_match,
+        text,
+    )
+
+    def replace_unopened_prefix(match):
+        reasoning_parts.append(match.group(1))
+        return ""
+
+    sanitized = re.sub(
+        r"(?is)^\s*((?:(?!<think\b).)*?)</think>\s*",
+        replace_unopened_prefix,
+        sanitized,
+        count=1,
+    )
+
+    def replace_unclosed_match(match):
+        reasoning_parts.append(match.group(1))
+        return ""
+
+    sanitized = re.sub(
+        r"(?is)<think\b[^>]*>(.*)$",
+        replace_unclosed_match,
+        sanitized,
+    )
     sanitized = re.sub(r"(?is)</think>\s*", "", sanitized)
 
-    if sanitized != text:
-        return sanitized.lstrip()
+    if reasoning_parts:
+        return sanitized.lstrip(), "\n\n".join(part.strip() for part in reasoning_parts if part.strip())
 
-    return text
+    return text, ""
+
+
+def strip_reasoning_content(content):
+    sanitized, _reasoning_content = extract_reasoning_content(content)
+    return sanitized
 
 
 def sanitize_chat_response(response):
@@ -30,8 +64,10 @@ def sanitize_chat_response(response):
         return response
 
     content = message.get("content")
-    sanitized_content = strip_reasoning_content(content)
-    if sanitized_content == content:
+    sanitized_content, extracted_reasoning_content = extract_reasoning_content(content)
+    existing_reasoning_content = str(message.get("reasoning_content") or "").strip()
+    reasoning_content = existing_reasoning_content or extracted_reasoning_content
+    if sanitized_content == content and not reasoning_content:
         return response
 
     sanitized_response = dict(response)
@@ -39,12 +75,14 @@ def sanitize_chat_response(response):
         **message,
         "content": sanitized_content,
     }
+    if reasoning_content:
+        sanitized_response["message"]["reasoning_content"] = reasoning_content
 
     raw_response = sanitized_response.get("raw")
     if isinstance(raw_response, dict):
         sanitized_response["raw"] = {
             **raw_response,
-            "reasoning_content_hidden": True,
+            "reasoning_content_hidden": bool(reasoning_content or sanitized_content != content),
         }
 
     return sanitized_response
@@ -57,6 +95,8 @@ class ReasoningStreamFilter:
         self.emitted_visible_content = False
         self.hidden_reasoning = False
         self.hide_unopened_reasoning_prefix = bool(hide_unopened_reasoning_prefix)
+        self.reasoning_parts = []
+        self._events = []
 
     def feed(self, delta):
         self.pending += str(delta or "")
@@ -70,7 +110,7 @@ class ReasoningStreamFilter:
 
         while self.pending:
             if self.inside_reasoning:
-                if not self._discard_until_think_close(final):
+                if not self._capture_until_think_close(final):
                     break
                 continue
 
@@ -81,7 +121,7 @@ class ReasoningStreamFilter:
 
             marker_name, marker_index = marker
             if marker_name == "close":
-                self._discard_unopened_reasoning_prefix(marker_index)
+                self._capture_unopened_reasoning_prefix(marker_index)
                 continue
 
             before_marker = self.pending[:marker_index]
@@ -98,23 +138,31 @@ class ReasoningStreamFilter:
             self.pending = self.pending[tag_end + 1:]
             self.inside_reasoning = True
             self.hidden_reasoning = True
+            self._events.append({"type": "start"})
 
         return "".join(output_parts)
 
-    def _discard_until_think_close(self, final):
+    def _capture_until_think_close(self, final):
         close_index = self.pending.lower().find(THINK_CLOSE_TAG)
         if close_index == -1:
             if final:
+                self._append_reasoning(self.pending)
                 self.pending = ""
                 self.inside_reasoning = False
+                self._events.append({"type": "end"})
                 return True
 
-            self.pending = self.pending[-(len(THINK_CLOSE_TAG) - 1):]
+            tail_length = min(len(self.pending), len(THINK_CLOSE_TAG) - 1)
+            capture_length = max(len(self.pending) - tail_length, 0)
+            self._append_reasoning(self.pending[:capture_length])
+            self.pending = self.pending[capture_length:]
             return False
 
+        self._append_reasoning(self.pending[:close_index])
         self.pending = self.pending[close_index + len(THINK_CLOSE_TAG):]
         self.inside_reasoning = False
         self.hidden_reasoning = True
+        self._events.append({"type": "end"})
         if not self.emitted_visible_content:
             self.pending = self.pending.lstrip()
         return True
@@ -135,9 +183,12 @@ class ReasoningStreamFilter:
 
         return min(markers, key=lambda marker: marker[1])
 
-    def _discard_unopened_reasoning_prefix(self, close_index):
+    def _capture_unopened_reasoning_prefix(self, close_index):
+        self._events.append({"type": "start"})
+        self._append_reasoning(self.pending[:close_index])
         self.pending = self.pending[close_index + len(THINK_CLOSE_TAG):].lstrip()
         self.hidden_reasoning = True
+        self._events.append({"type": "end"})
 
     def _emit_safe_pending(self, output_parts, final):
         if final:
@@ -179,3 +230,16 @@ class ReasoningStreamFilter:
         output_parts.append(content)
         if content.strip():
             self.emitted_visible_content = True
+
+    def _append_reasoning(self, content):
+        if content:
+            self.reasoning_parts.append(content)
+
+    @property
+    def reasoning_content(self):
+        return "\n\n".join(part.strip() for part in self.reasoning_parts if part.strip())
+
+    def pop_events(self):
+        events = self._events
+        self._events = []
+        return events
