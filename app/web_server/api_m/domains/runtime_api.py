@@ -9,8 +9,14 @@ class RuntimeAPI(BaseAPI):
         super().__init__(app, user_manager, db, model_manager, services=services)
         self.catalog_service = self.services.runtime_model_catalog_service
         self.download_service = self.services.runtime_model_download_service
+        self.runtime_manager = getattr(self.services, "runtime_manager", None)
 
     def register(self):
+        self.app.add_url_rule(
+            "/api/runtime/status",
+            view_func=self.get_runtime_status,
+            methods=["GET"],
+        )
         self.app.add_url_rule(
             "/api/runtime/models/catalog",
             view_func=self.get_runtime_model_catalog,
@@ -36,6 +42,28 @@ class RuntimeAPI(BaseAPI):
             view_func=self.cancel_runtime_model_download,
             methods=["POST"],
         )
+
+    def get_runtime_status(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        if not self.runtime_manager:
+            return self.ok(
+                {
+                    "runtime": {
+                        "status": "unavailable",
+                        "error_message": "HORIZONE runtime manager is not configured.",
+                        "base_url": "",
+                        "openai_base_url": "",
+                        "port": None,
+                        "port_range": None,
+                        "active_model": None,
+                    }
+                }
+            )
+
+        return self.ok({"runtime": self.runtime_manager.snapshot()})
 
     def get_runtime_model_catalog(self):
         auth = self.authenticate_request(request)

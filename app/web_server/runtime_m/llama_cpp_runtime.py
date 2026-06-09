@@ -1,5 +1,6 @@
 import os
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -43,8 +44,17 @@ class LlamaCppRuntimeManager:
         self.status = "stopped"
         self.error_message = ""
         self.active_model = None
+        self.active_port = self.runtime_config.llama_cpp_port
+        self._runtime_lock = threading.Lock()
 
-    def start_if_available(self):
+    def start_if_available(self, model_config_id=None, model_name=None):
+        with self._runtime_lock:
+            return self._start_if_available(
+                model_config_id=model_config_id,
+                model_name=model_name,
+            )
+
+    def _start_if_available(self, model_config_id=None, model_name=None):
         self.db.providers.ensure_seed_providers()
         self.error_message = ""
 
@@ -56,19 +66,21 @@ class LlamaCppRuntimeManager:
             self.status = "stopped"
             return self.snapshot()
 
-        model = self.select_default_ready_model()
+        model = self.select_ready_model(
+            model_config_id=model_config_id,
+            model_name=model_name,
+        )
         if not model:
             self.status = "error" if self.error_message else "stopped"
             return self.snapshot()
 
-        existing_runtime = self.runtime_probe(model)
-        if existing_runtime == "matching":
+        if self._is_active_model(model) and self._owns_running_process():
             self.status = "ready"
-            self.active_model = model
             return self.snapshot()
-        if existing_runtime == "conflict":
-            self.status = "error"
-            return self.snapshot()
+
+        if self.active_model and not self._is_active_model(model) and self._owns_running_process():
+            self.supervisor.stop()
+            self.active_model = None
 
         launch_command = self._resolve_launch_command()
         if not launch_command:
@@ -80,24 +92,50 @@ class LlamaCppRuntimeManager:
             )
             return self.snapshot()
 
-        command = self.build_command(launch_command, model)
-        started = self.supervisor.start(
-            command,
-            health_urls=self.health_urls(),
-            timeout_seconds=self.STARTUP_TIMEOUT_SECONDS,
-            env=self.build_environment(launch_command),
-        )
-        self.status = self.supervisor.status
-        self.error_message = self.supervisor.error_message
-        self.active_model = model if started else None
+        conflict_messages = []
+        for port in self.iter_candidate_ports():
+            self.active_port = port
+            existing_runtime = self.runtime_probe(model)
+            if existing_runtime == "matching":
+                self.status = "ready"
+                self.active_model = model
+                return self.snapshot()
+            if existing_runtime == "conflict":
+                if self.error_message:
+                    conflict_messages.append(self.error_message)
+                continue
+
+            command = self.build_command(launch_command, model)
+            started = self.supervisor.start(
+                command,
+                health_urls=self.health_urls(),
+                timeout_seconds=self.STARTUP_TIMEOUT_SECONDS,
+                env=self.build_environment(launch_command),
+            )
+            self.status = self.supervisor.status
+            self.error_message = self.supervisor.error_message
+            self.active_model = model if started else None
+            if started:
+                return self.snapshot()
+
+        self.status = "error"
+        self.active_model = None
+        if not self.error_message:
+            self.error_message = self._build_port_range_error(conflict_messages)
         return self.snapshot()
 
     def stop(self):
-        self.supervisor.stop()
-        self.status = self.supervisor.status
-        self.active_model = None
+        with self._runtime_lock:
+            self.supervisor.stop()
+            self.status = self.supervisor.status
+            self.active_model = None
 
     def select_default_ready_model(self):
+        return self.select_ready_model()
+
+    def select_ready_model(self, model_config_id=None, model_name=None):
+        requested_model_config_id = self._parse_optional_int(model_config_id)
+        requested_model_name = str(model_name or "").strip()
         invalid_filenames = []
         for download in self.db.runtime_model_downloads.ready():
             model_path = Path(download["local_path"]).expanduser()
@@ -113,11 +151,22 @@ class LlamaCppRuntimeManager:
             if not model_config or model_config.get("provider") != "llama_cpp":
                 continue
 
-            return RuntimeModelSelection(
+            selection = RuntimeModelSelection(
                 model_config_id=model_config["id"],
                 model_name=model_config["name"],
                 model_path=str(model_path),
             )
+
+            if requested_model_config_id and selection.model_config_id != requested_model_config_id:
+                continue
+            if (
+                not requested_model_config_id
+                and requested_model_name
+                and selection.model_name != requested_model_name
+            ):
+                continue
+
+            return selection
 
         if invalid_filenames:
             names = ", ".join(sorted(set(invalid_filenames)))
@@ -125,6 +174,8 @@ class LlamaCppRuntimeManager:
                 "Installed HORIZONE runtime file is not a chat model: "
                 f"{names}. Download a text/chat GGUF model instead of an mmproj projector file."
             )
+        elif requested_model_config_id or requested_model_name:
+            self.error_message = "Selected HORIZONE runtime model is not installed or ready."
 
         return None
 
@@ -141,7 +192,7 @@ class LlamaCppRuntimeManager:
             "--host",
             self.HOST,
             "--port",
-            str(self.runtime_config.llama_cpp_port),
+            str(self.active_port),
         ]
 
     def build_environment(self, launch_command):
@@ -159,13 +210,23 @@ class LlamaCppRuntimeManager:
         ]
 
     def base_url(self):
-        return f"http://{self.HOST}:{self.runtime_config.llama_cpp_port}"
+        return f"http://{self.HOST}:{self.active_port}"
 
     def snapshot(self):
         return {
             "status": self.status,
             "error_message": self.error_message,
             "base_url": self.base_url(),
+            "openai_base_url": f"{self.base_url()}/v1",
+            "port": self.active_port,
+            "port_range": {
+                "start": self.runtime_config.llama_cpp_port,
+                "end": getattr(
+                    self.runtime_config,
+                    "llama_cpp_port_max",
+                    self.runtime_config.llama_cpp_port,
+                ),
+            },
             "active_model": {
                 "model_config_id": self.active_model.model_config_id,
                 "model_name": self.active_model.model_name,
@@ -188,6 +249,23 @@ class LlamaCppRuntimeManager:
         binary_path = self.paths.resolve_llama_server_binary()
         return [binary_path] if binary_path else []
 
+    def iter_candidate_ports(self):
+        start_port = self._parse_optional_int(self.runtime_config.llama_cpp_port) or 8080
+        end_port = (
+            self._parse_optional_int(getattr(self.runtime_config, "llama_cpp_port_max", None))
+            or start_port
+        )
+        if end_port < start_port:
+            end_port = start_port
+
+        if self.active_port and start_port <= self.active_port <= end_port:
+            yield self.active_port
+
+        for port in range(start_port, end_port + 1):
+            if port == self.active_port:
+                continue
+            yield port
+
     def _is_llama_cpp_python_server(self, command):
         return len(command) >= 3 and command[-2:] == ["-m", "llama_cpp.server"]
 
@@ -206,9 +284,9 @@ class LlamaCppRuntimeManager:
 
         loaded_models = ", ".join(sorted(model_ids)) or "unknown model"
         self.error_message = (
-            f"HORIZONE runtime port {self.runtime_config.llama_cpp_port} is already in use "
+            f"HORIZONE runtime port {self.active_port} is already in use "
             f"by another llama.cpp server loaded with {loaded_models}. Stop that server, "
-            "or set HORIZONE_LLAMA_CPP_PORT to a free port before starting POLAR."
+            "or set HORIZONE_LLAMA_CPP_PORT to a free port before starting HORIZONE."
         )
         return "conflict"
 
@@ -221,3 +299,35 @@ class LlamaCppRuntimeManager:
             if isinstance(item, dict) and item.get("id"):
                 model_ids.add(str(item["id"]))
         return model_ids
+
+    def _is_active_model(self, model):
+        return bool(
+            self.active_model
+            and self.active_model.model_config_id == model.model_config_id
+            and self.active_model.model_name == model.model_name
+            and self.active_model.model_path == model.model_path
+        )
+
+    def _owns_running_process(self):
+        is_running = getattr(self.supervisor, "is_running", None)
+        return bool(is_running and is_running())
+
+    def _parse_optional_int(self, raw_value):
+        if raw_value is None or raw_value == "":
+            return None
+
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError):
+            return None
+
+    def _build_port_range_error(self, conflict_messages):
+        start_port = self.runtime_config.llama_cpp_port
+        end_port = getattr(self.runtime_config, "llama_cpp_port_max", start_port)
+        if conflict_messages:
+            return (
+                f"No free HORIZONE runtime port was available in {start_port}-{end_port}. "
+                f"Last conflict: {conflict_messages[-1]}"
+            )
+
+        return f"No free HORIZONE runtime port was available in {start_port}-{end_port}."

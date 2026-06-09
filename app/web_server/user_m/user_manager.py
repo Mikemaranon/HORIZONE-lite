@@ -49,7 +49,7 @@ class UserManager:
             return
 
         password = bootstrap_admin_password
-        message = "Bootstrap admin user created from POLAR_BOOTSTRAP_ADMIN_PASSWORD"
+        message = "Bootstrap admin user created from HORIZONE_BOOTSTRAP_ADMIN_PASSWORD"
 
         if not password and allow_insecure_default_admin:
             password = "admin"
@@ -57,7 +57,7 @@ class UserManager:
 
         if not password:
             self._log_info(
-                "No admin user created; set POLAR_BOOTSTRAP_ADMIN_PASSWORD to bootstrap local login."
+                "No admin user created; set HORIZONE_BOOTSTRAP_ADMIN_PASSWORD to bootstrap local login."
             )
             return
 

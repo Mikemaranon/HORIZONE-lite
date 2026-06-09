@@ -9,6 +9,7 @@ class RuntimeConfig:
     debug: bool = False
     llama_cpp_binary: str = ""
     llama_cpp_port: int = 8080
+    llama_cpp_port_max: int = 9000
     runtime_models_dir: str = ""
     runtime_disabled: bool = False
     bootstrap_admin_password: str | None = None

@@ -1,6 +1,7 @@
 from model_m import ProviderError
 from .chat_executor import ChatExecutor
 from .chat_request_preparer import ChatRequestPreparer
+from .reasoning_content_filter import sanitize_chat_response
 from .source_attribution_service import SourceAttributionService
 
 
@@ -78,6 +79,7 @@ class ChatService:
         return payload
 
     def _build_source_follow_up_payload(self, prepared, source_follow_up_response):
+        source_follow_up_response = sanitize_chat_response(source_follow_up_response)
         if prepared.stream_requested:
             return self.stream_service.build_static_stream_response(
                 prepared.conversation_id,
@@ -111,6 +113,7 @@ class ChatService:
         except ProviderError:
             raise
 
+        response = sanitize_chat_response(response)
         if prepared.conversation_id:
             self.persistence_service.finalize_response(
                 prepared.conversation_id,

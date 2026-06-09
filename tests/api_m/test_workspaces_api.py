@@ -8,7 +8,7 @@ class WorkspacesApiTests(ApiTestCase):
     def test_project_workspace_can_connect_index_read_and_search(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"
         workspace_root.mkdir()
-        (workspace_root / "app.py").write_text("def hello():\n    return 'polar'\n", encoding="utf-8")
+        (workspace_root / "app.py").write_text("def hello():\n    return 'horizone'\n", encoding="utf-8")
         (workspace_root / "node_modules").mkdir()
         (workspace_root / "node_modules" / "ignored.js").write_text("ignored", encoding="utf-8")
 
@@ -47,11 +47,11 @@ class WorkspacesApiTests(ApiTestCase):
         read_payload = read_response.get_json()
 
         self.assertEqual(read_response.status_code, 200)
-        self.assertIn("return 'polar'", read_payload["file"]["content"])
+        self.assertIn("return 'horizone'", read_payload["file"]["content"])
 
         search_response = self.client.post(
             "/api/workspaces/search",
-            json={"workspace_id": workspace["id"], "query": "polar"},
+            json={"workspace_id": workspace["id"], "query": "horizone"},
             headers=self.auth_headers,
         )
         search_payload = search_response.get_json()

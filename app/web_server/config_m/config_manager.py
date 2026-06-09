@@ -18,19 +18,20 @@ class ConfigManager:
             debug=self._get_env_bool("FLASK_DEBUG", False),
             llama_cpp_binary=os.environ.get("HORIZONE_LLAMA_CPP_BINARY", ""),
             llama_cpp_port=self._get_env_int("HORIZONE_LLAMA_CPP_PORT", 8080),
+            llama_cpp_port_max=self._get_env_int("HORIZONE_LLAMA_CPP_PORT_MAX", 9000),
             runtime_models_dir=self._load_runtime_models_dir(),
             runtime_disabled=self._get_env_bool("HORIZONE_RUNTIME_DISABLED", False),
-            bootstrap_admin_password=os.environ.get("POLAR_BOOTSTRAP_ADMIN_PASSWORD"),
+            bootstrap_admin_password=os.environ.get("HORIZONE_BOOTSTRAP_ADMIN_PASSWORD"),
             allow_insecure_default_admin=self._get_env_bool(
-                "POLAR_ALLOW_INSECURE_DEFAULT_ADMIN",
+                "HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN",
                 False,
             ),
             return_token_in_login_response=self._get_env_bool(
-                "POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE",
+                "HORIZONE_RETURN_TOKEN_IN_LOGIN_RESPONSE",
                 False,
             ),
             allow_public_registration=self._get_env_bool(
-                "POLAR_ALLOW_PUBLIC_REGISTRATION",
+                "HORIZONE_ALLOW_PUBLIC_REGISTRATION",
                 False,
             ),
         )
@@ -71,6 +72,7 @@ class ConfigManager:
                 "debug": self.runtime.debug,
                 "allow_public_registration": self.runtime.allow_public_registration,
                 "llama_cpp_port": self.runtime.llama_cpp_port,
+                "llama_cpp_port_max": self.runtime.llama_cpp_port_max,
                 "runtime_models_dir": self.runtime.runtime_models_dir,
                 "runtime_disabled": self.runtime.runtime_disabled,
             },
@@ -127,7 +129,7 @@ class ConfigManager:
         return str(Path.home() / ".horizone" / "runtime" / "models")
 
     def _load_secret_key(self) -> str:
-        configured = os.environ.get("SECRET_KEY") or os.environ.get("POLAR_SECRET_KEY")
+        configured = os.environ.get("SECRET_KEY") or os.environ.get("HORIZONE_SECRET_KEY")
         if configured:
             return configured
         return secrets.token_urlsafe(48)

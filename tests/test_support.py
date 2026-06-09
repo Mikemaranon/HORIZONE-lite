@@ -29,7 +29,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
         self.tools_path = Path(self.temp_dir.name) / "tools"
         os.environ["APP_DB_PATH"] = str(self.db_path)
         os.environ["HORIZONE_LITE_TOOLS_PATH"] = str(self.tools_path)
-        os.environ["POLAR_ALLOW_INSECURE_DEFAULT_ADMIN"] = "1"
+        os.environ["HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN"] = "1"
         os.environ["SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
         reset_singletons()
 
@@ -37,7 +37,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
         reset_singletons()
         os.environ.pop("APP_DB_PATH", None)
         os.environ.pop("HORIZONE_LITE_TOOLS_PATH", None)
-        os.environ.pop("POLAR_ALLOW_INSECURE_DEFAULT_ADMIN", None)
+        os.environ.pop("HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN", None)
         os.environ.pop("SECRET_KEY", None)
         os.environ.pop("ENABLE_CUSTOM_TOOLS", None)
         self.temp_dir.cleanup()

@@ -78,10 +78,15 @@ class FakeRuntimeManager:
     def __init__(self, snapshot):
         self.snapshot = snapshot
         self.start_calls = 0
+        self.start_args = []
 
-    def start_if_available(self):
+    def start_if_available(self, **kwargs):
         self.start_calls += 1
+        self.start_args.append(kwargs)
         return self.snapshot
+
+    def base_url(self):
+        return self.snapshot.get("base_url", "http://127.0.0.1:8080")
 
 
 def create_cloud_provider(
@@ -659,10 +664,19 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         response = provider.chat(
             [{"role": "user", "content": "Hola"}],
             "gemma-3-1b-it-q4",
-            {"temperature": 0.2, "top_p": 0.8, "max_tokens": 128},
+            {
+                "temperature": 0.2,
+                "top_p": 0.8,
+                "max_tokens": 128,
+                "_model_config_id": 42,
+            },
         )
 
         self.assertEqual(runtime_manager.start_calls, 1)
+        self.assertEqual(
+            runtime_manager.start_args[0],
+            {"model_config_id": 42, "model_name": "gemma-3-1b-it-q4"},
+        )
         payload = fake_http.calls[0]["payload"]
         self.assertTrue(fake_http.calls[0]["url"].endswith("/v1/chat/completions"))
         self.assertEqual(payload["model"], "gemma-3-1b-it-q4")

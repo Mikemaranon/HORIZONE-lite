@@ -56,7 +56,7 @@ class LlamaCppProvider(ModelProvider):
         return models
 
     def chat(self, messages: list[dict], model: str, settings: dict | None = None) -> dict:
-        self._ensure_runtime_ready()
+        self._ensure_runtime_ready(settings=settings, model=model)
         payload = self._build_chat_payload(messages, model, settings, stream=False)
         base_url = self._get_base_url(settings=settings)
 
@@ -86,7 +86,7 @@ class LlamaCppProvider(ModelProvider):
         settings: dict | None = None,
         should_stop=None,
     ):
-        self._ensure_runtime_ready()
+        self._ensure_runtime_ready(settings=settings, model=model)
         payload = self._build_chat_payload(messages, model, settings, stream=True)
         base_url = self._get_base_url(settings=settings)
         content_parts = []
@@ -168,6 +168,17 @@ class LlamaCppProvider(ModelProvider):
 
     def _get_base_url(self, settings=None):
         model_config_id = (settings or {}).get("_model_config_id")
+        configured_endpoint = self.settings_resolver.get_provider_endpoint(
+            self.provider_name,
+            "",
+            model_config_id=model_config_id,
+        )
+        if configured_endpoint:
+            return str(configured_endpoint or "").rstrip("/")
+
+        if self.runtime_manager:
+            return f"{self.runtime_manager.base_url().rstrip('/')}/v1"
+
         base_url = self.settings_resolver.get_provider_endpoint(
             self.provider_name,
             self.config.llama_cpp_base_url,
@@ -175,11 +186,14 @@ class LlamaCppProvider(ModelProvider):
         )
         return str(base_url or "").rstrip("/")
 
-    def _ensure_runtime_ready(self):
+    def _ensure_runtime_ready(self, settings=None, model=None):
         if not self.runtime_manager:
             return
 
-        snapshot = self.runtime_manager.start_if_available()
+        snapshot = self.runtime_manager.start_if_available(
+            model_config_id=(settings or {}).get("_model_config_id"),
+            model_name=model,
+        )
         if snapshot.get("status") == "ready":
             return
 

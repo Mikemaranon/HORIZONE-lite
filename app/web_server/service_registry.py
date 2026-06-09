@@ -36,6 +36,7 @@ class ServiceRegistry:
         self.db_manager = db_manager
         self.user_manager = user_manager
         self.model_manager = model_manager
+        self.runtime_manager = self._resolve_runtime_manager(model_manager)
 
         self.tool_loader = ToolLoader()
         self.tool_registry = ToolRegistry(
@@ -130,3 +131,8 @@ class ServiceRegistry:
             db_manager,
             ingestion_service=self.document_ingestion_service,
         )
+
+    def _resolve_runtime_manager(self, model_manager):
+        provider_manager = getattr(model_manager, "provider_manager", None)
+        provider_registry = getattr(provider_manager, "provider_registry", None)
+        return getattr(provider_registry, "runtime_manager", None)

@@ -45,7 +45,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
 
         from tests.test_support import reset_singletons
 
-        os.environ.pop("POLAR_ALLOW_INSECURE_DEFAULT_ADMIN", None)
+        os.environ.pop("HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN", None)
         reset_singletons()
 
         db = DBManager()

@@ -63,7 +63,7 @@ class ApiEndpointTests(ApiTestCase):
         response = self.client.patch(
             "/api/users/me",
             json={
-                "username": "polar-admin",
+                "username": "horizone-admin",
                 "current_password": "admin",
                 "password": "new-secret",
             },
@@ -74,20 +74,20 @@ class ApiEndpointTests(ApiTestCase):
         refreshed_token = cookie["token"].value
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload["user"]["username"], "polar-admin")
+        self.assertEqual(payload["user"]["username"], "horizone-admin")
         self.assertNotIn("token", payload)
         self.assertNotEqual(refreshed_token, self.token)
         self.assertIsNone(self.db.users.get("admin"))
-        self.assertIsNotNone(self.db.users.get("polar-admin"))
+        self.assertIsNotNone(self.db.users.get("horizone-admin"))
         self.assertFalse(self.user_manager.validate_token(self.token))
         self.assertTrue(self.user_manager.validate_token(refreshed_token))
-        self.assertTrue(self.user_manager.authenticate("polar-admin", "new-secret"))
+        self.assertTrue(self.user_manager.authenticate("horizone-admin", "new-secret"))
 
     def test_current_user_update_requires_valid_current_password(self):
         response = self.client.patch(
             "/api/users/me",
             json={
-                "username": "polar-admin",
+                "username": "horizone-admin",
                 "current_password": "wrong-password",
             },
             headers=self.auth_headers,
@@ -119,6 +119,31 @@ class ApiEndpointTests(ApiTestCase):
         self.assertGreaterEqual(len(payload["catalog"]), 1)
         self.assertEqual(payload["catalog"][0]["provider_type"], "llama_cpp")
         self.assertIn("download", payload["catalog"][0])
+
+    def test_runtime_status_endpoint_returns_llama_cpp_port(self):
+        class FakeRuntimeManager:
+            def snapshot(self):
+                return {
+                    "status": "ready",
+                    "error_message": "",
+                    "base_url": "http://127.0.0.1:8081",
+                    "openai_base_url": "http://127.0.0.1:8081/v1",
+                    "port": 8081,
+                    "port_range": {"start": 8080, "end": 9000},
+                    "active_model": {"model_name": "runtime-model"},
+                }
+
+        self.app.view_functions["get_runtime_status"].__self__.runtime_manager = FakeRuntimeManager()
+
+        response = self.client.get("/api/runtime/status", headers=self.auth_headers)
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["runtime"]["status"], "ready")
+        self.assertEqual(payload["runtime"]["port"], 8081)
+        self.assertEqual(payload["runtime"]["base_url"], "http://127.0.0.1:8081")
+        self.assertEqual(payload["runtime"]["openai_base_url"], "http://127.0.0.1:8081/v1")
+        self.assertEqual(payload["runtime"]["port_range"], {"start": 8080, "end": 9000})
 
     def test_runtime_model_catalog_search_endpoint_returns_matching_models(self):
         calls = []

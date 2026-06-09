@@ -11,11 +11,11 @@ class ConfigManagerTests(unittest.TestCase):
             "HOST",
             "FLASK_DEBUG",
             "SECRET_KEY",
-            "POLAR_SECRET_KEY",
-            "POLAR_BOOTSTRAP_ADMIN_PASSWORD",
-            "POLAR_ALLOW_INSECURE_DEFAULT_ADMIN",
-            "POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE",
-            "POLAR_ALLOW_PUBLIC_REGISTRATION",
+            "HORIZONE_SECRET_KEY",
+            "HORIZONE_BOOTSTRAP_ADMIN_PASSWORD",
+            "HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN",
+            "HORIZONE_RETURN_TOKEN_IN_LOGIN_RESPONSE",
+            "HORIZONE_ALLOW_PUBLIC_REGISTRATION",
             "DEFAULT_PROVIDER",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
@@ -24,6 +24,7 @@ class ConfigManagerTests(unittest.TestCase):
             "HORIZONE_LLAMA_CPP_BASE_URL",
             "HORIZONE_LLAMA_CPP_BINARY",
             "HORIZONE_LLAMA_CPP_PORT",
+            "HORIZONE_LLAMA_CPP_PORT_MAX",
             "HORIZONE_RUNTIME_DISABLED",
             "HORIZONE_RUNTIME_MODELS_DIR",
             "OLLAMA_API_KEY",
@@ -51,12 +52,13 @@ class ConfigManagerTests(unittest.TestCase):
         os.environ["HOST"] = "127.0.0.1"
         os.environ["FLASK_DEBUG"] = "true"
         os.environ["SECRET_KEY"] = "configured-secret"
-        os.environ["POLAR_BOOTSTRAP_ADMIN_PASSWORD"] = "configured-password"
-        os.environ["POLAR_ALLOW_INSECURE_DEFAULT_ADMIN"] = "true"
-        os.environ["POLAR_RETURN_TOKEN_IN_LOGIN_RESPONSE"] = "true"
-        os.environ["POLAR_ALLOW_PUBLIC_REGISTRATION"] = "true"
+        os.environ["HORIZONE_BOOTSTRAP_ADMIN_PASSWORD"] = "configured-password"
+        os.environ["HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN"] = "true"
+        os.environ["HORIZONE_RETURN_TOKEN_IN_LOGIN_RESPONSE"] = "true"
+        os.environ["HORIZONE_ALLOW_PUBLIC_REGISTRATION"] = "true"
         os.environ["HORIZONE_LLAMA_CPP_BINARY"] = "/usr/local/bin/llama-server"
         os.environ["HORIZONE_LLAMA_CPP_PORT"] = "9091"
+        os.environ["HORIZONE_LLAMA_CPP_PORT_MAX"] = "9100"
         os.environ["HORIZONE_RUNTIME_MODELS_DIR"] = "/tmp/horizone-models"
         os.environ["HORIZONE_RUNTIME_DISABLED"] = "true"
 
@@ -72,6 +74,7 @@ class ConfigManagerTests(unittest.TestCase):
         self.assertTrue(config.runtime.allow_public_registration)
         self.assertEqual(config.runtime.llama_cpp_binary, "/usr/local/bin/llama-server")
         self.assertEqual(config.runtime.llama_cpp_port, 9091)
+        self.assertEqual(config.runtime.llama_cpp_port_max, 9100)
         self.assertEqual(config.runtime.runtime_models_dir, "/tmp/horizone-models")
         self.assertTrue(config.runtime.runtime_disabled)
 

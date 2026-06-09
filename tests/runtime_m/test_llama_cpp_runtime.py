@@ -32,10 +32,13 @@ class FakePaths:
 
 class FakeSupervisor:
     def __init__(self, status="ready"):
-        self.status = status
+        self.start_status = status
+        self.status = "stopped"
         self.error_message = ""
         self.start_calls = []
         self.stop_called = False
+        self.stop_calls = 0
+        self.running = False
 
     def start(self, command, *, health_urls=None, timeout_seconds=30, env=None):
         self.start_calls.append(
@@ -46,11 +49,18 @@ class FakeSupervisor:
                 "env": env or {},
             }
         )
-        return self.status == "ready"
+        self.status = self.start_status
+        self.running = self.start_status == "ready"
+        return self.running
 
     def stop(self):
         self.stop_called = True
+        self.stop_calls += 1
+        self.running = False
         self.status = "stopped"
+
+    def is_running(self):
+        return self.running
 
 
 class FakeProcess:
@@ -195,6 +205,7 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
             "FLASK_DEBUG",
             "HORIZONE_LLAMA_CPP_BINARY",
             "HORIZONE_LLAMA_CPP_PORT",
+            "HORIZONE_LLAMA_CPP_PORT_MAX",
             "HORIZONE_RUNTIME_DISABLED",
             "HORIZONE_RUNTIME_MODELS_DIR",
             "WERKZEUG_RUN_MAIN",
@@ -253,6 +264,158 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(supervisor.start_calls[0]["health_urls"][0], "http://127.0.0.1:8080/health")
         self.assertIn("http://127.0.0.1:8080/v1/models", supervisor.start_calls[0]["health_urls"])
         self.assertEqual(snapshot["active_model"]["model_config_id"], model_id)
+
+    def test_uses_next_port_when_first_runtime_port_is_in_conflict(self):
+        os.environ["HORIZONE_LLAMA_CPP_PORT"] = "8080"
+        os.environ["HORIZONE_LLAMA_CPP_PORT_MAX"] = "8081"
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor()
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+        )
+
+        def conflict_on_first_port(model):
+            if manager.active_port == 8080:
+                manager.error_message = "port 8080 is already in use"
+                return "conflict"
+            return None
+
+        manager.runtime_probe = conflict_on_first_port
+        snapshot = manager.start_if_available(model_config_id=model_id)
+
+        self.assertEqual(snapshot["status"], "ready")
+        self.assertEqual(snapshot["port"], 8081)
+        self.assertEqual(snapshot["base_url"], "http://127.0.0.1:8081")
+        self.assertIn("8081", supervisor.start_calls[0]["command"])
+        self.assertEqual(supervisor.start_calls[0]["health_urls"][0], "http://127.0.0.1:8081/health")
+
+    def test_starts_requested_ready_model_instead_of_latest_ready_model(self):
+        db = DBManager()
+        first_model_path = Path(self.temp_dir.name) / "first.gguf"
+        second_model_path = Path(self.temp_dir.name) / "second.gguf"
+        first_model_path.write_text("gguf", encoding="utf-8")
+        second_model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        first_model_id = db.models.create("first-runtime", runtime_provider["id"])
+        second_model_id = db.models.create("second-runtime", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="first-runtime",
+            status="ready",
+            source_url="https://example.test/first.gguf",
+            filename="first.gguf",
+            model_config_id=first_model_id,
+            local_path=str(first_model_path),
+        )
+        db.runtime_model_downloads.create(
+            catalog_key="second-runtime",
+            status="ready",
+            source_url="https://example.test/second.gguf",
+            filename="second.gguf",
+            model_config_id=second_model_id,
+            local_path=str(second_model_path),
+        )
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+        )
+        snapshot = manager.start_if_available(model_config_id=first_model_id)
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertEqual(snapshot["status"], "ready")
+        self.assertEqual(command[1:3], ["-m", str(first_model_path)])
+        self.assertIn("first-runtime", command)
+        self.assertEqual(snapshot["active_model"]["model_config_id"], first_model_id)
+
+    def test_hot_swaps_owned_runtime_when_requested_model_changes(self):
+        db = DBManager()
+        first_model_path = Path(self.temp_dir.name) / "first.gguf"
+        second_model_path = Path(self.temp_dir.name) / "second.gguf"
+        first_model_path.write_text("gguf", encoding="utf-8")
+        second_model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        first_model_id = db.models.create("first-runtime", runtime_provider["id"])
+        second_model_id = db.models.create("second-runtime", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="first-runtime",
+            status="ready",
+            source_url="https://example.test/first.gguf",
+            filename="first.gguf",
+            model_config_id=first_model_id,
+            local_path=str(first_model_path),
+        )
+        db.runtime_model_downloads.create(
+            catalog_key="second-runtime",
+            status="ready",
+            source_url="https://example.test/second.gguf",
+            filename="second.gguf",
+            model_config_id=second_model_id,
+            local_path=str(second_model_path),
+        )
+        supervisor = FakeSupervisor()
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+        )
+
+        first_snapshot = manager.start_if_available(model_config_id=first_model_id)
+        second_snapshot = manager.start_if_available(model_config_id=second_model_id)
+
+        self.assertEqual(first_snapshot["active_model"]["model_config_id"], first_model_id)
+        self.assertEqual(second_snapshot["active_model"]["model_config_id"], second_model_id)
+        self.assertEqual(supervisor.stop_calls, 1)
+        self.assertEqual(len(supervisor.start_calls), 2)
+        self.assertEqual(supervisor.start_calls[1]["command"][1:3], ["-m", str(second_model_path)])
+        self.assertIn("second-runtime", supervisor.start_calls[1]["command"])
+
+    def test_reuses_owned_runtime_when_requested_model_is_already_active(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor()
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+        )
+
+        manager.start_if_available(model_config_id=model_id)
+        snapshot = manager.start_if_available(model_config_id=model_id)
+
+        self.assertEqual(snapshot["status"], "ready")
+        self.assertEqual(len(supervisor.start_calls), 1)
+        self.assertEqual(supervisor.stop_calls, 0)
 
     def test_reuses_matching_runtime_already_listening_on_port(self):
         db = DBManager()

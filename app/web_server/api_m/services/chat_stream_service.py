@@ -6,6 +6,7 @@ import uuid
 
 from model_m import ProviderError
 from .chat_executor import ChatExecutor
+from .reasoning_content_filter import ReasoningStreamFilter, sanitize_chat_response
 from .chat_sse_presenter import ChatSSEPresenter
 
 
@@ -113,6 +114,9 @@ class ChatStreamService:
 
             final_response = None
             streamed_text_parts = []
+            reasoning_filter = ReasoningStreamFilter(
+                hide_unopened_reasoning_prefix=self._may_emit_unopened_reasoning_prefix(model)
+            )
 
             event_stream = self.executor.stream_chat(
                 provider,
@@ -129,9 +133,11 @@ class ChatStreamService:
                 if event_type == "delta":
                     delta = event.get("delta") or ""
                     if delta:
-                        for display_delta in self._iter_display_deltas(delta):
-                            streamed_text_parts.append(display_delta)
-                            yield self._event("delta", {"delta": display_delta})
+                        visible_delta = reasoning_filter.feed(delta)
+                        if visible_delta:
+                            for display_delta in self._iter_display_deltas(visible_delta):
+                                streamed_text_parts.append(display_delta)
+                                yield self._event("delta", {"delta": display_delta})
                     continue
 
                 if event_type == "tool_start":
@@ -158,6 +164,12 @@ class ChatStreamService:
 
                 if event_type == "response":
                     final_response = event.get("response")
+
+            remaining_delta = reasoning_filter.flush()
+            if remaining_delta:
+                for display_delta in self._iter_display_deltas(remaining_delta):
+                    streamed_text_parts.append(display_delta)
+                    yield self._event("delta", {"delta": display_delta})
 
             was_cancelled = cancel_event.is_set()
             final_response = self._resolve_final_response(
@@ -243,6 +255,7 @@ class ChatStreamService:
             },
         )
 
+        response = sanitize_chat_response(response)
         content = ((response.get("message") or {}).get("content") or "")
         if content:
             for display_delta in self._iter_display_deltas(content):
@@ -285,6 +298,7 @@ class ChatStreamService:
                 },
             }
 
+        final_response = sanitize_chat_response(final_response)
         if was_cancelled:
             final_response["finish_reason"] = "cancelled"
             raw_response = final_response.get("raw") or {}
@@ -347,3 +361,10 @@ class ChatStreamService:
     def _pause_between_display_deltas(self):
         if self.display_delta_delay_seconds > 0:
             time.sleep(self.display_delta_delay_seconds)
+
+    def _may_emit_unopened_reasoning_prefix(self, model):
+        normalized_model = str(model or "").lower()
+        return any(
+            marker in normalized_model
+            for marker in ("reasoning", "qwen", "qwq", "kimi")
+        )
