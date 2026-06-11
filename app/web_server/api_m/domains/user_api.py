@@ -50,6 +50,9 @@ class UserAPI(BaseAPI):
         if not user:
             return self.error("User not found", 404)
 
+        user["default_password_active"] = self.user_manager.is_default_password_active(
+            user["username"]
+        )
         user.pop("password", None)
         return self.ok({"user": user})
 
@@ -86,6 +89,9 @@ class UserAPI(BaseAPI):
             "message": "Session profile updated.",
             "user": user,
         }
+        payload["user"]["default_password_active"] = (
+            self.user_manager.is_default_password_active(user["username"])
+        )
         runtime = getattr(self.config_manager, "runtime", None)
         if getattr(runtime, "return_token_in_login_response", False):
             payload["token"] = refreshed_token

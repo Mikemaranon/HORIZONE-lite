@@ -57,6 +57,7 @@ class ApiEndpointTests(ApiTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["user"]["username"], "admin")
         self.assertEqual(payload["user"]["role"], "admin")
+        self.assertTrue(payload["user"]["default_password_active"])
         self.assertNotIn("password", payload["user"])
 
     def test_current_user_can_update_username_and_password(self):
@@ -75,6 +76,7 @@ class ApiEndpointTests(ApiTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["user"]["username"], "horizone-admin")
+        self.assertFalse(payload["user"]["default_password_active"])
         self.assertNotIn("token", payload)
         self.assertNotEqual(refreshed_token, self.token)
         self.assertIsNone(self.db.users.get("admin"))

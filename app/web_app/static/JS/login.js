@@ -1,4 +1,4 @@
-import { loadPage, login, store_token } from "./SERVER_CONN/token-handler.js";
+import { loadPage, login } from "./SERVER_CONN/token-handler.js";
 
 async function handleLoginSubmit(event) {
     event.preventDefault(); // Prevent default form submission
@@ -12,16 +12,13 @@ async function handleLoginSubmit(event) {
         const response = await login(username, password)
 
         const data = await response.json();
-        console.log(data);
 
         if (response.ok) {
-            store_token(data.token);
             loadPage("/index");
         } else {
             errorMessage.textContent = data.error?.message || data.error || "An error occurred.";
         }
     } catch (error) {
-        console.error("Error during login:", error);
         errorMessage.textContent = "Incorrect user, please try again.";
     }
 }

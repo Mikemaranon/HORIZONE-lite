@@ -1,5 +1,6 @@
 import importlib
 import sys
+import unittest
 from pathlib import Path
 
 
@@ -20,6 +21,10 @@ DOMAINS = [
     "tests.tool_m.run",
 ]
 
+TOP_LEVEL_TESTS = [
+    "tests.test_server",
+]
+
 
 def main():
     failed_domains = []
@@ -29,6 +34,12 @@ def main():
         exit_code = module.main()
         if exit_code != 0:
             failed_domains.append(domain_runner)
+
+    for test_module in TOP_LEVEL_TESTS:
+        suite = unittest.defaultTestLoader.loadTestsFromName(test_module)
+        result = unittest.TextTestRunner(verbosity=2).run(suite)
+        if not result.wasSuccessful():
+            failed_domains.append(test_module)
 
     if failed_domains:
         print("\nFailed domains:")

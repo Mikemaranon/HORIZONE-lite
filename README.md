@@ -14,11 +14,11 @@
 
 ## AI That Feels Close, Fast, and Yours
 
-HORIZONE lite is a chat experience inspired by the comfort of modern conversational tools, but designed to give you more control. The app is meant to run in your own environment, keep your conversations organized, and let you choose how you want to work with AI at any moment.
+HORIZONE is a chat experience inspired by the comfort of modern conversational tools, but designed to give you more control. The app is meant to run in your own environment, keep your conversations organized, and let you choose how you want to work with AI at any moment.
 
-This is not just about sending prompts back and forth. HORIZONE lite aims to be a space where you can think, write, explore ideas, and keep context without friction.
+This is not just about sending prompts back and forth. HORIZONE aims to be a space where you can think, write, explore ideas, and keep context without friction.
 
-## What You Can Do With HORIZONE lite
+## What You Can Do With HORIZONE
 
 - Chat with different models from a single interface, without switching tools.
 - Choose between local and remote providers depending on what each conversation needs.
@@ -51,7 +51,7 @@ When a project is deleted, its conversations are kept as standalone chats with n
 
 ## Supported Providers
 
-HORIZONE lite can work with multiple AI paths inside the same app:
+HORIZONE can work with multiple AI paths inside the same app:
 
 - `MLX`: for local inference on Apple Silicon.
 - `Ollama`: for connecting to models served on `localhost`.
@@ -68,8 +68,34 @@ python app/web_server/main.py
 
 Then open the interface in your browser and start creating projects, profiles, and conversations.
 
-By default, HORIZONE lite stores its runtime SQLite database in `.horizone-lite/flask.db` at the project root so local usage data stays out of the versioned source tree. If you need an isolated path for tests or a custom environment, set `APP_DB_PATH`.
+For a core local preview install:
+
+```bash
+pip install -r requirements-core.txt
+```
+
+For Apple Silicon MLX builds, install:
+
+```bash
+pip install -r requirements-mac.txt
+```
+
+For the optional llama.cpp Python runtime, install:
+
+```bash
+pip install -r requirements-runtime-llamacpp.txt
+```
+
+Windows and Linux package builds can start from `requirements-windows.txt` or `requirements-linux.txt` and add optional provider/runtime files only when needed.
+
+By default, HORIZONE stores its runtime SQLite database in a user-level app data directory:
+
+- macOS: `~/Library/Application Support/HORIZONE/flask.db`
+- Windows: `%APPDATA%/HORIZONE/flask.db`
+- Linux: `~/.local/share/horizone/flask.db`
+
+If you need an isolated path for tests or a custom environment, set `APP_DB_PATH`. To move all default app data under a custom parent directory, set `HORIZONE_DATA_DIR`.
 
 ## In One Line
 
-HORIZONE lite is a local-first, flexible, pleasant AI conversation space built to help you choose your models, organize your work, and keep the experience simple from beginning to end.
+HORIZONE is a local-first, flexible, pleasant AI conversation space built to help you choose your models, organize your work, and keep the experience simple from beginning to end.

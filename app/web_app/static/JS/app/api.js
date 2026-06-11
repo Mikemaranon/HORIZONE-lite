@@ -1,4 +1,4 @@
-import { delete_token, getToken, send_API_request } from "../SERVER_CONN/token-handler.js";
+import { delete_token, send_API_request } from "../SERVER_CONN/token-handler.js";
 
 
 export async function apiRequestJson(method, endpoint, body = null) {
@@ -422,11 +422,7 @@ function ensureSuccessfulResponse(response, payload) {
 
 
 async function apiRequestFormData(method, endpoint, body) {
-    const token = getToken();
     const headers = {};
-    if (token) {
-        headers.Authorization = `Bearer ${token}`;
-    }
 
     const response = await fetch(endpoint, {
         method: method.toUpperCase(),

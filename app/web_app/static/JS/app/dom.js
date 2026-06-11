@@ -211,6 +211,8 @@ export const elements = {
     profileDefaultInput: document.getElementById("profile-default-input"),
     sessionUsernameValue: document.getElementById("session-username-value"),
     sessionRoleValue: document.getElementById("session-role-value"),
+    sessionDefaultPasswordWarning: document.getElementById("session-default-password-warning"),
+    sessionDefaultPasswordSummaryWarning: document.getElementById("session-default-password-summary-warning"),
     sessionUsernameInput: document.getElementById("session-username-input"),
     sessionCurrentPasswordInput: document.getElementById("session-current-password-input"),
     sessionNewPasswordInput: document.getElementById("session-new-password-input"),

@@ -13,10 +13,11 @@ class ConfigManager:
     def _load_runtime_config(self) -> RuntimeConfig:
         return RuntimeConfig(
             secret_key=self._load_secret_key(),
-            host=os.environ.get("HOST", "0.0.0.0"),
+            host=os.environ.get("HOST", "127.0.0.1"),
             port=self._get_env_int("PORT", 5050),
             debug=self._get_env_bool("FLASK_DEBUG", False),
             llama_cpp_binary=os.environ.get("HORIZONE_LLAMA_CPP_BINARY", ""),
+            llama_cpp_server_kind=self._load_llama_cpp_server_kind(),
             llama_cpp_port=self._get_env_int("HORIZONE_LLAMA_CPP_PORT", 8080),
             llama_cpp_port_max=self._get_env_int("HORIZONE_LLAMA_CPP_PORT_MAX", 9000),
             runtime_models_dir=self._load_runtime_models_dir(),
@@ -73,6 +74,7 @@ class ConfigManager:
                 "allow_public_registration": self.runtime.allow_public_registration,
                 "llama_cpp_port": self.runtime.llama_cpp_port,
                 "llama_cpp_port_max": self.runtime.llama_cpp_port_max,
+                "llama_cpp_server_kind": self.runtime.llama_cpp_server_kind,
                 "runtime_models_dir": self.runtime.runtime_models_dir,
                 "runtime_disabled": self.runtime.runtime_disabled,
             },
@@ -127,6 +129,13 @@ class ConfigManager:
             return configured
 
         return str(Path.home() / ".horizone" / "runtime" / "models")
+
+    def _load_llama_cpp_server_kind(self) -> str:
+        configured = os.environ.get("HORIZONE_LLAMA_CPP_SERVER_KIND", "native")
+        normalized = configured.strip().lower()
+        if normalized in {"native", "python"}:
+            return normalized
+        return "native"
 
     def _load_secret_key(self) -> str:
         configured = os.environ.get("SECRET_KEY") or os.environ.get("HORIZONE_SECRET_KEY")

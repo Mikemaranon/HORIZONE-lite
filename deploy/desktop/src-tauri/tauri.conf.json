@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HORIZONE",
+  "version": "0.1.0",
+  "identifier": "com.horizone.desktop",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": "http://127.0.0.1:5050",
+    "frontendDist": "../resources/tauri-placeholder"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    },
+    "resources": [
+      "../dist/backend/horizone-backend",
+      "../dist/runtime"
+    ]
+  }
+}

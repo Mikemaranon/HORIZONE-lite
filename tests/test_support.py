@@ -37,6 +37,7 @@ class IsolatedDatabaseTestCase(unittest.TestCase):
         reset_singletons()
         os.environ.pop("APP_DB_PATH", None)
         os.environ.pop("HORIZONE_LITE_TOOLS_PATH", None)
+        os.environ.pop("HORIZONE_DATA_DIR", None)
         os.environ.pop("HORIZONE_ALLOW_INSECURE_DEFAULT_ADMIN", None)
         os.environ.pop("SECRET_KEY", None)
         os.environ.pop("ENABLE_CUSTOM_TOOLS", None)

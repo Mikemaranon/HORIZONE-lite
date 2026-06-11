@@ -17,6 +17,7 @@ import {
     openCreateProviderModal,
 } from "../app/controllers/providers-controller.js";
 import {
+    dismissDefaultPasswordWarning,
     ensureAuthenticated,
     handleLogout,
     handleSessionProfileSubmit,
@@ -79,7 +80,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     bindSettingsUI();
     bootSettingsPage().catch((error) => {
-        console.error(error);
         showStatus(error.message || "The settings page could not be loaded.", true);
     });
 });
@@ -146,6 +146,9 @@ function bindSettingsUI() {
     elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);
     elements.logoutButton?.addEventListener("click", handleLogout);
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
+    document.querySelectorAll("[data-dismiss-default-password-warning]").forEach((button) => {
+        button.addEventListener("click", dismissDefaultPasswordWarning);
+    });
 
     elements.modelForm?.addEventListener("submit", handleModelSubmit);
     elements.providerForm?.addEventListener("submit", handleProviderSubmit);

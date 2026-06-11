@@ -107,7 +107,7 @@ export function renderConversationHeader() {
     if (state.workspaceMode === "settings") {
         elements.workspaceEyebrow.textContent = "Configuration";
         elements.conversationTitle.textContent = "General settings";
-        elements.conversationSubtitle.textContent = "Manage HORIZONE lite providers, models, profiles, and session here.";
+        elements.conversationSubtitle.textContent = "Manage HORIZONE providers, models, profiles, and session here.";
         elements.conversationMeta.innerHTML = "";
         elements.conversationMeta.hidden = true;
         elements.conversationSubtitle.hidden = false;

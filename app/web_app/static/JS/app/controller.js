@@ -122,6 +122,7 @@ import {
     toggleProjectActionsMenu,
 } from "./controllers/projects-controller.js";
 import {
+    dismissDefaultPasswordWarning,
     ensureAuthenticated,
     handleLogout,
     handleSessionProfileSubmit,
@@ -338,6 +339,9 @@ export function bindUI() {
     elements.documentsFileList?.addEventListener("dragstart", handleProjectDocumentDragStart);
     elements.documentsFileList?.addEventListener("dragend", handleProjectDocumentDragEnd);
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
+    document.querySelectorAll("[data-dismiss-default-password-warning]").forEach((button) => {
+        button.addEventListener("click", dismissDefaultPasswordWarning);
+    });
     elements.messagesContainer?.addEventListener("scroll", syncMessagesAutoScrollState, { passive: true });
     elements.messagesContainer?.addEventListener("click", handleToolConfirmationClick);
     elements.messagesContainer?.addEventListener("click", handleReasoningTraceMessageClick);

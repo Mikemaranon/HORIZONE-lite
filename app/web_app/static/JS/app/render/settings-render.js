@@ -23,6 +23,17 @@ export function renderSettingsSpace() {
 
 
 export function renderSettingsSession() {
+    const hasDefaultPassword = Boolean(
+        state.currentUser?.default_password_active
+        && !state.defaultPasswordWarningDismissed
+    );
+    if (elements.sessionDefaultPasswordWarning) {
+        elements.sessionDefaultPasswordWarning.hidden = !hasDefaultPassword;
+    }
+    if (elements.sessionDefaultPasswordSummaryWarning) {
+        elements.sessionDefaultPasswordSummaryWarning.hidden = !hasDefaultPassword;
+    }
+
     if (!elements.sessionUsernameValue || !elements.sessionRoleValue) {
         return;
     }

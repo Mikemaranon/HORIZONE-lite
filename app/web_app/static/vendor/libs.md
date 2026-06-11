@@ -10,7 +10,7 @@ Frontend dependencies are included manually as local vendor files under:
 app/web_app/static/vendor/
 ```
 
-This keeps HORIZONE Lite simple, portable and easy to run in local environments without requiring `npm`, `node_modules`, Vite, Webpack or similar tooling.
+This keeps HORIZONE simple, portable and easy to run in local environments without requiring `npm`, `node_modules`, Vite, Webpack or similar tooling.
 
 ---
 
@@ -30,9 +30,9 @@ app/web_app/static/vendor/highlight/github-dark.min.css
 app/web_app/static/vendor/highlight/LICENSE.txt
 ```
 
-#### Usage in HORIZONE Lite
+#### Usage in HORIZONE
 
-HORIZONE Lite already includes its own Markdown renderer in:
+HORIZONE already includes its own Markdown renderer in:
 
 ```txt
 app/web_app/static/JS/app/markdown.js
@@ -68,7 +68,7 @@ Reasons:
 - No dependency on `node_modules`.
 - Easier offline/local execution.
 - Easier auditing of third-party code.
-- Fits the lightweight philosophy of HORIZONE Lite.
+- Fits the lightweight philosophy of HORIZONE.
 
 #### Notes
 

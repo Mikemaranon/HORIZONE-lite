@@ -31,11 +31,11 @@ class ToolCallingTests(unittest.TestCase):
         parser = ToolCallParser()
 
         tool_call = parser.parse_text(
-            'Use this:\n{"tool_call":{"name":"web_search","arguments":{"query":"horizone lite"},"reason":"Need current sources."}}'
+            'Use this:\n{"tool_call":{"name":"web_search","arguments":{"query":"horizone"},"reason":"Need current sources."}}'
         )
 
         self.assertEqual(tool_call.name, "web_search")
-        self.assertEqual(tool_call.arguments["query"], "horizone lite")
+        self.assertEqual(tool_call.arguments["query"], "horizone")
         self.assertEqual(tool_call.reason, "Need current sources.")
 
     def test_parser_accepts_no_tool_decision(self):
@@ -51,7 +51,7 @@ class ToolCallingTests(unittest.TestCase):
         parser = ToolCallParser()
 
         with self.assertRaises(ToolCallParseError):
-            parser.parse_text('{"tool_call":{"name":"web_search","arguments":"horizone lite"}}')
+            parser.parse_text('{"tool_call":{"name":"web_search","arguments":"horizone"}}')
 
     def test_policy_blocks_high_risk_tools_without_confirmation(self):
         policy = ToolCallPolicy(auto_execute_risks={"read_only"})

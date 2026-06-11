@@ -1,9 +1,7 @@
 import {
     delete_token,
-    getToken,
     loadPage,
     send_API_request,
-    store_token,
 } from "../../SERVER_CONN/token-handler.js";
 import { updateCurrentUser } from "../api.js";
 import { elements } from "../dom.js";
@@ -19,11 +17,17 @@ export function ensureAuthenticated() {
 }
 
 
+export function dismissDefaultPasswordWarning() {
+    state.defaultPasswordWarningDismissed = true;
+    renderSettingsSession();
+}
+
+
 export async function handleLogout() {
     try {
         await send_API_request("POST", "/logout");
     } catch (error) {
-        console.warn("Logout server call failed:", error);
+        // Continue local sign-out even if the session cookie is already gone.
     }
 
     delete_token();
@@ -76,10 +80,6 @@ export async function handleSessionProfileSubmit(event) {
             current_password: currentPassword,
             password: newPassword,
         });
-
-        if (payload.token) {
-            store_token(payload.token);
-        }
 
         applyCurrentUserPayload(payload);
         renderSettingsSession();

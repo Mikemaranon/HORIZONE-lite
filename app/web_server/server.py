@@ -56,7 +56,11 @@ class Server:
             config_manager=self.config_manager,
             db_manager=self.db_manager,
         )
-        runtime_manager.start_if_available()
+        try:
+            runtime_manager.start_if_available()
+        except Exception as error:
+            runtime_manager.status = "error"
+            runtime_manager.error_message = f"HORIZONE runtime startup failed: {error}"
         atexit.register(runtime_manager.stop)
         return runtime_manager
 

@@ -40,7 +40,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         self.assertIsNotNone(db.users.get("admin"))
         self.assertIs(user_manager.db, db)
 
-    def test_admin_bootstrap_requires_explicit_configuration(self):
+    def test_clean_boot_creates_default_admin_preview_login(self):
         import os
 
         from tests.test_support import reset_singletons
@@ -57,7 +57,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
             allow_insecure_default_admin=config_manager.runtime.allow_insecure_default_admin,
         )
 
-        self.assertIsNone(db.users.get("admin"))
+        self.assertIsNotNone(db.users.get("admin"))
 
     def test_creates_default_profile_on_first_boot(self):
         db = DBManager()

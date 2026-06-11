@@ -37,12 +37,29 @@ class DBConnectorTests(IsolatedDatabaseTestCase):
 
     def test_default_path_is_outside_versioned_source_tree(self):
         os.environ.pop("APP_DB_PATH", None)
+        data_dir = self.db_path.parent / "default-data"
+        os.environ["HORIZONE_DATA_DIR"] = str(data_dir)
 
-        connector = DBConnector()
-        default_path = _default_db_path()
-        source_tree_root = Path(__file__).resolve().parents[2] / "app" / "web_server"
+        try:
+            connector = DBConnector()
+            default_path = _default_db_path()
+            source_tree_root = Path(__file__).resolve().parents[2] / "app" / "web_server"
+        finally:
+            os.environ.pop("HORIZONE_DATA_DIR", None)
 
         self.assertEqual(connector.db_path, default_path)
         self.assertFalse(str(default_path).startswith(str(source_tree_root.resolve())))
         self.assertEqual(default_path.name, "flask.db")
-        self.assertEqual(default_path.parent.name, ".horizone-lite")
+        self.assertEqual(default_path.parent, data_dir.resolve())
+
+    def test_horizone_data_dir_overrides_default_parent(self):
+        os.environ.pop("APP_DB_PATH", None)
+        data_dir = self.db_path.parent / "horizone-data"
+        os.environ["HORIZONE_DATA_DIR"] = str(data_dir)
+        try:
+            connector = DBConnector()
+        finally:
+            os.environ.pop("HORIZONE_DATA_DIR", None)
+
+        self.assertEqual(connector.db_path, (data_dir / "flask.db").resolve())
+        self.assertTrue(data_dir.exists())

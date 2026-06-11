@@ -148,7 +148,7 @@ class RuntimeModelCatalogService:
         return payload
 
     def _request_json(self, url):
-        request = Request(url, headers={"User-Agent": "HORIZONE-lite/1.0"})
+        request = Request(url, headers={"User-Agent": "HORIZONE/1.0"})
         try:
             with self.opener(request, timeout=20) as response:
                 raw_payload = response.read().decode("utf-8")

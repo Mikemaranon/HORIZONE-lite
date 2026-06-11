@@ -1,24 +1,13 @@
-const TOKEN_KEY = "auth_token";
-
 export function store_token(token) {
-    if (!token) {
-        return;
-    }
-    try {
-        delete_token(); // Clear any existing token
-    } catch (error) {
-        console.error("Error deleting existing token:", error);
-    }
-    localStorage.setItem(TOKEN_KEY, token);
-    console.log("Token stored:", token);
+    return token || null;
 }
 
 export function getToken() {
-    return localStorage.getItem(TOKEN_KEY);
+    return null;
 }
 
 export function delete_token() {
-    localStorage.removeItem(TOKEN_KEY);
+    return null;
 }
 
 export async function login(username, password) {
@@ -32,23 +21,19 @@ export async function login(username, password) {
         headers: {
             "Content-Type": "application/json"
         },
+        credentials: "same-origin",
         body: JSON.stringify({ username, password })
     };
-
-    console.log("loging... :", endpoint, options);
 
     try {
         const response = await fetch(endpoint, options);
         return response;
     } catch (error) {
-        console.error("Error in API request:", error);
         throw error;
     }
 }
 
 export async function send_API_request(method, endpoint, body = null, requestOptions = {}) {
-    const token = localStorage.getItem(TOKEN_KEY);
-
     const options = {
         method: method.toUpperCase(),
         headers: {
@@ -57,10 +42,6 @@ export async function send_API_request(method, endpoint, body = null, requestOpt
         credentials: "same-origin",
     };
 
-    if (token) {
-        options.headers.Authorization = "Bearer " + token;
-    }
-    
     if (body && method.toUpperCase() !== "GET") {
         options.body = JSON.stringify(body);
     }
@@ -69,20 +50,13 @@ export async function send_API_request(method, endpoint, body = null, requestOpt
         options.signal = requestOptions.signal;
     }
 
-    console.log("Fetching:", endpoint, options);
-
     try {
         return await fetch(endpoint, options);
     } catch (error) {
-        console.error("Error in API request:", error);
         throw error;
     }
 }
 
 export async function loadPage(url) {
-    try {
-        window.location.href = url;
-    } catch (error) {
-        console.error("Error loading page:", error);
-    }
+    window.location.href = url;
 }

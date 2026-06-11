@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HORIZONE lite · Settings</title>
+    <title>HORIZONE · Settings</title>
     <link rel="stylesheet" href="/static/CSS/index.css">
     <script type="module" src="/static/JS/settings/main.js"></script>
 </head>
@@ -21,7 +21,7 @@
             <div class="settings-page__account">
                 <div id="settings-account-avatar" class="settings-page__account-avatar" aria-hidden="true">H</div>
                 <div class="settings-page__account-copy">
-                    <strong id="settings-account-name" class="settings-page__account-name">HORIZONE lite</strong>
+                    <strong id="settings-account-name" class="settings-page__account-name">HORIZONE</strong>
                     <p id="settings-account-meta" class="settings-page__account-meta">
                         Local workspace configuration
                     </p>
@@ -88,7 +88,7 @@
                             <p id="workspace-eyebrow" class="workspace__eyebrow" hidden></p>
                             <h2 id="conversation-title" class="workspace__title">General settings</h2>
                             <p id="conversation-subtitle" class="workspace__subtitle settings-page__header-subtitle">
-                                Configure HORIZONE lite's global components here without mixing them into the chat experience.
+                                Configure HORIZONE's global components here without mixing them into the chat experience.
                             </p>
                         </div>
                     </div>
@@ -212,6 +212,18 @@
                                     <span class="settings-page__session-label">Current user</span>
                                     <strong id="session-username-value" class="settings-page__session-value">No session</strong>
                                     <span id="session-role-value" class="settings-page__session-role">Role: unknown</span>
+                                    <p id="session-default-password-summary-warning" class="session-warning" hidden>
+                                        <span>Default local password detected. Please change it from Settings before using HORIZONE regularly.</span>
+                                        <button
+                                            class="session-warning__close"
+                                            type="button"
+                                            aria-label="Dismiss default password warning"
+                                            title="Dismiss"
+                                            data-dismiss-default-password-warning="true"
+                                        >
+                                            ×
+                                        </button>
+                                    </p>
                                 </div>
 
                                 <div class="settings-page__session-actions">
@@ -485,6 +497,18 @@
                         </label>
                         <p class="field__help">
                             If you change the password, the rest of this user's active sessions will be signed out for security.
+                        </p>
+                        <p id="session-default-password-warning" class="session-warning" hidden>
+                            <span>Default local password detected. Please change it from Settings before using HORIZONE regularly.</span>
+                            <button
+                                class="session-warning__close"
+                                type="button"
+                                aria-label="Dismiss default password warning"
+                                title="Dismiss"
+                                data-dismiss-default-password-warning="true"
+                            >
+                                ×
+                            </button>
                         </p>
                         <div class="settings-block__actions">
                             <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancel</button>

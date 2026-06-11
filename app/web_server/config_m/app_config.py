@@ -4,10 +4,11 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RuntimeConfig:
     secret_key: str
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 5050
     debug: bool = False
     llama_cpp_binary: str = ""
+    llama_cpp_server_kind: str = "native"
     llama_cpp_port: int = 8080
     llama_cpp_port_max: int = 9000
     runtime_models_dir: str = ""

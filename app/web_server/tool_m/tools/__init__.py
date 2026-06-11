@@ -1,1 +1,1 @@
-# Built-in tools for HORIZONE lite.
+# Built-in tools for HORIZONE.

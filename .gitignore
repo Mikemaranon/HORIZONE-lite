@@ -8,3 +8,11 @@ mini-TODO
 audit.md
 llama.md
 .DS_Store
+zertan-builds
+build.md
+deploy/builds/*/files/*
+deploy/builds/*/desktop/
+deploy/desktop/build/
+deploy/desktop/dist/
+deploy/desktop/src-tauri/gen/
+deploy/desktop/src-tauri/target/

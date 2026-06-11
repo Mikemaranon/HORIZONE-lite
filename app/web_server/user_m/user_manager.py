@@ -51,15 +51,9 @@ class UserManager:
         password = bootstrap_admin_password
         message = "Bootstrap admin user created from HORIZONE_BOOTSTRAP_ADMIN_PASSWORD"
 
-        if not password and allow_insecure_default_admin:
-            password = "admin"
-            message = "Insecure default admin user created by explicit opt-in"
-
         if not password:
-            self._log_info(
-                "No admin user created; set HORIZONE_BOOTSTRAP_ADMIN_PASSWORD to bootstrap local login."
-            )
-            return
+            password = "admin"
+            message = "Default local admin user created for first-run preview login"
 
         hashed = generate_password_hash(password)
         self.db.users.create(
@@ -77,6 +71,12 @@ class UserManager:
                 return True
 
         return False
+
+    def is_default_password_active(self, username: str) -> bool:
+        user = self.db.users.get(username)
+        if not user:
+            return False
+        return check_password_hash(user["password"], "admin")
 
     def get_token_from_cookie(self, request):
         token = request.cookies.get("token")

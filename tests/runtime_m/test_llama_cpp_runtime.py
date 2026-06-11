@@ -2,6 +2,7 @@ import os
 import json
 import struct
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 from config_m import ConfigManager
@@ -208,6 +209,8 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
             "HORIZONE_LLAMA_CPP_PORT_MAX",
             "HORIZONE_RUNTIME_DISABLED",
             "HORIZONE_RUNTIME_MODELS_DIR",
+            "HOST",
+            "PORT",
             "WERKZEUG_RUN_MAIN",
         ]:
             os.environ.pop(key, None)
@@ -538,6 +541,79 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
         self.assertIn(str(model_path), command)
         self.assertIn("--model_alias", command)
         self.assertIn("runtime-model", command)
+        self.assertEqual(supervisor.start_calls[0]["env"]["GGML_METAL_DEVICES"], "-1")
+
+    def test_runtime_process_does_not_inherit_backend_host_or_port(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("", ["python", "-m", "llama_cpp.server"]),
+            supervisor=supervisor,
+            environ={
+                "HOST": "127.0.0.1",
+                "PORT": "53121",
+                "GGML_METAL_DEVICES": "0",
+            },
+        )
+        manager.start_if_available()
+
+        runtime_env = supervisor.start_calls[0]["env"]
+        self.assertNotIn("HOST", runtime_env)
+        self.assertNotIn("PORT", runtime_env)
+        self.assertEqual(runtime_env["GGML_METAL_DEVICES"], "0")
+
+    def test_starts_bundled_llama_cpp_python_executable_with_python_server_args(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        config_manager = ConfigManager()
+        config_manager.runtime = replace(
+            config_manager.runtime,
+            llama_cpp_binary="/Applications/HORIZONE.app/Contents/Resources/_up_/dist/runtime/horizone-llama-server",
+            llama_cpp_server_kind="python",
+        )
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=config_manager,
+            db_manager=db,
+            paths=FakePaths(config_manager.runtime.llama_cpp_binary),
+            supervisor=supervisor,
+        )
+        snapshot = manager.start_if_available()
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertEqual(snapshot["status"], "ready")
+        self.assertEqual(command[0], config_manager.runtime.llama_cpp_binary)
+        self.assertIn("--model", command)
+        self.assertIn("--model_alias", command)
+        self.assertNotIn("-m", command)
+        self.assertNotIn("--alias", command)
         self.assertEqual(supervisor.start_calls[0]["env"]["GGML_METAL_DEVICES"], "-1")
 
     def test_preserves_configured_metal_device_filter_for_llama_cpp_python_server(self):

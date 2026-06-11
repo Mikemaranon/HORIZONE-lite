@@ -23,6 +23,7 @@ class ConfigManagerTests(unittest.TestCase):
             "GOOGLE_BASE_URL",
             "HORIZONE_LLAMA_CPP_BASE_URL",
             "HORIZONE_LLAMA_CPP_BINARY",
+            "HORIZONE_LLAMA_CPP_SERVER_KIND",
             "HORIZONE_LLAMA_CPP_PORT",
             "HORIZONE_LLAMA_CPP_PORT_MAX",
             "HORIZONE_RUNTIME_DISABLED",
@@ -40,12 +41,13 @@ class ConfigManagerTests(unittest.TestCase):
         config = ConfigManager()
 
         self.assertEqual(config.runtime.port, 5050)
-        self.assertEqual(config.runtime.host, "0.0.0.0")
+        self.assertEqual(config.runtime.host, "127.0.0.1")
         self.assertFalse(config.runtime.debug)
         self.assertTrue(config.runtime.secret_key)
         self.assertFalse(config.runtime.allow_insecure_default_admin)
         self.assertFalse(config.runtime.return_token_in_login_response)
         self.assertFalse(config.runtime.allow_public_registration)
+        self.assertEqual(config.runtime.llama_cpp_server_kind, "native")
 
     def test_runtime_values_can_be_overridden(self):
         os.environ["PORT"] = "9090"
@@ -57,6 +59,7 @@ class ConfigManagerTests(unittest.TestCase):
         os.environ["HORIZONE_RETURN_TOKEN_IN_LOGIN_RESPONSE"] = "true"
         os.environ["HORIZONE_ALLOW_PUBLIC_REGISTRATION"] = "true"
         os.environ["HORIZONE_LLAMA_CPP_BINARY"] = "/usr/local/bin/llama-server"
+        os.environ["HORIZONE_LLAMA_CPP_SERVER_KIND"] = "python"
         os.environ["HORIZONE_LLAMA_CPP_PORT"] = "9091"
         os.environ["HORIZONE_LLAMA_CPP_PORT_MAX"] = "9100"
         os.environ["HORIZONE_RUNTIME_MODELS_DIR"] = "/tmp/horizone-models"
@@ -73,6 +76,7 @@ class ConfigManagerTests(unittest.TestCase):
         self.assertTrue(config.runtime.return_token_in_login_response)
         self.assertTrue(config.runtime.allow_public_registration)
         self.assertEqual(config.runtime.llama_cpp_binary, "/usr/local/bin/llama-server")
+        self.assertEqual(config.runtime.llama_cpp_server_kind, "python")
         self.assertEqual(config.runtime.llama_cpp_port, 9091)
         self.assertEqual(config.runtime.llama_cpp_port_max, 9100)
         self.assertEqual(config.runtime.runtime_models_dir, "/tmp/horizone-models")

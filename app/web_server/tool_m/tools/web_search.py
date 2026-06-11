@@ -53,7 +53,7 @@ def run(arguments: dict) -> dict:
     request = Request(
         SEARCH_ENDPOINT.format(query=quote_plus(query)),
         headers={
-            "User-Agent": "HORIZONE-lite/0.1",
+            "User-Agent": "HORIZONE/0.1",
         },
     )
 

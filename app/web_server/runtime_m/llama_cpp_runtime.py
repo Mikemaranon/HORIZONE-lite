@@ -197,6 +197,8 @@ class LlamaCppRuntimeManager:
 
     def build_environment(self, launch_command):
         environment = dict(self.environ)
+        environment.pop("HOST", None)
+        environment.pop("PORT", None)
         if self._is_llama_cpp_python_server(list(launch_command)):
             environment.setdefault("GGML_METAL_DEVICES", "-1")
         return environment
@@ -267,7 +269,11 @@ class LlamaCppRuntimeManager:
             yield port
 
     def _is_llama_cpp_python_server(self, command):
-        return len(command) >= 3 and command[-2:] == ["-m", "llama_cpp.server"]
+        if len(command) >= 3 and command[-2:] == ["-m", "llama_cpp.server"]:
+            return True
+        return str(
+            getattr(self.runtime_config, "llama_cpp_server_kind", "native") or "native"
+        ).strip().lower() == "python"
 
     def _probe_existing_runtime(self, model):
         try:

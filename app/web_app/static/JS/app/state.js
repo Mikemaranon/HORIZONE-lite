@@ -13,6 +13,7 @@ export const state = {
     workspaceTools: [],
     settings: {},
     currentUser: null,
+    defaultPasswordWarningDismissed: false,
     workspaceMode: "home",
     activeProjectId: null,
     activeConversationId: null,

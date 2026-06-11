@@ -83,7 +83,7 @@ export function syncSettingsCategoryUI() {
         descriptionNode.textContent = activeConfig.description;
     }
 
-    document.title = `HORIZONE lite · ${activeConfig.title}`;
+    document.title = `HORIZONE · ${activeConfig.title}`;
 }
 
 
@@ -116,7 +116,7 @@ function renderSettingsSidebarAccount() {
     const accountNameNode = document.getElementById("settings-account-name");
     const accountMetaNode = document.getElementById("settings-account-meta");
     const accountAvatarNode = document.getElementById("settings-account-avatar");
-    const username = state.currentUser?.username || "HORIZONE lite";
+    const username = state.currentUser?.username || "HORIZONE";
     const role = state.currentUser?.role || "local";
     const initial = String(username).trim().charAt(0).toUpperCase() || "H";
 

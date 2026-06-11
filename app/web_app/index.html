@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HORIZONE lite</title>
+    <title>HORIZONE</title>
     <link rel="stylesheet" href="/static/vendor/highlight/github-dark.min.css">
     <link rel="stylesheet" href="/static/CSS/index.css">
     <script src="/static/vendor/highlight/highlight.min.js"></script>
@@ -23,12 +23,12 @@
             <div class="sidebar__inner">
                 <div class="sidebar__top">
                     <div class="brand">
-                        <img class="brand__logo-full" src="/static/assets/logos/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE lite">
+                        <img class="brand__logo-full" src="/static/assets/logos/HORIZONE_FULL_LOGO.PNG" alt="HORIZONE">
                     </div>
                     <nav class="sidebar-links" aria-label="Quick links">
                         <a
                             class="sidebar-link"
-                            href="https://github.com/Mikemaranon/HORIZONE-lite"
+                            href="https://github.com/Mikemaranon/HORIZONE"
                             rel="noreferrer"
                         >
                             <span class="sidebar-link__label">
@@ -201,9 +201,28 @@
                         </div>
                     </section>
 
+                    <section
+                        id="session-default-password-summary-warning"
+                        class="session-warning session-warning--inline"
+                        role="status"
+                        aria-live="polite"
+                        hidden
+                    >
+                        <span>Default local password detected. Please change it from Settings before using HORIZONE regularly.</span>
+                        <button
+                            class="session-warning__close"
+                            type="button"
+                            aria-label="Dismiss default password warning"
+                            title="Dismiss"
+                            data-dismiss-default-password-warning="true"
+                        >
+                            ×
+                        </button>
+                    </section>
+
                     <section class="chat-surface">
                         <div id="empty-state" class="empty-state">
-                            <p class="empty-state__eyebrow">HORIZONE lite</p>
+                            <p class="empty-state__eyebrow">HORIZONE</p>
                             <h3>Your local space for talking to models.</h3>
                             <p>
                                 Create a chat, open general settings for the model, and use the chat panel to choose a profile and prepare tools without leaving this view.
@@ -358,7 +377,7 @@
                                         <div>
                                             <h4>Tools</h4>
                                             <p class="settings-block__copy">
-                                                Enable or disable global tools and upload Python files that follow the HORIZONE lite contract.
+                                                Enable or disable global tools and upload Python files that follow the HORIZONE contract.
                                             </p>
                                         </div>
                                         <div class="settings-block__actions settings-block__actions--tools">
@@ -430,7 +449,7 @@
                                 </div>
                             </div>
                             <p class="composer__footer-note">
-                                HORIZONE lite can respond using MLX, Ollama, or OpenAI based on your active configuration.
+                                HORIZONE can respond using MLX, Ollama, or OpenAI based on your active configuration.
                             </p>
                         </form>
                     </footer>
@@ -1145,6 +1164,18 @@
                         </label>
                         <p class="field__help">
                             If you change the password, the rest of this user's active sessions will be signed out for security.
+                        </p>
+                        <p id="session-default-password-warning" class="session-warning" hidden>
+                            <span>Default local password detected. Please change it from Settings before using HORIZONE regularly.</span>
+                            <button
+                                class="session-warning__close"
+                                type="button"
+                                aria-label="Dismiss default password warning"
+                                title="Dismiss"
+                                data-dismiss-default-password-warning="true"
+                            >
+                                ×
+                            </button>
                         </p>
                         <div class="settings-block__actions">
                             <button id="session-profile-cancel-button" class="ghost-button" type="button">Cancel</button>
