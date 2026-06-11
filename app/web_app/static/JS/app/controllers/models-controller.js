@@ -37,6 +37,7 @@ import {
     setModelModalState,
     setPendingModelConfigId,
     setRuntimeModelCatalogSearchState,
+    setRuntimeModelCatalogViabilityFilter,
     setSelectedSettingsModelId,
 } from "../state-actions.js";
 import { state } from "../state.js";
@@ -44,13 +45,7 @@ import { showStatus } from "../status-ui.js";
 import { loadConversations, loadModels, loadRuntimeModelCatalog, searchRuntimeModelCatalog } from "../store.js";
 import { requiresProviderSelection } from "../model-form-validation.js";
 
-const ALLOWED_MODEL_ICON_TYPES = new Set([
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-    "image/gif",
-]);
-const MAX_MODEL_ICON_SIZE_BYTES = 512 * 1024;
+const MAX_MODEL_ICON_SIZE_BYTES = 10 * 1024 * 1024;
 let runtimeDownloadPollTimer = null;
 let runtimeCatalogSearchTimer = null;
 let runtimeCatalogSearchRequestId = 0;
@@ -257,6 +252,8 @@ export function openRuntimeModelCatalog() {
         results: [],
         isSearching: false,
     });
+    setRuntimeModelCatalogViabilityFilter("all");
+    syncRuntimeModelCatalogViabilityFilterButtons();
     if (elements.runtimeModelCatalogSearchInput) {
         elements.runtimeModelCatalogSearchInput.value = "";
     }
@@ -271,6 +268,18 @@ export function closeRuntimeModelCatalog() {
 }
 
 
+export function handleRuntimeModelCatalogViabilityFilterClick(event) {
+    const button = event.target.closest("[data-runtime-model-viability-filter]");
+    if (!button) {
+        return;
+    }
+
+    setRuntimeModelCatalogViabilityFilter(button.dataset.runtimeModelViabilityFilter);
+    syncRuntimeModelCatalogViabilityFilterButtons();
+    renderRuntimeModelCatalogSearchResults();
+}
+
+
 export function handleRuntimeModelCatalogSearchInput(event) {
     if (event.target.id !== "runtime-model-catalog-search") {
         return;
@@ -278,6 +287,15 @@ export function handleRuntimeModelCatalogSearchInput(event) {
 
     const query = event.target.value || "";
     queueRuntimeModelCatalogSearch(query);
+}
+
+
+export function syncRuntimeModelCatalogViabilityFilterButtons() {
+    elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
+        const isActive = button.dataset.runtimeModelViabilityFilter === state.runtimeModelCatalogViabilityFilter;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
 }
 
 
@@ -636,12 +654,12 @@ async function readModelIconFromInput() {
         return "";
     }
 
-    if (!ALLOWED_MODEL_ICON_TYPES.has(file.type)) {
-        throw new Error("The icon must be PNG, JPEG, WEBP, or GIF.");
+    if (!file.type.startsWith("image/")) {
+        throw new Error("The icon must be an image.");
     }
 
     if (file.size > MAX_MODEL_ICON_SIZE_BYTES) {
-        throw new Error("The icon exceeds the 512 KB limit.");
+        throw new Error("The icon exceeds the 10 MB limit.");
     }
 
     return new Promise((resolve, reject) => {

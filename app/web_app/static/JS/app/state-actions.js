@@ -308,6 +308,14 @@ export function setRuntimeModelCatalogSearchState({
 }
 
 
+export function setRuntimeModelCatalogViabilityFilter(filter = "all") {
+    const normalized = String(filter || "all").trim().toLowerCase();
+    state.runtimeModelCatalogViabilityFilter = ["all", "blue", "yellow", "red"].includes(normalized)
+        ? normalized
+        : "all";
+}
+
+
 export function applyRuntimeModelDownloadsPayload(data) {
     state.runtimeModelDownloads = data.downloads || [];
 }

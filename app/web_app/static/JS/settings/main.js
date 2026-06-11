@@ -3,6 +3,7 @@ import {
     handleModelIconInputChange,
     handleModelSubmit,
     handleRuntimeModelCatalogSearchInput,
+    handleRuntimeModelCatalogViabilityFilterClick,
     openCreateModelModal,
     openRuntimeModelCatalog,
 } from "../app/controllers/models-controller.js";
@@ -19,8 +20,12 @@ import {
 import {
     dismissDefaultPasswordWarning,
     ensureAuthenticated,
+    handleSessionAvatarChangeClick,
+    handleSessionAvatarDelete,
+    handleSessionAvatarInputChange,
     handleLogout,
     handleSessionProfileSubmit,
+    openSessionAvatarEditor,
     openSessionProfileEditor,
 } from "../app/controllers/session-controller.js";
 import {
@@ -40,6 +45,7 @@ import {
     closeRuntimeModelCatalogModal,
     closeProfileModal,
     closeProviderModal,
+    closeSessionAvatarModal,
     closeSessionProfileModal,
     closeToolUploadModal,
 } from "../app/modal-ui.js";
@@ -144,6 +150,10 @@ function bindSettingsUI() {
     elements.settingsFilterToolsButton?.addEventListener("click", handleToolsFilterToggle);
 
     elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);
+    elements.sessionAvatarEditButton?.addEventListener("click", openSessionAvatarEditor);
+    elements.sessionAvatarChangeButton?.addEventListener("click", handleSessionAvatarChangeClick);
+    elements.sessionAvatarDeleteButton?.addEventListener("click", handleSessionAvatarDelete);
+    elements.sessionAvatarInput?.addEventListener("change", handleSessionAvatarInputChange);
     elements.logoutButton?.addEventListener("click", handleLogout);
     elements.statusBannerCloseButton?.addEventListener("click", dismissStatusBanner);
     document.querySelectorAll("[data-dismiss-default-password-warning]").forEach((button) => {
@@ -169,6 +179,7 @@ function bindSettingsUI() {
     elements.providerCancelButton?.addEventListener("click", closeProviderModal);
     elements.profileCancelButton?.addEventListener("click", closeProfileModal);
     elements.closeSessionProfileButton?.addEventListener("click", closeSessionProfileModal);
+    elements.closeSessionAvatarButton?.addEventListener("click", closeSessionAvatarModal);
     elements.sessionProfileCancelButton?.addEventListener("click", closeSessionProfileModal);
     elements.closeToolUploadButton?.addEventListener("click", closeToolUploadModal);
     elements.toolUploadCancelButton?.addEventListener("click", closeToolUploadModal);
@@ -182,10 +193,14 @@ function bindSettingsUI() {
     elements.providerModal?.addEventListener("click", handleModalBackdropClick("closeProviderModal", closeProviderModal));
     elements.profileModal?.addEventListener("click", handleModalBackdropClick("closeProfileModal", closeProfileModal));
     elements.sessionProfileModal?.addEventListener("click", handleModalBackdropClick("closeSessionProfileModal", closeSessionProfileModal));
+    elements.sessionAvatarModal?.addEventListener("click", handleModalBackdropClick("closeSessionAvatarModal", closeSessionAvatarModal));
     elements.toolUploadModal?.addEventListener("click", handleModalBackdropClick("closeToolUploadModal", closeToolUploadModal));
     document.getElementById("settings-sidebar-toggle")?.addEventListener("click", toggleSettingsSidebar);
     document.getElementById("settings-sidebar-backdrop")?.addEventListener("click", closeSettingsSidebar);
     elements.runtimeModelCatalogSearchInput?.addEventListener("input", handleRuntimeModelCatalogSearchInput);
+    elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
+        button.addEventListener("click", handleRuntimeModelCatalogViabilityFilterClick);
+    });
 
     document.addEventListener("click", handleSettingsDocumentClick);
     document.addEventListener("keydown", handleSettingsEscape);
@@ -236,6 +251,12 @@ function handleSettingsEscape(event) {
 
     if (elements.sessionProfileModal && !elements.sessionProfileModal.hidden) {
         closeSessionProfileModal();
+        event.stopPropagation();
+        return;
+    }
+
+    if (elements.sessionAvatarModal && !elements.sessionAvatarModal.hidden) {
+        closeSessionAvatarModal();
         event.stopPropagation();
         return;
     }

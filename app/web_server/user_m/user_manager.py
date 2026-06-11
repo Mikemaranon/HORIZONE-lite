@@ -148,6 +148,7 @@ class UserManager:
                 {
                     "username": current_username,
                     "role": user["role"],
+                    "avatar_image": user.get("avatar_image", ""),
                 },
                 token,
             )
@@ -170,9 +171,28 @@ class UserManager:
             {
                 "username": normalized_username,
                 "role": user["role"],
+                "avatar_image": user.get("avatar_image", ""),
             },
             refreshed_token,
         )
+
+    def update_user_avatar(self, token: str, avatar_image: str):
+        session = self.db.sessions.get(token)
+        if session is None:
+            raise ValueError("Unauthorized")
+
+        username = session["username"]
+        user = self.db.users.get(username)
+        if user is None:
+            raise ValueError("User not found")
+
+        self.db.users.update_avatar(username, avatar_image or "")
+        refreshed_user = self.db.users.get(username)
+        return {
+            "username": refreshed_user["username"],
+            "role": refreshed_user["role"],
+            "avatar_image": refreshed_user.get("avatar_image", ""),
+        }
     
     def login(self, username: str, password: str):
         if self.authenticate(username, password):

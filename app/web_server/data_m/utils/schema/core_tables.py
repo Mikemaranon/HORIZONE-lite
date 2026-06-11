@@ -4,6 +4,7 @@ CORE_SCHEMA_STATEMENTS = [
         username TEXT PRIMARY KEY,
         password TEXT NOT NULL,
         role TEXT DEFAULT 'user',
+        avatar_image TEXT DEFAULT '',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         is_active INTEGER DEFAULT 1,

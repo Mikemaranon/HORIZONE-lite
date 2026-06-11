@@ -40,9 +40,29 @@ export function renderSettingsSession() {
 
     const username = state.currentUser?.username || "No session";
     const role = state.currentUser?.role || "unknown";
+    const avatarImage = state.currentUser?.avatar_image || "";
+    const fallbackInitial = getUserInitial(username);
 
     elements.sessionUsernameValue.textContent = username;
     elements.sessionRoleValue.textContent = `Role: ${role}`;
+    renderUserAvatarElement(elements.sessionAvatarPreview, username, avatarImage, fallbackInitial);
+    renderUserAvatarElement(elements.sessionAvatarModalPreview, username, avatarImage, fallbackInitial);
+    if (elements.sessionAvatarDeleteButton) {
+        elements.sessionAvatarDeleteButton.disabled = !avatarImage;
+    }
+
+    const accountNameNode = document.getElementById("settings-account-name");
+    const accountMetaNode = document.getElementById("settings-account-meta");
+    const accountAvatarNode = document.getElementById("settings-account-avatar");
+    if (accountNameNode) {
+        accountNameNode.textContent = username;
+    }
+    if (accountMetaNode) {
+        accountMetaNode.textContent = role === "admin"
+            ? "Administrator account for this local installation"
+            : `${role} account for this local installation`;
+    }
+    renderUserAvatarElement(accountAvatarNode, username, avatarImage, fallbackInitial);
 }
 
 
@@ -198,7 +218,8 @@ export function renderRuntimeModelCatalogSearchResults() {
     }
 
     const query = String(state.runtimeModelCatalogSearchQuery || "").trim();
-    const catalog = state.runtimeModelCatalogSearchResults || [];
+    const catalog = filterRuntimeCatalogByViability(state.runtimeModelCatalogSearchResults || []);
+    syncRuntimeCatalogFilterButtonState();
 
     if (!query) {
         elements.runtimeModelCatalogResults.innerHTML = "";
@@ -212,7 +233,7 @@ export function renderRuntimeModelCatalogSearchResults() {
 
     elements.runtimeModelCatalogResults.innerHTML = catalog.length
         ? catalog.map(createRuntimeCatalogCardMarkup).join("")
-        : `<div class="profiles-manager__empty">No matching GGUF models were found.</div>`;
+        : `<div class="profiles-manager__empty">${escapeHtml(getRuntimeCatalogEmptyMessage())}</div>`;
 }
 
 
@@ -284,6 +305,7 @@ function createRuntimeCatalogCardMarkup(entry) {
             </a>
         `
         : "";
+    const viabilityMarkup = createHardwareViabilityMarkup(entry.hardware_viability);
     const detailTags = [
         entry.quantization,
         entry.recommended_ram_gb ? `${entry.recommended_ram_gb} GB RAM` : "",
@@ -302,6 +324,7 @@ function createRuntimeCatalogCardMarkup(entry) {
                 </div>
                 <div class="runtime-model-card__actions">
                     ${linkMarkup}
+                    ${viabilityMarkup}
                     ${actionMarkup}
                 </div>
             </div>
@@ -316,6 +339,61 @@ function createRuntimeCatalogCardMarkup(entry) {
             ${download.error_message ? `<p class="runtime-model-card__error">${escapeHtml(download.error_message)}</p>` : ""}
         </article>
     `;
+}
+
+
+function createHardwareViabilityMarkup(viability) {
+    const color = normalizeViabilityColor(viability?.color);
+    const level = viability?.level || "unknown";
+    const required = Number(viability?.required_ram_gb || 0);
+    const hardware = viability?.hardware || {};
+    const capacity = hardware.vram_gb || hardware.ram_gb || 0;
+    const capacityLabel = hardware.vram_gb ? `${hardware.vram_gb} GB VRAM` : `${capacity || "?"} GB RAM`;
+    const title = `${viability?.label || "Local viability unknown"} ${required ? `Estimated need: ${required} GB. ` : ""}Detected: ${capacityLabel}.`;
+
+    return `
+        <span
+            class="runtime-model-card__viability runtime-model-card__viability--${escapeHtml(color)}"
+            title="${escapeHtml(title)}"
+            aria-label="${escapeHtml(`Model viability: ${level}`)}"
+        ></span>
+    `;
+}
+
+
+function filterRuntimeCatalogByViability(catalog) {
+    const activeFilter = state.runtimeModelCatalogViabilityFilter || "all";
+    if (activeFilter === "all") {
+        return catalog;
+    }
+
+    return catalog.filter((entry) => (
+        normalizeViabilityColor(entry.hardware_viability?.color) === activeFilter
+    ));
+}
+
+
+function getRuntimeCatalogEmptyMessage() {
+    const filter = state.runtimeModelCatalogViabilityFilter || "all";
+    if (filter === "all") {
+        return "No matching GGUF models were found.";
+    }
+    return `No ${filter} models match the current search.`;
+}
+
+
+function normalizeViabilityColor(color) {
+    const normalized = String(color || "yellow").trim().toLowerCase();
+    return normalized === "green" ? "blue" : normalized;
+}
+
+
+function syncRuntimeCatalogFilterButtonState() {
+    elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
+        const isActive = button.dataset.runtimeModelViabilityFilter === (state.runtimeModelCatalogViabilityFilter || "all");
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
 }
 
 
@@ -384,6 +462,23 @@ function formatBytes(bytes) {
         unitIndex += 1;
     }
     return `${normalized.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+
+function renderUserAvatarElement(element, username, avatarImage, fallbackInitial) {
+    if (!element) {
+        return;
+    }
+
+    element.innerHTML = avatarImage
+        ? `<img src="${escapeHtml(avatarImage)}" alt="${escapeHtml(username)}">`
+        : escapeHtml(fallbackInitial);
+    element.classList.toggle("has-image", Boolean(avatarImage));
+}
+
+
+function getUserInitial(username) {
+    return String(username || "H").trim().charAt(0).toUpperCase() || "H";
 }
 
 
@@ -1011,14 +1106,18 @@ function createModelCardMarkup(model, { includeDefaultBadge = false } = {}) {
                 <div class="chat-profile-card__heading">
                     <div class="chat-profile-card__identity">
                         ${createModelAvatarMarkup(modelLabel, model.icon_image, "model-badge-avatar model-badge-avatar--card")}
-                        <strong>${escapeHtml(modelLabel)}</strong>
+                        <strong class="chat-profile-card__model-label">${escapeHtml(modelLabel)}</strong>
                     </div>
                 </div>
                 ${defaultBadge}
             </div>
             <div class="chat-profile-card__tags">
-                <span class="chat-profile-card__tag">${escapeHtml(model.name)}</span>
-                <span class="chat-profile-card__tag">${escapeHtml(model.provider_name || getProviderTypeDisplayName(model.provider))}</span>
+                <span class="chat-profile-card__tag chat-profile-card__tag--truncate">
+                    <span class="chat-profile-card__tag-text">${escapeHtml(model.name)}</span>
+                </span>
+                <span class="chat-profile-card__tag chat-profile-card__tag--truncate">
+                    <span class="chat-profile-card__tag-text">${escapeHtml(model.provider_name || getProviderTypeDisplayName(model.provider))}</span>
+                </span>
             </div>
         </article>
     `;

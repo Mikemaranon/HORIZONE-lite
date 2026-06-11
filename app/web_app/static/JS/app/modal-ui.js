@@ -122,6 +122,16 @@ export function closeSessionProfileModal() {
 }
 
 
+export function openSessionAvatarModal() {
+    openModal(elements.sessionAvatarModal);
+}
+
+
+export function closeSessionAvatarModal() {
+    closeModal(elements.sessionAvatarModal);
+}
+
+
 export function openModelModal() {
     openModal(elements.modelModal);
 }

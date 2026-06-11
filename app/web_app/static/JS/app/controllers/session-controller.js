@@ -3,9 +3,14 @@ import {
     loadPage,
     send_API_request,
 } from "../../SERVER_CONN/token-handler.js";
-import { updateCurrentUser } from "../api.js";
+import { updateCurrentUser, updateCurrentUserAvatar } from "../api.js";
 import { elements } from "../dom.js";
-import { closeSessionProfileModal, openSessionProfileModal } from "../modal-ui.js";
+import {
+    closeSessionAvatarModal,
+    closeSessionProfileModal,
+    openSessionAvatarModal,
+    openSessionProfileModal,
+} from "../modal-ui.js";
 import { renderSettingsSession } from "../render.js";
 import { applyCurrentUserPayload } from "../state-actions.js";
 import { state } from "../state.js";
@@ -45,6 +50,50 @@ export function openSessionProfileEditor() {
     openSessionProfileModal();
     elements.sessionUsernameInput.focus({ preventScroll: true });
     elements.sessionUsernameInput.select();
+}
+
+
+export function openSessionAvatarEditor() {
+    renderSettingsSession();
+    openSessionAvatarModal();
+    elements.sessionAvatarChangeButton?.focus({ preventScroll: true });
+}
+
+
+export function handleSessionAvatarChangeClick() {
+    elements.sessionAvatarInput?.click();
+}
+
+
+export async function handleSessionAvatarInputChange(event) {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    if (!file) {
+        return;
+    }
+    if (!file.type.startsWith("image/")) {
+        showStatus("Choose an image file for the profile photo.", true);
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        showStatus("Choose an image smaller than 10 MB.", true);
+        return;
+    }
+
+    try {
+        const avatarImage = await readFileAsDataUrl(file);
+        await saveSessionAvatar(avatarImage);
+    } catch (error) {
+        showStatus(error.message || "The profile photo could not be updated.", true);
+    }
+}
+
+
+export async function handleSessionAvatarDelete() {
+    if (!state.currentUser?.avatar_image) {
+        return;
+    }
+    await saveSessionAvatar("");
 }
 
 
@@ -89,4 +138,27 @@ export async function handleSessionProfileSubmit(event) {
     } catch (error) {
         showStatus(error.message || "The session profile could not be updated.", true);
     }
+}
+
+
+async function saveSessionAvatar(avatarImage) {
+    try {
+        const payload = await updateCurrentUserAvatar(avatarImage);
+        applyCurrentUserPayload(payload);
+        renderSettingsSession();
+        closeSessionAvatarModal();
+        showStatus(payload.message || "Profile photo updated.");
+    } catch (error) {
+        showStatus(error.message || "The profile photo could not be updated.", true);
+    }
+}
+
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => resolve(String(reader.result || "")));
+        reader.addEventListener("error", () => reject(new Error("The image could not be read.")));
+        reader.readAsDataURL(file);
+    });
 }

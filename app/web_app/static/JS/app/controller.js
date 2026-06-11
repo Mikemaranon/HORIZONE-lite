@@ -51,6 +51,7 @@ import {
     handleModelSearchInput,
     handleModelSubmit,
     handleRuntimeModelCatalogSearchInput,
+    handleRuntimeModelCatalogViabilityFilterClick,
     openCreateModelModal,
     openModelSwitcher,
     openRuntimeModelCatalog,
@@ -124,8 +125,12 @@ import {
 import {
     dismissDefaultPasswordWarning,
     ensureAuthenticated,
+    handleSessionAvatarChangeClick,
+    handleSessionAvatarDelete,
+    handleSessionAvatarInputChange,
     handleLogout,
     handleSessionProfileSubmit,
+    openSessionAvatarEditor,
     openSessionProfileEditor,
 } from "./controllers/session-controller.js";
 import { elements } from "./dom.js";
@@ -141,6 +146,7 @@ import {
     closeProfileSwitchModal,
     closeProjectCustomizeModal,
     closeProviderModal,
+    closeSessionAvatarModal,
     closeSessionProfileModal,
     closeToolTraceModal,
     closeToolUploadModal,
@@ -320,10 +326,15 @@ export function bindUI() {
     elements.deleteProjectButton?.addEventListener("click", handleProjectDelete);
     elements.settingsNewProfileButton?.addEventListener("click", () => openCreateProfileModal("settings"));
     elements.editSessionProfileButton?.addEventListener("click", openSessionProfileEditor);
+    elements.sessionAvatarEditButton?.addEventListener("click", openSessionAvatarEditor);
+    elements.sessionAvatarChangeButton?.addEventListener("click", handleSessionAvatarChangeClick);
+    elements.sessionAvatarDeleteButton?.addEventListener("click", handleSessionAvatarDelete);
+    elements.sessionAvatarInput?.addEventListener("change", handleSessionAvatarInputChange);
     elements.modelCancelButton?.addEventListener("click", closeModelModal);
     elements.providerCancelButton?.addEventListener("click", closeProviderModal);
     elements.profileCancelButton?.addEventListener("click", closeProfileModal);
     elements.closeSessionProfileButton?.addEventListener("click", closeSessionProfileModal);
+    elements.closeSessionAvatarButton?.addEventListener("click", closeSessionAvatarModal);
     elements.sessionProfileCancelButton?.addEventListener("click", closeSessionProfileModal);
     elements.sessionProfileForm?.addEventListener("submit", handleSessionProfileSubmit);
     elements.documentsInput?.addEventListener("change", handleDocumentsSelected);
@@ -360,12 +371,16 @@ export function bindUI() {
     elements.chatExportModal?.addEventListener("click", handleChatExportModalClick);
     elements.profileModal?.addEventListener("click", handleProfileModalClick);
     elements.sessionProfileModal?.addEventListener("click", handleSessionProfileModalClick);
+    elements.sessionAvatarModal?.addEventListener("click", handleSessionAvatarModalClick);
     elements.projectCustomizeModal?.addEventListener("click", handleProjectModalClick);
     elements.documentsModal?.addEventListener("click", handleDocumentsModalClick);
     elements.toolUploadModal?.addEventListener("click", handleToolUploadModalClick);
     elements.toolTraceModal?.addEventListener("click", handleToolTraceModalClick);
     elements.modelSwitchSearchInput?.addEventListener("input", handleModelSearchInput);
     elements.runtimeModelCatalogSearchInput?.addEventListener("input", handleRuntimeModelCatalogSearchInput);
+    elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
+        button.addEventListener("click", handleRuntimeModelCatalogViabilityFilterClick);
+    });
     elements.modelSwitchSearchClearButton?.addEventListener("click", handleModelSearchClear);
     elements.projectAgentSwitchSearchInput?.addEventListener("input", handleProjectAgentSearchInput);
     elements.projectAgentSwitchSearchClearButton?.addEventListener("click", handleProjectAgentSearchClear);
@@ -474,6 +489,13 @@ function handleProjectModalClick(event) {
 function handleSessionProfileModalClick(event) {
     if (event.target.dataset.closeSessionProfileModal === "true") {
         closeSessionProfileModal();
+    }
+}
+
+
+function handleSessionAvatarModalClick(event) {
+    if (event.target.dataset.closeSessionAvatarModal === "true") {
+        closeSessionAvatarModal();
     }
 }
 

@@ -77,6 +77,13 @@
 
 .workspace-connect-dialog__panel {
     width: min(680px, 100%);
+    max-height: min(760px, calc(100dvh - 36px));
+}
+
+.workspace-connect-dialog__panel .project-create-dialog__form {
+    min-height: 0;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+    overflow: hidden;
 }
 
 .modal__header {
@@ -206,6 +213,7 @@
 }
 
 .workspace-dialog-files {
+    min-height: 0;
     display: grid;
     gap: 10px;
     padding: 12px;
@@ -223,37 +231,41 @@
     font-weight: 650;
 }
 
-.workspace-dialog-files__list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.workspace-dialog-file,
-.workspace-dialog-files__empty {
-    max-width: min(300px, 100%);
-    padding: 5px 8px;
-    border-radius: 6px;
-    background: rgba(30, 31, 25, 0.06);
+.workspace-dialog-files__tree {
+    min-width: 0;
+    min-height: 0;
+    max-height: 42dvh;
+    margin: 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(24, 27, 25, 0.05);
     color: var(--text);
+    font-family: "SFMono-Regular", "SF Mono", "Menlo", "Monaco", monospace;
     font-size: 0.78rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.55;
+    overflow: auto;
+    white-space: pre;
 }
 
-.workspace-dialog-files__empty {
+.workspace-dialog-files__tree:empty::before {
+    content: "No indexed files shown yet.";
     color: var(--text-soft);
-    background: transparent;
-    padding-left: 0;
 }
 
 .workspace-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+    margin: 0 -24px -24px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--line);
+    background: rgba(247, 249, 244, 0.96);
+    backdrop-filter: blur(14px);
 }
 
 .workspace-dialog-actions__secondary,

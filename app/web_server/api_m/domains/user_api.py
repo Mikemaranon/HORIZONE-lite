@@ -9,6 +9,7 @@ class UserAPI(BaseAPI):
         self.app.add_url_rule("/api/users/register", view_func=self.register_user, methods=["POST"])
         self.app.add_url_rule("/api/users/me", view_func=self.get_current_user, methods=["GET"])
         self.app.add_url_rule("/api/users/me", view_func=self.update_current_user, methods=["PATCH"])
+        self.app.add_url_rule("/api/users/me/avatar", view_func=self.update_current_user_avatar, methods=["PATCH"])
         self.app.add_url_rule("/api/users/get", view_func=self.get_user, methods=["POST"])
         self.app.add_url_rule("/api/users/all", view_func=self.get_all_users, methods=["GET"])
         self.app.add_url_rule("/api/users/delete", view_func=self.delete_user, methods=["DELETE"])
@@ -106,6 +107,34 @@ class UserAPI(BaseAPI):
             max_age=60 * 60,
         )
         return response, status_code
+
+    def update_current_user_avatar(self):
+        auth = self.authenticate_request(request)
+        if auth is not True:
+            return auth
+
+        token = self.user_manager.get_token_from_cookie(request)
+        if not token:
+            token = self.user_manager.get_request_token(request)
+
+        data = self.get_request_json(request)
+        avatar_image = (data.get("avatar_image") or "").strip()
+        if avatar_image and not avatar_image.startswith("data:image/"):
+            return self.error("Avatar must be an image data URL.", 400)
+        if len(avatar_image) > 14_500_000:
+            return self.error("Avatar image is too large.", 400)
+
+        try:
+            user = self.user_manager.update_user_avatar(token, avatar_image)
+        except ValueError as error:
+            message = str(error)
+            status_code = 401 if message == "Unauthorized" else 400
+            return self.error(message, status_code)
+
+        user["default_password_active"] = self.user_manager.is_default_password_active(
+            user["username"]
+        )
+        return self.ok({"message": "Profile photo updated.", "user": user})
 
     def get_user(self):
 

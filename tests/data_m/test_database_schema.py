@@ -42,6 +42,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
                 "hot_path_indexes",
                 "llama_cpp_runtime_foundation",
                 "message_reasoning_content",
+                "user_avatar_image",
             ],
         )
         self.assertIn("idx_messages_conversation_position", message_index_names)
@@ -207,3 +208,58 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
 
         self.assertIn("reasoning_content", message_column_names)
         self.assertIn("message_reasoning_content", migration_names)
+
+    def test_existing_migrated_database_receives_user_avatar_column(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            for version, name in [
+                (1, "legacy_column_backfills"),
+                (2, "project_models_shape"),
+                (3, "project_model_defaults"),
+                (4, "chat_integrity_indexes"),
+                (5, "hot_path_indexes"),
+                (6, "llama_cpp_runtime_foundation"),
+                (7, "message_reasoning_content"),
+            ]:
+                connection.execute(
+                    "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
+                    (version, name),
+                )
+            connection.execute(
+                """
+                CREATE TABLE users (
+                    username TEXT PRIMARY KEY,
+                    password TEXT NOT NULL,
+                    role TEXT DEFAULT 'user'
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        database = Database()
+
+        _, user_columns = database.execute("PRAGMA table_info(users)", fetchall=True)
+        _, migration_rows = database.execute(
+            """
+            SELECT version, name
+            FROM schema_migrations
+            ORDER BY version ASC
+            """,
+            fetchall=True,
+        )
+        user_column_names = {column[1] for column in user_columns}
+        migration_names = [row[1] for row in migration_rows]
+
+        self.assertIn("avatar_image", user_column_names)
+        self.assertIn("user_avatar_image", migration_names)

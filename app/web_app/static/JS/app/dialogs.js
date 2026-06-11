@@ -237,10 +237,10 @@ function ensureWorkspaceDialog() {
                     </label>
                     <section id="workspace-connect-files-section" class="workspace-dialog-files" hidden>
                         <div class="workspace-dialog-files__header">
-                            <span>Indexed files</span>
+                            <span>Workspace tree</span>
                             <span id="workspace-connect-file-count">0 files</span>
                         </div>
-                        <div id="workspace-connect-files" class="workspace-dialog-files__list"></div>
+                        <pre id="workspace-connect-files" class="workspace-dialog-files__tree" aria-label="Workspace tree"></pre>
                     </section>
                     <p id="workspace-connect-error" class="form-error" hidden>Enter a local folder path.</p>
                     <div class="workspace-dialog-actions">
@@ -360,7 +360,7 @@ async function handleWorkspaceFolderBrowse() {
 function configureWorkspaceDialog(state, existingWorkspace, workspaceMeta) {
     const isConnected = !!existingWorkspace;
     const fileCount = Number(workspaceMeta.fileCount || 0);
-    const files = (workspaceMeta.files || []).slice(0, 5);
+    const files = workspaceMeta.files || [];
     const indexedLabel = existingWorkspace?.last_indexed_at
         ? `Last indexed ${existingWorkspace.last_indexed_at}`
         : "Not indexed yet";
@@ -389,19 +389,64 @@ function configureWorkspaceDialog(state, existingWorkspace, workspaceMeta) {
     }
 
     if (!files.length) {
-        const emptyNode = document.createElement("span");
-        emptyNode.className = "workspace-dialog-files__empty";
-        emptyNode.textContent = "No indexed files shown yet.";
-        state.filesList.appendChild(emptyNode);
+        state.filesList.textContent = "No indexed files shown yet.";
         return;
     }
 
-    files.forEach((file) => {
-        const fileNode = document.createElement("span");
-        fileNode.className = "workspace-dialog-file";
-        fileNode.title = file.path || "";
-        fileNode.textContent = file.path || "";
-        state.filesList.appendChild(fileNode);
+    state.filesList.textContent = createWorkspaceTreeText(files);
+}
+
+
+function createWorkspaceTreeText(files) {
+    const root = createTreeNode(".");
+    for (const file of files || []) {
+        addPathToTree(root, String(file.path || "").split("/").filter(Boolean), file.kind || "file");
+    }
+    return renderTreeNode(root).join("\n");
+}
+
+
+function createTreeNode(name, kind = "directory") {
+    return { name, kind, children: new Map() };
+}
+
+
+function addPathToTree(root, parts, kind) {
+    if (!parts.length) {
+        return;
+    }
+    let current = root;
+    parts.forEach((part, index) => {
+        const isLeaf = index === parts.length - 1;
+        if (!current.children.has(part)) {
+            current.children.set(part, createTreeNode(part, isLeaf ? kind : "directory"));
+        }
+        current = current.children.get(part);
+        if (isLeaf) {
+            current.kind = kind;
+        }
+    });
+}
+
+
+function renderTreeNode(root) {
+    const lines = [root.name];
+    renderTreeChildren(root, "", lines);
+    return lines;
+}
+
+
+function renderTreeChildren(node, prefix, lines) {
+    const children = [...node.children.values()].sort((left, right) => {
+        if (left.kind !== right.kind) {
+            return left.kind === "directory" ? -1 : 1;
+        }
+        return left.name.localeCompare(right.name);
+    });
+    children.forEach((child, index) => {
+        const isLast = index === children.length - 1;
+        lines.push(`${prefix}${isLast ? "└── " : "├── "}${child.name}`);
+        renderTreeChildren(child, `${prefix}${isLast ? "    " : "│   "}`, lines);
     });
 }
 

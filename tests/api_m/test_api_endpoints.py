@@ -85,6 +85,30 @@ class ApiEndpointTests(ApiTestCase):
         self.assertTrue(self.user_manager.validate_token(refreshed_token))
         self.assertTrue(self.user_manager.authenticate("horizone-admin", "new-secret"))
 
+    def test_current_user_can_update_and_delete_avatar(self):
+        response = self.client.patch(
+            "/api/users/me/avatar",
+            json={"avatar_image": self.MODEL_ICON_DATA_URL},
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["user"]["avatar_image"], self.MODEL_ICON_DATA_URL)
+        self.assertEqual(
+            self.client.get("/api/users/me", headers=self.auth_headers).get_json()["user"]["avatar_image"],
+            self.MODEL_ICON_DATA_URL,
+        )
+
+        delete_response = self.client.patch(
+            "/api/users/me/avatar",
+            json={"avatar_image": ""},
+            headers=self.auth_headers,
+        )
+
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.get_json()["user"]["avatar_image"], "")
+
     def test_current_user_update_requires_valid_current_password(self):
         response = self.client.patch(
             "/api/users/me",

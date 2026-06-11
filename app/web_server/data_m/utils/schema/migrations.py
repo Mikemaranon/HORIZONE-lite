@@ -40,6 +40,7 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("project_models", "color", "TEXT DEFAULT '#1c8b59'"),
     ColumnMigration("project_models", "system_prompt", "TEXT DEFAULT ''"),
     ColumnMigration("project_models", "is_default", "INTEGER NOT NULL DEFAULT 0"),
+    ColumnMigration("users", "avatar_image", "TEXT DEFAULT ''"),
 ]
 
 
@@ -51,4 +52,5 @@ VERSIONED_SCHEMA_MIGRATIONS = [
     SchemaMigration(5, "hot_path_indexes"),
     SchemaMigration(6, "llama_cpp_runtime_foundation"),
     SchemaMigration(7, "message_reasoning_content"),
+    SchemaMigration(8, "user_avatar_image"),
 ]

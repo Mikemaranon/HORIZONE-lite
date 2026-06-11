@@ -8,6 +8,7 @@ export const state = {
     runtimeModelCatalog: [],
     runtimeModelCatalogSearchResults: [],
     runtimeModelCatalogSearchQuery: "",
+    runtimeModelCatalogViabilityFilter: "all",
     isRuntimeModelCatalogSearching: false,
     runtimeModelDownloads: [],
     workspaceTools: [],

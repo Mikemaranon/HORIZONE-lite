@@ -23,6 +23,7 @@ const DEFAULT_AGENT_COLOR = "#1c8b59";
 export function renderMessages({ preserveViewport = false } = {}) {
     const showConversation = state.workspaceMode === "conversation" && !!state.activeConversation;
     const showEmptyState = state.workspaceMode === "home";
+    const activeProject = getActiveProject();
 
     syncChatExportState();
 
@@ -36,6 +37,14 @@ export function renderMessages({ preserveViewport = false } = {}) {
     }
 
     elements.messagesContainer.hidden = false;
+    if (!state.activeMessages.length) {
+        elements.messagesContainer.innerHTML = activeProject
+            ? createProjectConversationEmptyMarkup(activeProject)
+            : "";
+        enableMessagesAutoScroll();
+        return;
+    }
+
     elements.messagesContainer.innerHTML = state.activeMessages
         .map((message, index, messages) => createMessageMarkup(message, {
             previousMessage: messages[index - 1] || null,
@@ -52,6 +61,17 @@ export function renderMessages({ preserveViewport = false } = {}) {
 
     enableMessagesAutoScroll();
     scrollMessagesToBottom();
+}
+
+
+function createProjectConversationEmptyMarkup(project) {
+    return `
+        <div class="empty-state empty-state--project-chat">
+            <p class="empty-state__eyebrow">HORIZONE</p>
+            <h3>${escapeHtml(project.name || "Project")} project chat.</h3>
+            <p>How should we start our new task?</p>
+        </div>
+    `;
 }
 
 
@@ -93,9 +113,11 @@ export function renderConversationHeader() {
     }
 
     if (state.workspaceMode === "project" && activeProject) {
-        const workspaceName = state.projectWorkspace?.display_name || activeProject.name || "Project";
+        const workspaceName = state.projectWorkspace?.display_name || "No workspace connected";
         elements.workspaceEyebrow.textContent = "Project";
-        elements.conversationTitle.textContent = `Active workspace: ${workspaceName}`;
+        elements.conversationTitle.textContent = state.projectWorkspace
+            ? `Workspace: ${workspaceName}`
+            : workspaceName;
         elements.conversationMeta.innerHTML = createProjectAgentChipsMarkup(getProjectModels());
         elements.conversationMeta.hidden = false;
         elements.conversationSubtitle.hidden = true;

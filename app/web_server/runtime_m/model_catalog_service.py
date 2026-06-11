@@ -4,6 +4,7 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from .exceptions import RuntimeRequestError
+from .hardware_profile import LocalHardwareProfile
 
 class RuntimeModelCatalogService:
     HUGGING_FACE_MODELS_URL = "https://huggingface.co/api/models"
@@ -28,6 +29,7 @@ class RuntimeModelCatalogService:
             Path(__file__).resolve().parent / "catalog" / "llama_models.json"
         )
         self.opener = opener or urlopen
+        self.hardware_profile = LocalHardwareProfile()
 
     def sync_catalog(self):
         entries = self._load_catalog_file()
@@ -77,6 +79,7 @@ class RuntimeModelCatalogService:
                     "is_installed": bool(model),
                     "model_config_id": model["id"] if model else (download or {}).get("model_config_id"),
                     "download": download,
+                    "hardware_viability": self.hardware_profile.assess_model(entry),
                 }
             )
         return catalog

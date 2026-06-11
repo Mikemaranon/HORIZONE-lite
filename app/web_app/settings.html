@@ -208,10 +208,21 @@
                     <section class="settings-page__panel" data-settings-category-panel="session" hidden>
                         <section class="settings-block">
                             <div class="settings-page__session-summary">
-                                <div class="settings-page__session-card">
-                                    <span class="settings-page__session-label">Current user</span>
-                                    <strong id="session-username-value" class="settings-page__session-value">No session</strong>
-                                    <span id="session-role-value" class="settings-page__session-role">Role: unknown</span>
+                                <div class="settings-page__session-card session-profile-preview">
+                                    <button
+                                        id="session-avatar-edit-button"
+                                        class="session-profile-preview__avatar-button"
+                                        type="button"
+                                        aria-label="Edit profile photo"
+                                        title="Edit profile photo"
+                                    >
+                                        <span id="session-avatar-preview" class="session-profile-preview__avatar" aria-hidden="true">H</span>
+                                        <span class="session-profile-preview__edit-icon" aria-hidden="true">
+                                            <img src="/static/assets/icons/pencil.png" alt="">
+                                        </span>
+                                    </button>
+                                    <strong id="session-username-value" class="settings-page__session-value session-profile-preview__name">No session</strong>
+                                    <span id="session-role-value" class="settings-page__session-role session-profile-preview__role" hidden>Role: unknown</span>
                                     <p id="session-default-password-summary-warning" class="session-warning" hidden>
                                         <span>Default local password detected. Please change it from Settings before using HORIZONE regularly.</span>
                                         <button
@@ -226,7 +237,7 @@
                                     </p>
                                 </div>
 
-                                <div class="settings-page__session-actions">
+                                <div class="settings-page__session-actions settings-block__actions--centered">
                                     <button class="ghost-button" id="edit-session-profile-button" type="button">Edit profile</button>
                                     <button class="ghost-button" id="logout-button" type="button">Sign out</button>
                                 </div>
@@ -270,6 +281,21 @@
                             autocomplete="off"
                         >
                     </label>
+                    <div class="runtime-catalog__viability-filter" aria-label="Filter by model viability">
+                        <button class="runtime-catalog__filter-button is-active" type="button" data-runtime-model-viability-filter="all">All</button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="blue">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--blue" aria-hidden="true"></span>
+                            Blue
+                        </button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="yellow">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--yellow" aria-hidden="true"></span>
+                            Yellow
+                        </button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="red">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--red" aria-hidden="true"></span>
+                            Red
+                        </button>
+                    </div>
                     <div id="runtime-model-catalog-results" class="runtime-catalog__grid runtime-catalog__grid--modal" aria-live="polite"></div>
                 </section>
             </div>
@@ -318,7 +344,7 @@
                                     <input
                                         id="model-icon-input"
                                         type="file"
-                                        accept="image/png,image/jpeg,image/webp,image/gif"
+                                        accept="image/*"
                                     >
                                     <p class="field__help">
                                         Upload a lightweight logo to identify this model in chat responses.
@@ -515,6 +541,30 @@
                             <button id="session-profile-submit-button" class="action-button action-button--primary" type="submit">Save changes</button>
                         </div>
                     </form>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="session-avatar-modal" class="modal" hidden>
+        <div class="modal__backdrop" data-close-session-avatar-modal="true"></div>
+        <div class="modal__panel modal__panel--narrow modal__panel--avatar">
+            <div class="modal__header">
+                <div>
+                    <p class="modal__eyebrow">Profile photo</p>
+                    <h3>Edit photo</h3>
+                </div>
+                <button id="close-session-avatar-button" class="icon-button" type="button" aria-label="Close profile photo">×</button>
+            </div>
+
+            <div class="modal__body">
+                <section class="settings-block session-avatar-editor">
+                    <span id="session-avatar-modal-preview" class="session-avatar-editor__preview" aria-hidden="true">H</span>
+                    <input id="session-avatar-input" type="file" accept="image/*" hidden>
+                    <div class="settings-block__actions settings-block__actions--centered">
+                        <button id="session-avatar-change-button" class="action-button action-button--primary" type="button">Change</button>
+                        <button id="session-avatar-delete-button" class="ghost-button ghost-button--danger" type="button" disabled>Delete</button>
+                    </div>
                 </section>
             </div>
         </div>

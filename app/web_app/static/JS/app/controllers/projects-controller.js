@@ -140,6 +140,7 @@ export async function handleNewProjectChat({ handleConversationSelect, closeSide
         renderApp();
         await handleConversationSelect(payload.conversation.id, { closeSidebarOnMobile });
         closeSidebarOnMobile();
+        elements.composerInput?.focus({ preventScroll: true });
     } catch (error) {
         showStatus(error.message || "The project chat could not be created.", true);
     }

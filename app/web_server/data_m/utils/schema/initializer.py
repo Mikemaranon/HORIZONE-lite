@@ -47,6 +47,7 @@ class DatabaseSchemaInitializer:
             "hot_path_indexes": self.ensure_hot_path_indexes,
             "llama_cpp_runtime_foundation": self.ensure_llama_cpp_runtime_foundation,
             "message_reasoning_content": self.ensure_message_reasoning_content,
+            "user_avatar_image": self.ensure_user_avatar_image,
         }
 
         for migration in self.versioned_migrations:
@@ -257,6 +258,9 @@ class DatabaseSchemaInitializer:
         ]
         for statement in statements:
             database.execute(statement)
+
+    def ensure_user_avatar_image(self, database):
+        self.ensure_column(database, "users", "avatar_image", "TEXT DEFAULT ''")
 
     def ensure_llama_cpp_runtime_foundation(self, database):
         self.ensure_column(

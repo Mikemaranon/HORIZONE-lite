@@ -1,6 +1,6 @@
 [package]
 name = "horizone-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "HORIZONE desktop shell"
 authors = ["HORIZONE"]
 edition = "2021"

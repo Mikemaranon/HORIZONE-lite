@@ -118,6 +118,7 @@ function renderSettingsSidebarAccount() {
     const accountAvatarNode = document.getElementById("settings-account-avatar");
     const username = state.currentUser?.username || "HORIZONE";
     const role = state.currentUser?.role || "local";
+    const avatarImage = state.currentUser?.avatar_image || "";
     const initial = String(username).trim().charAt(0).toUpperCase() || "H";
 
     if (accountNameNode) {
@@ -129,6 +130,19 @@ function renderSettingsSidebarAccount() {
             : `${role} account for this local installation`;
     }
     if (accountAvatarNode) {
-        accountAvatarNode.textContent = initial;
+        accountAvatarNode.innerHTML = avatarImage
+            ? `<img src="${escapeHtmlAttribute(avatarImage)}" alt="${escapeHtmlAttribute(username)}">`
+            : initial;
+        accountAvatarNode.classList.toggle("has-image", Boolean(avatarImage));
     }
+}
+
+
+function escapeHtmlAttribute(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }

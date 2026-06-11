@@ -207,7 +207,7 @@ export async function indexProjectWorkspace(workspaceId) {
 export async function loadWorkspaceFiles(workspaceId, query = "") {
     const params = new URLSearchParams({
         workspace_id: String(workspaceId),
-        limit: "20",
+        limit: "500",
     });
     if (query) {
         params.set("query", query);
@@ -383,6 +383,13 @@ export async function persistSetting(key, value) {
 
 export async function updateCurrentUser(data) {
     return apiRequestJson("PATCH", "/api/users/me", data);
+}
+
+
+export async function updateCurrentUserAvatar(avatarImage) {
+    return apiRequestJson("PATCH", "/api/users/me/avatar", {
+        avatar_image: avatarImage || "",
+    });
 }
 
 

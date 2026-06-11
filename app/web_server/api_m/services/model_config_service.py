@@ -3,14 +3,6 @@ from pathlib import Path
 from .service_errors import RequestError, ResourceNotFoundError
 
 
-ALLOWED_MODEL_ICON_MIME_TYPES = {
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-    "image/gif",
-}
-
-
 class ModelConfigService:
     def __init__(self, db_manager, runtime_config=None):
         self.db = db_manager
@@ -137,11 +129,11 @@ class ModelConfigService:
             raise RequestError("icon_image must be a base64 data URL")
 
         mime_type = prefix[5:].split(";", 1)[0].strip().lower()
-        if mime_type not in ALLOWED_MODEL_ICON_MIME_TYPES:
-            raise RequestError("icon_image must be PNG, JPEG, WEBP, or GIF")
+        if not mime_type.startswith("image/"):
+            raise RequestError("icon_image must be an image")
         if not payload:
             raise RequestError("icon_image payload is empty")
-        if len(icon_image) > 700_000:
+        if len(icon_image) > 14_500_000:
             raise RequestError("icon_image is too large")
         return icon_image
 
