@@ -46,6 +46,12 @@ import { loadConversations, loadModels, loadRuntimeModelCatalog, searchRuntimeMo
 import { requiresProviderSelection } from "../model-form-validation.js";
 
 const MAX_MODEL_ICON_SIZE_BYTES = 10 * 1024 * 1024;
+const RUNTIME_CATALOG_FILTER_LABELS = {
+    all: "All",
+    blue: "Blue",
+    yellow: "Yellow",
+    red: "Red",
+};
 let runtimeDownloadPollTimer = null;
 let runtimeCatalogSearchTimer = null;
 let runtimeCatalogSearchRequestId = 0;
@@ -264,6 +270,7 @@ export function openRuntimeModelCatalog() {
 
 
 export function closeRuntimeModelCatalog() {
+    closeRuntimeModelCatalogFilterMenu();
     closeRuntimeModelCatalogModal();
 }
 
@@ -276,6 +283,7 @@ export function handleRuntimeModelCatalogViabilityFilterClick(event) {
 
     setRuntimeModelCatalogViabilityFilter(button.dataset.runtimeModelViabilityFilter);
     syncRuntimeModelCatalogViabilityFilterButtons();
+    closeRuntimeModelCatalogFilterMenu();
     renderRuntimeModelCatalogSearchResults();
 }
 
@@ -295,6 +303,63 @@ export function syncRuntimeModelCatalogViabilityFilterButtons() {
         const isActive = button.dataset.runtimeModelViabilityFilter === state.runtimeModelCatalogViabilityFilter;
         button.classList.toggle("is-active", isActive);
         button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+    syncRuntimeModelCatalogFilterMenuButton();
+}
+
+
+export function toggleRuntimeModelCatalogFilterMenu(button) {
+    if (!button) {
+        return;
+    }
+
+    const menu = button.closest(".runtime-catalog__filter-menu")?.querySelector("[data-runtime-model-filter-menu]");
+    const shouldOpen = menu?.hidden;
+    closeRuntimeModelCatalogFilterMenu();
+
+    if (!menu || !shouldOpen) {
+        return;
+    }
+
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+}
+
+
+export function closeRuntimeModelCatalogFilterMenu() {
+    elements.runtimeModelCatalogFilterMenus?.forEach((menu) => {
+        menu.hidden = true;
+    });
+    elements.runtimeModelCatalogFilterMenuButtons?.forEach((button) => {
+        button.setAttribute("aria-expanded", "false");
+    });
+}
+
+
+export function handleRuntimeModelCatalogFilterMenuButtonClick(event) {
+    const button = event.target.closest("[data-runtime-model-filter-menu-button]");
+    if (!button) {
+        return false;
+    }
+
+    toggleRuntimeModelCatalogFilterMenu(button);
+    return true;
+}
+
+
+function syncRuntimeModelCatalogFilterMenuButton() {
+    const activeFilter = state.runtimeModelCatalogViabilityFilter || "all";
+    const label = RUNTIME_CATALOG_FILTER_LABELS[activeFilter] || RUNTIME_CATALOG_FILTER_LABELS.all;
+
+    elements.runtimeModelCatalogFilterMenuLabels?.forEach((labelNode) => {
+        labelNode.textContent = label;
+    });
+    elements.runtimeModelCatalogFilterMenuDots?.forEach((dot) => {
+        dot.className = "runtime-catalog__filter-dot";
+        dot.hidden = activeFilter === "all";
+        if (activeFilter !== "all") {
+            dot.classList.add(`runtime-catalog__filter-dot--${activeFilter}`);
+        }
     });
 }
 

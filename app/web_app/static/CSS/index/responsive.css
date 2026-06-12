@@ -98,6 +98,26 @@
         align-items: stretch;
     }
 
+    .settings-space .settings-block__header-row {
+        flex-direction: row;
+        align-items: flex-end;
+    }
+
+    .settings-space .settings-block__header-row > div:first-child {
+        min-width: 0;
+    }
+
+    .settings-space .settings-block__header-row > .action-button,
+    .settings-space .settings-block__actions {
+        flex: none;
+        margin-left: auto;
+    }
+
+    .settings-space .settings-block__actions--flush {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .project-models-manager .settings-block__header-row {
         flex-direction: row;
         align-items: center;
@@ -218,6 +238,60 @@
     .modal__header,
     .modal__body {
         padding: 16px;
+    }
+
+    #runtime-model-catalog-modal .modal__header {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    #runtime-model-catalog-modal .modal__header > div:first-child {
+        min-width: 0;
+        flex: 1 1 auto;
+        padding-left: 6px;
+    }
+
+    #runtime-model-catalog-modal .modal__eyebrow {
+        display: none;
+    }
+
+    #runtime-model-catalog-modal .modal__header h3 {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #runtime-model-catalog-modal .modal__header-actions {
+        flex: none;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    #runtime-model-catalog-modal .modal__header-actions > .ghost-button {
+        min-height: 36px;
+        padding: 0 10px;
+        white-space: nowrap;
+    }
+
+    #runtime-model-catalog-modal .modal__header-actions > .icon-button {
+        width: 36px;
+        height: 36px;
+    }
+
+    .runtime-catalog__viability-filter--desktop {
+        display: none;
+    }
+
+    .runtime-catalog__filter-menu {
+        display: block;
+    }
+
+    .runtime-catalog__filter-menu-button {
+        min-height: 36px;
+        padding-inline: 10px;
     }
 
     .chat-export__option-top {

@@ -1,7 +1,10 @@
 import {
+    closeRuntimeModelCatalog,
+    closeRuntimeModelCatalogFilterMenu,
     handleModelIconClear,
     handleModelIconInputChange,
     handleModelSubmit,
+    handleRuntimeModelCatalogFilterMenuButtonClick,
     handleRuntimeModelCatalogSearchInput,
     handleRuntimeModelCatalogViabilityFilterClick,
     openCreateModelModal,
@@ -42,7 +45,6 @@ import {
 import { elements } from "../app/dom.js";
 import {
     closeModelModal,
-    closeRuntimeModelCatalogModal,
     closeProfileModal,
     closeProviderModal,
     closeSessionAvatarModal,
@@ -175,7 +177,7 @@ function bindSettingsUI() {
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
 
     elements.modelCancelButton?.addEventListener("click", closeModelModal);
-    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalogModal);
+    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalog);
     elements.providerCancelButton?.addEventListener("click", closeProviderModal);
     elements.profileCancelButton?.addEventListener("click", closeProfileModal);
     elements.closeSessionProfileButton?.addEventListener("click", closeSessionProfileModal);
@@ -189,7 +191,7 @@ function bindSettingsUI() {
     elements.closeProfileButton?.addEventListener("click", closeProfileModal);
 
     elements.modelModal?.addEventListener("click", handleModalBackdropClick("closeModelModal", closeModelModal));
-    elements.runtimeModelCatalogModal?.addEventListener("click", handleModalBackdropClick("closeRuntimeModelCatalogModal", closeRuntimeModelCatalogModal));
+    elements.runtimeModelCatalogModal?.addEventListener("click", handleRuntimeModelCatalogModalClick);
     elements.providerModal?.addEventListener("click", handleModalBackdropClick("closeProviderModal", closeProviderModal));
     elements.profileModal?.addEventListener("click", handleModalBackdropClick("closeProfileModal", closeProfileModal));
     elements.sessionProfileModal?.addEventListener("click", handleModalBackdropClick("closeSessionProfileModal", closeSessionProfileModal));
@@ -200,6 +202,9 @@ function bindSettingsUI() {
     elements.runtimeModelCatalogSearchInput?.addEventListener("input", handleRuntimeModelCatalogSearchInput);
     elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
         button.addEventListener("click", handleRuntimeModelCatalogViabilityFilterClick);
+    });
+    elements.runtimeModelCatalogFilterMenuButtons?.forEach((button) => {
+        button.addEventListener("click", handleRuntimeModelCatalogFilterMenuButtonClick);
     });
 
     document.addEventListener("click", handleSettingsDocumentClick);
@@ -238,7 +243,7 @@ function handleSettingsEscape(event) {
     }
 
     if (elements.runtimeModelCatalogModal && !elements.runtimeModelCatalogModal.hidden) {
-        closeRuntimeModelCatalogModal();
+        closeRuntimeModelCatalog();
         event.stopPropagation();
         return;
     }
@@ -275,6 +280,20 @@ function handleModalBackdropClick(dataAttribute, closeHandler) {
             closeHandler();
         }
     };
+}
+
+
+function handleRuntimeModelCatalogModalClick(event) {
+    if (event.target.dataset.closeRuntimeModelCatalogModal === "true") {
+        closeRuntimeModelCatalog();
+        return;
+    }
+
+    if (event.target.closest(".runtime-catalog__filter-menu")) {
+        return;
+    }
+
+    closeRuntimeModelCatalogFilterMenu();
 }
 
 

@@ -73,23 +73,20 @@
             <header class="workspace__topbar settings-page__topbar settings-page__header">
                 <div class="workspace__topbar-row settings-page__header-row">
                     <div class="workspace__topbar-main settings-page__header-main">
+                        <button
+                            id="settings-sidebar-toggle"
+                            class="ghost-button settings-page__sidebar-toggle"
+                            type="button"
+                            aria-label="Open settings navigation"
+                            aria-controls="settings-sidebar"
+                            aria-expanded="false"
+                            hidden
+                        >
+                            <span class="settings-page__sidebar-toggle-icon" aria-hidden="true">☰</span>
+                        </button>
                         <div class="workspace__identity settings-page__identity">
-                            <button
-                                id="settings-sidebar-toggle"
-                                class="ghost-button settings-page__sidebar-toggle"
-                                type="button"
-                                aria-label="Open settings navigation"
-                                aria-controls="settings-sidebar"
-                                aria-expanded="false"
-                                hidden
-                            >
-                                <span class="settings-page__sidebar-toggle-icon" aria-hidden="true">☰</span>
-                            </button>
                             <p id="workspace-eyebrow" class="workspace__eyebrow" hidden></p>
                             <h2 id="conversation-title" class="workspace__title">General settings</h2>
-                            <p id="conversation-subtitle" class="workspace__subtitle settings-page__header-subtitle">
-                                Configure HORIZONE's global components here without mixing them into the chat experience.
-                            </p>
                         </div>
                     </div>
 
@@ -114,6 +111,9 @@
                     </div>
                 </div>
 
+                <p id="conversation-subtitle" class="workspace__subtitle settings-page__header-subtitle">
+                    Configure HORIZONE's global components here without mixing them into the chat experience.
+                </p>
                 <div id="conversation-meta" class="workspace__meta" hidden></div>
             </header>
 
@@ -258,6 +258,49 @@
                     <h3>Add model</h3>
                 </div>
                 <div class="modal__header-actions">
+                    <div class="runtime-catalog__viability-filter runtime-catalog__viability-filter--header runtime-catalog__viability-filter--desktop" aria-label="Filter by model viability">
+                        <button class="runtime-catalog__filter-button is-active" type="button" data-runtime-model-viability-filter="all">All</button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="blue">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--blue" aria-hidden="true"></span>
+                            Blue
+                        </button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="yellow">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--yellow" aria-hidden="true"></span>
+                            Yellow
+                        </button>
+                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="red">
+                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--red" aria-hidden="true"></span>
+                            Red
+                        </button>
+                    </div>
+                    <div class="runtime-catalog__filter-menu">
+                        <button
+                            class="ghost-button runtime-catalog__filter-menu-button"
+                            type="button"
+                            aria-label="Filter by model viability"
+                            aria-haspopup="menu"
+                            aria-expanded="false"
+                            data-runtime-model-filter-menu-button
+                        >
+                            <span class="runtime-catalog__filter-dot" data-runtime-model-filter-menu-dot hidden aria-hidden="true"></span>
+                            <span data-runtime-model-filter-menu-label>All</span>
+                        </button>
+                        <div class="runtime-catalog__filter-menu-panel" role="menu" data-runtime-model-filter-menu hidden>
+                            <button class="runtime-catalog__filter-menu-item is-active" type="button" role="menuitem" data-runtime-model-viability-filter="all">All</button>
+                            <button class="runtime-catalog__filter-menu-item" type="button" role="menuitem" data-runtime-model-viability-filter="blue">
+                                <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--blue" aria-hidden="true"></span>
+                                Blue
+                            </button>
+                            <button class="runtime-catalog__filter-menu-item" type="button" role="menuitem" data-runtime-model-viability-filter="yellow">
+                                <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--yellow" aria-hidden="true"></span>
+                                Yellow
+                            </button>
+                            <button class="runtime-catalog__filter-menu-item" type="button" role="menuitem" data-runtime-model-viability-filter="red">
+                                <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--red" aria-hidden="true"></span>
+                                Red
+                            </button>
+                        </div>
+                    </div>
                     <a
                         class="ghost-button"
                         href="https://huggingface.co/models?library=gguf"
@@ -281,21 +324,6 @@
                             autocomplete="off"
                         >
                     </label>
-                    <div class="runtime-catalog__viability-filter" aria-label="Filter by model viability">
-                        <button class="runtime-catalog__filter-button is-active" type="button" data-runtime-model-viability-filter="all">All</button>
-                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="blue">
-                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--blue" aria-hidden="true"></span>
-                            Blue
-                        </button>
-                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="yellow">
-                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--yellow" aria-hidden="true"></span>
-                            Yellow
-                        </button>
-                        <button class="runtime-catalog__filter-button" type="button" data-runtime-model-viability-filter="red">
-                            <span class="runtime-catalog__filter-dot runtime-catalog__filter-dot--red" aria-hidden="true"></span>
-                            Red
-                        </button>
-                    </div>
                     <div id="runtime-model-catalog-results" class="runtime-catalog__grid runtime-catalog__grid--modal" aria-live="polite"></div>
                 </section>
             </div>

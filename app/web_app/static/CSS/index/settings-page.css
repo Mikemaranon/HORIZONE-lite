@@ -1,6 +1,7 @@
 .app-body--settings {
     height: 100dvh;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 .app-body--settings.is-settings-sidebar-open {
@@ -13,14 +14,13 @@
 
 .settings-page {
     width: min(100%, 1520px);
-    height: 100dvh;
-    min-height: 0;
+    min-height: 100dvh;
     margin: 0 auto;
     display: grid;
     grid-template-columns: minmax(248px, 292px) minmax(0, 1fr);
     gap: 46px;
     padding: 34px 40px 48px;
-    overflow: hidden;
+    overflow: visible;
     background:
         radial-gradient(circle at top left, rgba(28, 139, 89, 0.05), transparent 22%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 18%),
@@ -48,7 +48,7 @@
     min-width: 42px;
     height: 42px;
     padding: 0;
-    margin-bottom: 4px;
+    margin: 0;
     color: var(--text);
     background: rgba(255, 255, 255, 0.58);
 }
@@ -203,14 +203,14 @@
     min-width: 0;
     min-height: 0;
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
     align-content: start;
     gap: 22px;
 }
 
 .settings-page__scroll {
     min-height: 0;
-    overflow-y: auto;
+    overflow: visible;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
 }
@@ -509,6 +509,15 @@
         display: inline-flex;
     }
 
+    .settings-page__header-main {
+        align-items: center;
+        gap: 14px;
+    }
+
+    .settings-page__sidebar-toggle {
+        margin-top: 0;
+    }
+
     .settings-page__backdrop {
         position: fixed;
         inset: 0;
@@ -537,31 +546,40 @@
     }
 
     .settings-page__hero-header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        flex-direction: column;
-        align-items: stretch;
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+    }
+
+    .settings-page__hero-main {
+        flex: 1 1 auto;
     }
 
     .settings-page__hero-actions,
     .settings-page__category-actions {
-        width: 100%;
+        width: auto;
         min-width: 0;
         min-height: 0;
-        align-items: center;
-        justify-content: flex-start;
+        align-items: flex-end;
+        justify-content: flex-end;
     }
 
     .settings-page__hero-actions {
-        align-self: start;
+        align-self: flex-end;
         position: static;
-        margin-top: 2px;
+        flex: none;
+        margin-top: 0;
         z-index: 0;
     }
 
     .settings-page__category-actions {
         position: static;
-        align-self: start;
+        align-self: flex-end;
+    }
+
+    .settings-page__category-actions:has(> :nth-child(2)) {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .settings-page__header-row {
@@ -569,6 +587,10 @@
         display: flex;
         align-items: flex-start;
         padding-right: clamp(180px, 46vw, 250px);
+    }
+
+    .settings-page__header-subtitle {
+        margin-top: 14px;
     }
 
     .settings-page__header-actions {
@@ -593,11 +615,6 @@
     .settings-page__content,
     .settings-page__main {
         gap: 18px;
-    }
-
-    .settings-page__hero-actions,
-    .settings-page__category-actions {
-        flex-wrap: wrap;
     }
 
     .settings-page__category-actions--tools {

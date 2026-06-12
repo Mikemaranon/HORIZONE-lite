@@ -44,12 +44,15 @@ import {
     toggleSidebar,
 } from "./controllers/layout-controller.js";
 import {
+    closeRuntimeModelCatalog,
+    closeRuntimeModelCatalogFilterMenu,
     handleActiveChatModelEdit,
     handleModelIconClear,
     handleModelIconInputChange,
     handleModelSearchClear,
     handleModelSearchInput,
     handleModelSubmit,
+    handleRuntimeModelCatalogFilterMenuButtonClick,
     handleRuntimeModelCatalogSearchInput,
     handleRuntimeModelCatalogViabilityFilterClick,
     openCreateModelModal,
@@ -300,7 +303,7 @@ export function bindUI() {
     elements.toolUploadDropzone?.addEventListener("dragleave", handleToolUploadDragLeave);
     elements.toolUploadDropzone?.addEventListener("drop", handleToolUploadDrop);
     elements.closeModelSwitchButton?.addEventListener("click", closeModelSwitchModal);
-    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalogModal);
+    elements.closeRuntimeModelCatalogButton?.addEventListener("click", closeRuntimeModelCatalog);
     elements.closeProjectAgentSwitchButton?.addEventListener("click", closeProjectAgentSwitchModal);
     elements.closeProjectModelsButton?.addEventListener("click", closeProjectModelsModal);
     elements.closeChatExportButton?.addEventListener("click", closeChatExportModal);
@@ -381,6 +384,9 @@ export function bindUI() {
     elements.runtimeModelCatalogViabilityFilters?.forEach((button) => {
         button.addEventListener("click", handleRuntimeModelCatalogViabilityFilterClick);
     });
+    elements.runtimeModelCatalogFilterMenuButtons?.forEach((button) => {
+        button.addEventListener("click", handleRuntimeModelCatalogFilterMenuButtonClick);
+    });
     elements.modelSwitchSearchClearButton?.addEventListener("click", handleModelSearchClear);
     elements.projectAgentSwitchSearchInput?.addEventListener("input", handleProjectAgentSearchInput);
     elements.projectAgentSwitchSearchClearButton?.addEventListener("click", handleProjectAgentSearchClear);
@@ -419,8 +425,16 @@ function handleModelSwitchModalClick(event) {
 
 function handleRuntimeModelCatalogModalClick(event) {
     if (event.target.dataset.closeRuntimeModelCatalogModal === "true") {
+        closeRuntimeModelCatalogFilterMenu();
         closeRuntimeModelCatalogModal();
+        return;
     }
+
+    if (event.target.closest(".runtime-catalog__filter-menu")) {
+        return;
+    }
+
+    closeRuntimeModelCatalogFilterMenu();
 }
 
 

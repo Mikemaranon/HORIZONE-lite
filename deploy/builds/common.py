@@ -37,6 +37,13 @@ PLATFORM_LABELS = {
 
 SUPPORTED_TARGETS = ("desktop",)
 
+MACOS_MLX_MODULES = {
+    "mlx_lm": "mlx-lm",
+    "mlx": "mlx",
+}
+
+MACOS_MLX_PYINSTALLER_PACKAGES = ("mlx_lm", "mlx")
+
 STAGE_IGNORE = shutil.ignore_patterns(
     "__pycache__",
     "*.pyc",
@@ -164,6 +171,32 @@ def validate_runtime_source() -> None:
     )
 
 
+def has_python_module(module_name: str) -> bool:
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except ModuleNotFoundError:
+        return False
+
+
+def ensure_macos_mlx_dependencies() -> None:
+    missing_packages = [
+        package_name
+        for module_name, package_name in MACOS_MLX_MODULES.items()
+        if not has_python_module(module_name)
+    ]
+    if not missing_packages:
+        return
+
+    formatted_packages = ", ".join(missing_packages)
+    raise SystemExit(
+        "macOS desktop builds must be frozen from an environment with MLX installed "
+        "so the packaged app can use the MLX provider. "
+        f"Missing: {formatted_packages}. "
+        "Run `.venv/bin/pip install -r requirements/requirements-mac.txt` and rebuild "
+        "without `--skip-backend-freeze`."
+    )
+
+
 def prepare_desktop_stage(build_root: Path, version: str, platform_name: str) -> Path:
     stage_root = build_root / "stage"
     if stage_root.exists():
@@ -199,7 +232,11 @@ def web_server_module_names(web_server_root: Path) -> list[str]:
     return module_names
 
 
-def pyinstaller_backend_command(stage_root: Path, build_root: Path) -> list[str]:
+def pyinstaller_backend_command(
+    stage_root: Path,
+    build_root: Path,
+    platform_name: str | None = None,
+) -> list[str]:
     separator = ";" if sys.platform.startswith("win") else ":"
     command = [
         sys.executable,
@@ -223,6 +260,10 @@ def pyinstaller_backend_command(stage_root: Path, build_root: Path) -> list[str]
         "--add-data",
         f"{stage_root / 'requirements'}{separator}requirements",
     ]
+    if platform_name == "macos":
+        for package_name in MACOS_MLX_PYINSTALLER_PACKAGES:
+            command.extend(["--collect-all", package_name])
+
     for module_name in web_server_module_names(stage_root / "app" / "web_server"):
         command.extend(["--hidden-import", module_name])
     command.append(str(stage_root / "backend_entry.py"))
@@ -236,14 +277,17 @@ def ensure_pyinstaller_available(message: str) -> None:
         raise SystemExit(message) from error
 
 
-def freeze_desktop_backend(stage_root: Path, build_root: Path) -> None:
+def freeze_desktop_backend(stage_root: Path, build_root: Path, platform_name: str) -> None:
     ensure_pyinstaller_available(
         "PyInstaller is required for a full desktop build. "
         "Install it in the active environment or run with --prepare-only."
     )
+    if platform_name == "macos":
+        ensure_macos_mlx_dependencies()
+
     if BACKEND_DIST_ROOT.exists():
         shutil.rmtree(BACKEND_DIST_ROOT)
-    run(pyinstaller_backend_command(stage_root, build_root))
+    run(pyinstaller_backend_command(stage_root, build_root, platform_name))
 
 
 def ensure_frozen_backend_exists() -> None:
@@ -457,7 +501,7 @@ def run_desktop_build(
     if skip_backend_freeze:
         ensure_frozen_backend_exists()
     else:
-        freeze_desktop_backend(stage_root, build_root)
+        freeze_desktop_backend(stage_root, build_root, platform_name)
     prepare_runtime_bundle(build_root)
     clean_tauri_bundle_outputs(platform_name)
     build_tauri_desktop()
