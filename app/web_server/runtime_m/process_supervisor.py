@@ -89,6 +89,9 @@ class ProcessSupervisor:
     def is_running(self):
         return bool(self.process and self.process.poll() is None)
 
+    def read_output_tail(self, *, max_bytes=4096):
+        return self._read_output_tail(max_bytes=max_bytes)
+
     def wait_until_ready(self, health_urls, *, timeout_seconds=30):
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:

@@ -1,4 +1,5 @@
 :root {
+    --ui-font-size: 75%;
     --bg: #f3f1ea;
     --panel: #f8f7f1;
     --panel-strong: #ffffff;
@@ -26,14 +27,14 @@
     --form-select-hover-bg: #f7f5ee;
     --form-select-border: #cfd4c8;
     --form-select-hover-border: #bbc4b6;
-    --radius-xl: 28px;
-    --radius-lg: 22px;
-    --radius-md: 16px;
-    --radius-sm: 12px;
+    --radius-xl: 22px;
+    --radius-lg: 18px;
+    --radius-md: 13px;
+    --radius-sm: 10px;
     --radius-pill: 999px;
-    --sidebar-width: 332px;
-    --chat-sidebar-width: 332px;
-    --content-width: 880px;
+    --sidebar-width: 266px;
+    --chat-sidebar-width: 266px;
+    --content-width: 704px;
     --font-ui: "SF Pro Display", "Segoe UI Variable", "Avenir Next", sans-serif;
     --font-display: "SF Pro Display", "Segoe UI Variable", "Avenir Next", sans-serif;
 }

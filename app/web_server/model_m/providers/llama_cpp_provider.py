@@ -5,6 +5,9 @@ from .base_provider import ModelProvider
 
 class LlamaCppProvider(ModelProvider):
     provider_name = "llama_cpp"
+    RUNTIME_HEADERS = {
+        "Accept-Encoding": "identity",
+    }
 
     def __init__(
         self,
@@ -28,7 +31,7 @@ class LlamaCppProvider(ModelProvider):
         base_url = self._get_base_url()
         response = self.http_client.get_json(
             f"{base_url}/models",
-            headers={},
+            headers=self.RUNTIME_HEADERS,
             provider_name=self.provider_name,
         )
         self._raise_if_error_response(response)
@@ -58,15 +61,26 @@ class LlamaCppProvider(ModelProvider):
     def chat(self, messages: list[dict], model: str, settings: dict | None = None) -> dict:
         self._ensure_runtime_ready(settings=settings, model=model)
         payload = self._build_chat_payload(messages, model, settings, stream=False)
-        base_url = self._get_base_url(settings=settings)
 
-        response = self.http_client.post_json(
-            f"{base_url}/chat/completions",
-            payload,
-            headers={},
-            provider_name=self.provider_name,
-        )
-        self._raise_if_error_response(response, model=model)
+        for attempt in range(2):
+            base_url = self._get_base_url(settings=settings)
+            try:
+                response = self.http_client.post_json(
+                    f"{base_url}/chat/completions",
+                    payload,
+                    headers=self.RUNTIME_HEADERS,
+                    provider_name=self.provider_name,
+                )
+                self._raise_if_error_response(response, model=model)
+                break
+            except ModelOperationError as error:
+                if attempt == 0 and self._restart_after_runtime_decode_error(
+                    error,
+                    settings=settings,
+                    model=model,
+                ):
+                    continue
+                raise self._with_runtime_diagnostics(error, model=model) from error
 
         choice = (response.get("choices") or [{}])[0]
         message = choice.get("message", {})
@@ -96,34 +110,57 @@ class LlamaCppProvider(ModelProvider):
         message_id = None
         chunk_count = 0
 
-        for chunk in self.http_client.stream_sse_json(
-            f"{base_url}/chat/completions",
-            payload,
-            headers={},
-            provider_name=self.provider_name,
-        ):
-            if self.is_stop_requested(should_stop):
+        for attempt in range(2):
+            try:
+                base_url = self._get_base_url(settings=settings)
+                for chunk in self.http_client.stream_sse_json(
+                    f"{base_url}/chat/completions",
+                    payload,
+                    headers=self.RUNTIME_HEADERS,
+                    provider_name=self.provider_name,
+                ):
+                    if self.is_stop_requested(should_stop):
+                        break
+
+                    chunk_count += 1
+                    self._raise_if_error_response(chunk, model=model)
+                    response_model = chunk.get("model", response_model)
+                    message_id = chunk.get("id") or message_id
+                    if chunk.get("usage"):
+                        usage = chunk["usage"]
+
+                    choice = (chunk.get("choices") or [{}])[0]
+                    delta = choice.get("delta") or {}
+                    text = delta.get("content") or ""
+                    if text:
+                        content_parts.append(text)
+                        yield {
+                            "type": "delta",
+                            "delta": text,
+                        }
+
+                    if choice.get("finish_reason") is not None:
+                        finish_reason = choice.get("finish_reason")
                 break
-
-            chunk_count += 1
-            self._raise_if_error_response(chunk, model=model)
-            response_model = chunk.get("model", response_model)
-            message_id = chunk.get("id") or message_id
-            if chunk.get("usage"):
-                usage = chunk["usage"]
-
-            choice = (chunk.get("choices") or [{}])[0]
-            delta = choice.get("delta") or {}
-            text = delta.get("content") or ""
-            if text:
-                content_parts.append(text)
-                yield {
-                    "type": "delta",
-                    "delta": text,
-                }
-
-            if choice.get("finish_reason") is not None:
-                finish_reason = choice.get("finish_reason")
+            except ModelOperationError as error:
+                can_retry = (
+                    attempt == 0
+                    and not content_parts
+                    and not self.is_stop_requested(should_stop)
+                    and self._restart_after_runtime_decode_error(
+                        error,
+                        settings=settings,
+                        model=model,
+                    )
+                )
+                if can_retry:
+                    chunk_count = 0
+                    usage = {}
+                    finish_reason = None
+                    response_model = model
+                    message_id = None
+                    continue
+                raise self._with_runtime_diagnostics(error, model=model) from error
 
         if self.is_stop_requested(should_stop):
             finish_reason = "cancelled"
@@ -226,3 +263,67 @@ class LlamaCppProvider(ModelProvider):
             provider=self.provider_name,
             details={"raw_error": raw_error, "model": model},
         )
+
+    def _with_runtime_diagnostics(self, error, model=None):
+        details = dict(getattr(error, "details", {}) or {})
+        if model:
+            details.setdefault("model", model)
+
+        runtime_log_tail = self._read_runtime_log_tail()
+        if runtime_log_tail:
+            details["runtime_log_tail"] = runtime_log_tail
+
+        return ModelOperationError(
+            self._friendly_runtime_error_message(error),
+            provider=self.provider_name,
+            status_code=getattr(error, "status_code", None),
+            details=details,
+        )
+
+    def _friendly_runtime_error_message(self, error):
+        message = str(getattr(error, "message", "") or error)
+        lowered = message.lower()
+        decode_error = str((getattr(error, "details", {}) or {}).get("decode_error", "")).lower()
+
+        if "incorrect header check" in lowered or "incorrect header check" in decode_error:
+            return (
+                "HORIZONE runtime returned an undecodable response while running this model. "
+                f"Original error: {message}"
+            )
+
+        return message
+
+    def _read_runtime_log_tail(self):
+        supervisor = getattr(self.runtime_manager, "supervisor", None)
+        if not supervisor:
+            return ""
+
+        read_output_tail = getattr(supervisor, "read_output_tail", None)
+        if callable(read_output_tail):
+            return read_output_tail()
+
+        legacy_reader = getattr(supervisor, "_read_output_tail", None)
+        if callable(legacy_reader):
+            return legacy_reader()
+
+        return ""
+
+    def _restart_after_runtime_decode_error(self, error, settings=None, model=None):
+        if not self._is_restartable_runtime_error(error):
+            return False
+        if not self.runtime_manager or not hasattr(self.runtime_manager, "stop"):
+            return False
+
+        self.runtime_manager.stop()
+        self._ensure_runtime_ready(settings=settings, model=model)
+        return True
+
+    def _is_restartable_runtime_error(self, error):
+        message = str(getattr(error, "message", "") or error).lower()
+        details = getattr(error, "details", {}) or {}
+        raw_error = details.get("raw_error")
+        if isinstance(raw_error, dict):
+            message = f"{message} {str(raw_error.get('message') or '')}".lower()
+        decode_error = str(details.get("decode_error", "")).lower()
+
+        return "incorrect header check" in message or "incorrect header check" in decode_error

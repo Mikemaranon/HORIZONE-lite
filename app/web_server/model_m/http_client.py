@@ -1,4 +1,5 @@
 import json
+import zlib
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -6,17 +7,19 @@ from .exceptions import ModelOperationError, ProviderUnavailableError
 
 
 class JsonHttpClient:
+    DEFAULT_HEADERS = {
+        "Accept-Encoding": "identity",
+    }
+
     def __init__(self, timeout_seconds=120):
         self.timeout_seconds = timeout_seconds
 
     def get_json(self, url, *, headers=None, provider_name=None):
-        request = Request(url, headers=headers or {}, method="GET")
+        request = Request(url, headers=self._merge_headers(headers), method="GET")
         return self._send(request, provider_name=provider_name)
 
     def post_json(self, url, payload, *, headers=None, provider_name=None):
-        request_headers = {"Content-Type": "application/json"}
-        if headers:
-            request_headers.update(headers)
+        request_headers = self._merge_headers(headers, {"Content-Type": "application/json"})
 
         request = Request(
             url,
@@ -35,9 +38,7 @@ class JsonHttpClient:
         yield from self._stream_json_lines(request, provider_name=provider_name)
 
     def _build_post_request(self, url, payload, *, headers=None):
-        request_headers = {"Content-Type": "application/json"}
-        if headers:
-            request_headers.update(headers)
+        request_headers = self._merge_headers(headers, {"Content-Type": "application/json"})
 
         return Request(
             url,
@@ -72,6 +73,8 @@ class JsonHttpClient:
                 "Provider returned an invalid JSON response.",
                 provider=provider_name,
             ) from error
+        except (UnicodeDecodeError, zlib.error) as error:
+            self._raise_response_decode_error(error, provider_name=provider_name)
 
     def _stream_sse_json(self, request, *, provider_name=None):
         try:
@@ -101,6 +104,8 @@ class JsonHttpClient:
                 f"Could not reach provider endpoint: {error.reason}",
                 provider=provider_name,
             ) from error
+        except (UnicodeDecodeError, zlib.error) as error:
+            self._raise_response_decode_error(error, provider_name=provider_name)
 
     def _stream_json_lines(self, request, *, provider_name=None):
         try:
@@ -125,6 +130,8 @@ class JsonHttpClient:
                 f"Could not reach provider endpoint: {error.reason}",
                 provider=provider_name,
             ) from error
+        except (UnicodeDecodeError, zlib.error) as error:
+            self._raise_response_decode_error(error, provider_name=provider_name)
 
     def _parse_sse_payload(self, lines, *, provider_name=None):
         if not lines:
@@ -160,6 +167,21 @@ class JsonHttpClient:
             status_code=error.code,
             details=payload if isinstance(payload, dict) else {"raw": payload},
         ) from error
+
+    def _raise_response_decode_error(self, error, *, provider_name=None):
+        raise ModelOperationError(
+            "Provider returned a response body that could not be decoded.",
+            provider=provider_name,
+            details={"decode_error": str(error)},
+        ) from error
+
+    def _merge_headers(self, headers=None, defaults=None):
+        merged = dict(self.DEFAULT_HEADERS)
+        if defaults:
+            merged.update(defaults)
+        if headers:
+            merged.update(headers)
+        return merged
 
     def _read_error_payload(self, error):
         try:

@@ -17,11 +17,32 @@ from tests.test_support import IsolatedDatabaseTestCase
 
 
 class FakeHttpClient:
-    def __init__(self, *, get_response=None, post_response=None, sse_events=None, json_lines=None):
+    def __init__(
+        self,
+        *,
+        get_response=None,
+        post_response=None,
+        sse_events=None,
+        json_lines=None,
+        get_error=None,
+        post_error=None,
+        sse_error=None,
+        json_lines_error=None,
+    ):
         self.get_response = get_response or {}
         self.post_response = post_response or {}
-        self.sse_events = sse_events or []
+        self.post_responses = list(post_response) if isinstance(post_response, list) else []
+        self.sse_event_batches = (
+            list(sse_events)
+            if sse_events and all(isinstance(event, list) for event in sse_events)
+            else []
+        )
+        self.sse_events = [] if self.sse_event_batches else (sse_events or [])
         self.json_lines = json_lines or []
+        self.get_error = get_error
+        self.post_error = post_error
+        self.sse_error = sse_error
+        self.json_lines_error = json_lines_error
         self.calls = []
 
     def get_json(self, url, *, headers=None, provider_name=None):
@@ -33,6 +54,8 @@ class FakeHttpClient:
                 "provider_name": provider_name,
             }
         )
+        if self.get_error:
+            raise self.get_error
         return self.get_response
 
     def post_json(self, url, payload, *, headers=None, provider_name=None):
@@ -45,6 +68,10 @@ class FakeHttpClient:
                 "provider_name": provider_name,
             }
         )
+        if self.post_error:
+            raise self.post_error
+        if self.post_responses:
+            return self.post_responses.pop(0)
         return self.post_response
 
     def stream_sse_json(self, url, payload, *, headers=None, provider_name=None):
@@ -57,7 +84,10 @@ class FakeHttpClient:
                 "provider_name": provider_name,
             }
         )
-        for event in self.sse_events:
+        if self.sse_error:
+            raise self.sse_error
+        events = self.sse_event_batches.pop(0) if self.sse_event_batches else self.sse_events
+        for event in events:
             yield event
 
     def stream_json_lines(self, url, payload, *, headers=None, provider_name=None):
@@ -70,20 +100,35 @@ class FakeHttpClient:
                 "provider_name": provider_name,
             }
         )
+        if self.json_lines_error:
+            raise self.json_lines_error
         for line in self.json_lines:
             yield line
 
 
+class FakeRuntimeSupervisor:
+    def __init__(self, output_tail=""):
+        self.output_tail = output_tail
+
+    def read_output_tail(self, *, max_bytes=4096):
+        return self.output_tail
+
+
 class FakeRuntimeManager:
-    def __init__(self, snapshot):
+    def __init__(self, snapshot, supervisor=None):
         self.snapshot = snapshot
+        self.supervisor = supervisor
         self.start_calls = 0
         self.start_args = []
+        self.stop_calls = 0
 
     def start_if_available(self, **kwargs):
         self.start_calls += 1
         self.start_args.append(kwargs)
         return self.snapshot
+
+    def stop(self):
+        self.stop_calls += 1
 
     def base_url(self):
         return self.snapshot.get("base_url", "http://127.0.0.1:8080")
@@ -640,6 +685,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(models[0]["id"], "gemma-3-1b-it-q4")
         self.assertEqual(models[0]["source"], "horizone_runtime")
         self.assertTrue(fake_http.calls[0]["url"].endswith("/v1/models"))
+        self.assertEqual(fake_http.calls[0]["headers"]["Accept-Encoding"], "identity")
         self.assertEqual(fake_http.calls[0]["provider_name"], "llama_cpp")
 
     def test_llama_cpp_provider_chat_uses_chat_completion_shape(self):
@@ -685,6 +731,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(payload["top_p"], 0.8)
         self.assertEqual(payload["max_tokens"], 128)
         self.assertFalse(payload["stream"])
+        self.assertEqual(fake_http.calls[0]["headers"]["Accept-Encoding"], "identity")
         self.assertEqual(response["message"]["content"], "Hola desde llama.cpp")
         self.assertEqual(response["message_id"], "chatcmpl-runtime")
 
@@ -708,6 +755,41 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertIn("llama-server", str(error.exception))
         self.assertEqual(runtime_manager.start_calls, 1)
         self.assertEqual(fake_http.calls, [])
+
+    def test_llama_cpp_provider_restarts_runtime_once_after_decode_error_response(self):
+        runtime_manager = FakeRuntimeManager({"status": "ready", "base_url": "http://127.0.0.1:8080"})
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(
+            post_response=[
+                {
+                    "error": {
+                        "message": "Error -3 while decompressing data: incorrect header check",
+                    },
+                },
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "qwen35",
+                    "choices": [
+                        {
+                            "message": {"role": "assistant", "content": "Hola"},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                },
+            ]
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        response = provider.chat(
+            [{"role": "user", "content": "Hola"}],
+            "qwen35",
+        )
+
+        self.assertEqual(response["message"]["content"], "Hola")
+        self.assertEqual(runtime_manager.stop_calls, 1)
+        self.assertEqual(runtime_manager.start_calls, 2)
+        self.assertEqual(len(fake_http.calls), 2)
 
     def test_llama_cpp_provider_stream_chat_yields_deltas_and_final_response(self):
         manager = ProviderManager(ConfigManager())
@@ -753,6 +835,94 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(events[2]["response"]["usage"]["completion_tokens"], 2)
         self.assertTrue(fake_http.calls[0]["payload"]["stream"])
         self.assertEqual(fake_http.calls[0]["payload"]["stream_options"]["include_usage"], True)
+        self.assertEqual(fake_http.calls[0]["headers"]["Accept-Encoding"], "identity")
+
+    def test_llama_cpp_provider_stream_chat_restarts_runtime_once_before_tokens(self):
+        runtime_manager = FakeRuntimeManager({"status": "ready", "base_url": "http://127.0.0.1:8080"})
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(
+            sse_events=[
+                [
+                    {
+                        "error": {
+                            "message": "Error -3 while decompressing data: incorrect header check",
+                        },
+                    }
+                ],
+                [
+                    {
+                        "id": "chatcmpl-runtime",
+                        "model": "qwen35",
+                        "choices": [
+                            {
+                                "delta": {"content": "Ho"},
+                                "finish_reason": None,
+                            }
+                        ],
+                    },
+                    {
+                        "id": "chatcmpl-runtime",
+                        "model": "qwen35",
+                        "choices": [
+                            {
+                                "delta": {"content": "la"},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    },
+                ],
+            ]
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        events = list(
+            provider.stream_chat(
+                [{"role": "user", "content": "Hola"}],
+                "qwen35",
+            )
+        )
+
+        self.assertEqual(events[0]["delta"], "Ho")
+        self.assertEqual(events[1]["delta"], "la")
+        self.assertEqual(events[2]["response"]["message"]["content"], "Hola")
+        self.assertEqual(runtime_manager.stop_calls, 1)
+        self.assertEqual(runtime_manager.start_calls, 2)
+        self.assertEqual(len(fake_http.calls), 2)
+
+    def test_llama_cpp_provider_adds_runtime_diagnostics_to_decode_errors(self):
+        runtime_manager = FakeRuntimeManager(
+            {"status": "ready", "base_url": "http://127.0.0.1:8080"},
+            supervisor=FakeRuntimeSupervisor(
+                "llama_init_from_model: failed\n"
+                "Error -3 while decompressing data: incorrect header check"
+            ),
+        )
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(
+            sse_error=ModelOperationError(
+                "Provider returned a response body that could not be decoded.",
+                provider="llama_cpp",
+                details={
+                    "decode_error": "Error -3 while decompressing data: incorrect header check"
+                },
+            )
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        with self.assertRaises(ModelOperationError) as error:
+            list(
+                provider.stream_chat(
+                    [{"role": "user", "content": "Hola"}],
+                    "gemma-3-1b-it-q4",
+                )
+            )
+
+        self.assertIn("undecodable response", str(error.exception))
+        self.assertEqual(error.exception.details["model"], "gemma-3-1b-it-q4")
+        self.assertIn("incorrect header check", error.exception.details["decode_error"])
+        self.assertIn("llama_init_from_model", error.exception.details["runtime_log_tail"])
 
     def test_anthropic_provider_chat_uses_messages_api_shape(self):
         db = DBManager()

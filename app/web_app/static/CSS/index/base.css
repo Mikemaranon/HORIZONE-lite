@@ -14,7 +14,7 @@ body {
 }
 
 html {
-    font-size: 93.75%;
+    font-size: var(--ui-font-size);
 }
 
 body {

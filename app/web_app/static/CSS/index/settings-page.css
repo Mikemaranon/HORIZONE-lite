@@ -13,7 +13,7 @@
 }
 
 .settings-page {
-    width: min(100%, 1520px);
+    width: min(100%, 1216px);
     min-height: 100dvh;
     margin: 0 auto;
     display: grid;
