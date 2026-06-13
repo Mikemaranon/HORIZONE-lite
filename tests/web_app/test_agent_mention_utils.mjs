@@ -1,19 +1,23 @@
 import assert from "node:assert/strict";
 
 const utilsModuleUrl = new URL("../../app/web_app/static/JS/app/agent-mention-utils.js", import.meta.url);
+const markupModuleUrl = new URL("../../app/web_app/static/JS/app/agent-mention-markup.js", import.meta.url);
 
 const {
+    createAgentMentionSegments,
     extractAgentMentionTurns,
     extractMentionedAgents,
     filterMentionAgents,
     getActiveMentionQuery,
     replaceActiveMention,
 } = await import(utilsModuleUrl);
+const { createMentionedContentMarkup } = await import(markupModuleUrl);
 
 const agents = [
     {
         id: 1,
         nickname: "Coder",
+        color: "#2f7df6",
         model: { name: "qwen-coder", display_name: "Qwen Coder" },
     },
     {
@@ -47,6 +51,29 @@ assert.deepEqual(
         cursorPosition: 14,
     },
     "selecting an option should replace the active mention token",
+);
+
+assert.deepEqual(
+    createAgentMentionSegments("Ask @Coder first, then @Reviewer.", agents).map((segment) => ({
+        type: segment.type,
+        text: segment.text,
+        color: segment.color || "",
+    })),
+    [
+        { type: "text", text: "Ask ", color: "" },
+        { type: "mention", text: "@Coder", color: "#2f7df6" },
+        { type: "text", text: " first, then ", color: "" },
+        { type: "mention", text: "@Reviewer", color: "#1c8b59" },
+        { type: "text", text: ".", color: "" },
+    ],
+    "mention segments should preserve text and expose agent colors",
+);
+
+const mentionedMarkup = createMentionedContentMarkup("Ask @Coder <now>", agents);
+assert.equal(
+    mentionedMarkup,
+    'Ask <span class="agent-mention-token" style="--agent-mention-color: #2f7df6">@Coder</span> &lt;now&gt;',
+    "mention markup should color only the mention without adding whitespace or unsafe text",
 );
 
 assert.deepEqual(

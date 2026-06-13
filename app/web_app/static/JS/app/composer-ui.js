@@ -1,11 +1,37 @@
+import { createMentionedContentMarkup } from "./agent-mention-markup.js";
 import { elements } from "./dom.js";
 import { getSelectedModel, getSelectedModelConfig } from "./provider-helpers.js";
+import { getMentionableProjectAgents } from "./selectors.js";
 import { state } from "./state.js";
 
 
 export function autoResizeComposer() {
     elements.composerInput.style.height = "auto";
     elements.composerInput.style.height = `${Math.min(elements.composerInput.scrollHeight, 220)}px`;
+    syncComposerHighlight();
+}
+
+
+export function syncComposerHighlight() {
+    if (!elements.composerHighlight || !elements.composerInput) {
+        return;
+    }
+
+    elements.composerHighlight.innerHTML = createMentionedContentMarkup(
+        elements.composerInput.value,
+        getMentionableProjectAgents(),
+    ) || "<br>";
+    elements.composerInput.closest(".composer__input-wrap")?.classList.add("is-highlight-ready");
+    syncComposerHighlightScroll();
+}
+
+
+export function syncComposerHighlightScroll() {
+    if (!elements.composerHighlight || !elements.composerInput) {
+        return;
+    }
+
+    elements.composerHighlight.scrollTop = elements.composerInput.scrollTop;
 }
 
 
@@ -56,6 +82,7 @@ export function syncComposerAvailability() {
         elements.composerInput.placeholder = "Ask anything...";
         elements.composerHint.textContent = "`Shift + Enter` for a new line";
     }
+    syncComposerHighlight();
 }
 
 

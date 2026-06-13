@@ -84,6 +84,11 @@
     overflow-wrap: anywhere;
 }
 
+.agent-mention-token {
+    color: var(--agent-mention-color, var(--accent-strong));
+    font-weight: 650;
+}
+
 .message__content--plain {
     white-space: pre-wrap;
 }

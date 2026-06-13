@@ -23,6 +23,7 @@ export const elements = {
     toolsUploadInput: document.getElementById("tools-upload-input"),
     composerShell: document.querySelector(".composer-shell"),
     composerForm: document.getElementById("composer-form"),
+    composerHighlight: document.getElementById("composer-highlight"),
     composerInput: document.getElementById("composer-input"),
     composerMentionMenu: document.getElementById("composer-mention-menu"),
     composerHint: document.getElementById("composer-hint"),

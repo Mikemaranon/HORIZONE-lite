@@ -9,7 +9,7 @@ import {
 import { renderApp } from "../app-runtime.js";
 import { closeComposerMentionMenu } from "../agent-mentions.js";
 import { extractAgentMentionTurns } from "../agent-mention-utils.js";
-import { setLoading, syncComposerAvailability } from "../composer-ui.js";
+import { setLoading, syncComposerAvailability, syncComposerHighlight } from "../composer-ui.js";
 import { confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
 import {
@@ -137,6 +137,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         elements.composerInput.value = "";
         closeComposerMentionMenu();
         autoResizeComposerHeight();
+        syncComposerHighlight();
 
         let payload = null;
         for (const responderTurn of responderTurns) {

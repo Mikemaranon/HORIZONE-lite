@@ -83,6 +83,38 @@ export function replaceActiveMention(value, cursorPosition, agent) {
 }
 
 
+export function createAgentMentionSegments(content, agents) {
+    const text = String(content || "");
+    const matches = findMentionMatches(text, agents);
+    if (!matches.length) {
+        return text ? [{ type: "text", text }] : [];
+    }
+
+    const segments = [];
+    let cursor = 0;
+
+    for (const match of matches) {
+        if (match.start > cursor) {
+            segments.push({ type: "text", text: text.slice(cursor, match.start) });
+        }
+
+        segments.push({
+            type: "mention",
+            text: text.slice(match.start, match.end),
+            agent: match.agent,
+            color: normalizeAgentColor(match.agent?.color),
+        });
+        cursor = match.end;
+    }
+
+    if (cursor < text.length) {
+        segments.push({ type: "text", text: text.slice(cursor) });
+    }
+
+    return segments;
+}
+
+
 export function extractMentionedAgents(content, agents) {
     return extractAgentMentionTurns(content, agents).map((turn) => turn.agent);
 }
@@ -165,6 +197,12 @@ function getMentionableAgents(agents) {
 
 function normalize(value) {
     return String(value || "").trim().toLowerCase();
+}
+
+
+function normalizeAgentColor(color) {
+    const normalized = String(color || "#1c8b59").trim();
+    return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized.toLowerCase() : "#1c8b59";
 }
 
 

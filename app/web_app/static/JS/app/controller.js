@@ -6,7 +6,7 @@ import {
     handleComposerMentionKeyDown,
     handleComposerMentionMenuClick,
 } from "./agent-mentions.js";
-import { autoResizeComposer } from "./composer-ui.js";
+import { autoResizeComposer, syncComposerHighlightScroll } from "./composer-ui.js";
 import { handleReasoningTraceMessageClick, handleToolTraceMessageClick } from "./message-ui.js";
 import {
     disableMessagesAutoScroll,
@@ -245,6 +245,7 @@ export function bindUI() {
         autoResizeComposer();
         handleComposerMentionInput();
     });
+    elements.composerInput.addEventListener("scroll", syncComposerHighlightScroll);
     elements.composerMentionMenu?.addEventListener("click", handleComposerMentionMenuClick);
     elements.conversationTitle?.addEventListener("click", handleConversationTitleClick);
     elements.conversationTitle?.addEventListener("input", handleConversationTitleInput);

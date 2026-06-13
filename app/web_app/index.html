@@ -432,11 +432,14 @@
                     <footer class="composer-shell">
                         <form id="composer-form" class="composer">
                             <div class="composer__surface">
-                                <textarea
-                                    id="composer-input"
-                                    rows="1"
-                                    placeholder="Ask anything..."
-                                ></textarea>
+                                <div class="composer__input-wrap">
+                                    <div id="composer-highlight" class="composer__highlight" aria-hidden="true"></div>
+                                    <textarea
+                                        id="composer-input"
+                                        rows="1"
+                                        placeholder="Ask anything..."
+                                    ></textarea>
+                                </div>
                                 <div
                                     id="composer-mention-menu"
                                     class="composer-mention-menu"

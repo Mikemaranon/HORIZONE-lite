@@ -265,6 +265,16 @@
     line-height: 1;
 }
 
+@media (min-width: 1101px) {
+    .settings-page__header {
+        padding-bottom: 18px;
+    }
+
+    .settings-page__header-subtitle {
+        margin-top: -15px;
+    }
+}
+
 .settings-page__content {
     width: min(100%, 1100px);
     display: grid;
