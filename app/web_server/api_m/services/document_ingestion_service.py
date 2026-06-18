@@ -1,3 +1,9 @@
+import re
+import xml.etree.ElementTree as ElementTree
+import zipfile
+import zlib
+from html import unescape
+from io import BytesIO
 from pathlib import Path
 
 from werkzeug.utils import secure_filename
@@ -11,6 +17,10 @@ class DocumentIngestionService:
     MAX_DOCUMENT_BYTES = 1024 * 1024
     MAX_DOCUMENT_TEXT_CHARS = 20_000
     MAX_CHUNK_CHARS = 1_200
+    SUPPORTED_STRUCTURED_EXTENSIONS = {
+        ".docx",
+        ".pdf",
+    }
     SUPPORTED_TEXT_EXTENSIONS = {
         ".txt",
         ".md",
@@ -66,7 +76,7 @@ class DocumentIngestionService:
                 f'The document "{original_filename}" exceeds the limit of 1 MB.'
             )
 
-        text_content = self._decode_document_bytes(content_bytes, original_filename)
+        text_content = self._extract_document_text(content_bytes, original_filename)
         normalized_text = self._normalize_document_text(text_content)
         if not normalized_text:
             raise DocumentIngestionError(
@@ -121,10 +131,157 @@ class DocumentIngestionService:
 
     def _is_supported_document(self, filename, content_type):
         suffix = Path(filename).suffix.lower()
-        if suffix in self.SUPPORTED_TEXT_EXTENSIONS:
+        if (
+            suffix in self.SUPPORTED_TEXT_EXTENSIONS
+            or suffix in self.SUPPORTED_STRUCTURED_EXTENSIONS
+        ):
             return True
 
         return content_type.startswith("text/")
+
+    def _extract_document_text(self, content_bytes, filename):
+        suffix = Path(filename).suffix.lower()
+        if suffix == ".docx":
+            return self._extract_docx_text(content_bytes, filename)
+        if suffix == ".pdf":
+            return self._extract_pdf_text(content_bytes, filename)
+
+        return self._decode_document_bytes(content_bytes, filename)
+
+    def _extract_docx_text(self, content_bytes, filename):
+        try:
+            archive = zipfile.ZipFile(BytesIO(content_bytes))
+        except zipfile.BadZipFile as error:
+            raise DocumentIngestionError(
+                f'The document "{filename}" is not a readable DOCX file.'
+            ) from error
+
+        text_parts = []
+        xml_names = [
+            name
+            for name in archive.namelist()
+            if name == "word/document.xml"
+            or name.startswith("word/header")
+            or name.startswith("word/footer")
+        ]
+
+        for xml_name in xml_names:
+            try:
+                root = ElementTree.fromstring(archive.read(xml_name))
+            except ElementTree.ParseError:
+                continue
+
+            for paragraph in root.iter():
+                if not paragraph.tag.endswith("}p"):
+                    continue
+
+                paragraph_parts = []
+                for node in paragraph.iter():
+                    if node.tag.endswith("}t") and node.text:
+                        paragraph_parts.append(node.text)
+                    elif node.tag.endswith("}tab"):
+                        paragraph_parts.append("\t")
+                    elif node.tag.endswith("}br") or node.tag.endswith("}cr"):
+                        paragraph_parts.append("\n")
+
+                paragraph_text = "".join(paragraph_parts).strip()
+                if paragraph_text:
+                    text_parts.append(paragraph_text)
+
+        if not text_parts:
+            raise DocumentIngestionError(
+                f'The document "{filename}" has no readable DOCX text.'
+            )
+
+        return "\n\n".join(text_parts)
+
+    def _extract_pdf_text(self, content_bytes, filename):
+        decoded_streams = self._extract_pdf_streams(content_bytes)
+        text_parts = []
+
+        for stream in decoded_streams:
+            stream_text = stream.decode("latin-1", errors="ignore")
+            text_parts.extend(self._extract_pdf_text_operators(stream_text))
+
+        if not text_parts:
+            fallback_text = content_bytes.decode("latin-1", errors="ignore")
+            text_parts.extend(self._extract_pdf_text_operators(fallback_text))
+
+        normalized_parts = [part.strip() for part in text_parts if part.strip()]
+        if not normalized_parts:
+            raise DocumentIngestionError(
+                f'The document "{filename}" has no readable PDF text.'
+            )
+
+        return "\n".join(normalized_parts)
+
+    def _extract_pdf_streams(self, content_bytes):
+        streams = []
+        for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", content_bytes, re.DOTALL):
+            stream = match.group(1).strip(b"\r\n")
+            dictionary_bytes = content_bytes[max(0, match.start() - 500):match.start()]
+            if b"/FlateDecode" in dictionary_bytes:
+                try:
+                    stream = zlib.decompress(stream)
+                except zlib.error:
+                    continue
+            streams.append(stream)
+        return streams
+
+    def _extract_pdf_text_operators(self, stream_text):
+        text_parts = []
+        for block in re.findall(r"BT(.*?)ET", stream_text, flags=re.DOTALL):
+            for array_body in re.findall(r"\[(.*?)\]\s*TJ", block, flags=re.DOTALL):
+                fragments = [
+                    self._decode_pdf_literal(match.group(1))
+                    for match in re.finditer(r"\((.*?)\)", array_body, flags=re.DOTALL)
+                ]
+                if fragments:
+                    text_parts.append("".join(fragments))
+
+            for literal in re.finditer(r"\((.*?)\)\s*Tj", block, flags=re.DOTALL):
+                text_parts.append(self._decode_pdf_literal(literal.group(1)))
+
+            for hex_text in re.finditer(r"<([0-9A-Fa-f\s]+)>\s*Tj", block):
+                text_parts.append(self._decode_pdf_hex(hex_text.group(1)))
+
+        return text_parts
+
+    def _decode_pdf_literal(self, value):
+        value = re.sub(r"\\([nrtbf()\\])", self._replace_pdf_escape, value)
+        value = re.sub(
+            r"\\([0-7]{1,3})",
+            lambda match: chr(int(match.group(1), 8)),
+            value,
+        )
+        return unescape(value)
+
+    def _replace_pdf_escape(self, match):
+        escapes = {
+            "n": "\n",
+            "r": "\r",
+            "t": "\t",
+            "b": "\b",
+            "f": "\f",
+            "(": "(",
+            ")": ")",
+            "\\": "\\",
+        }
+        return escapes.get(match.group(1), match.group(1))
+
+    def _decode_pdf_hex(self, value):
+        hex_value = re.sub(r"\s+", "", value)
+        if len(hex_value) % 2:
+            hex_value = f"{hex_value}0"
+
+        try:
+            raw = bytes.fromhex(hex_value)
+        except ValueError:
+            return ""
+
+        if raw.startswith(b"\xfe\xff"):
+            return raw[2:].decode("utf-16-be", errors="ignore")
+        return raw.decode("latin-1", errors="ignore")
 
     def _decode_document_bytes(self, content_bytes, filename):
         for encoding in ("utf-8", "utf-8-sig", "latin-1"):

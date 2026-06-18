@@ -41,6 +41,9 @@ class ModelManager:
             should_stop=should_stop,
         )
 
+    def cancel_stream(self, provider_name: str) -> bool:
+        return self.provider_manager.cancel_stream(provider_name)
+
     def generate_conversation_title(
         self,
         provider_name: str,

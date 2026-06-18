@@ -26,6 +26,7 @@ class ConfigManagerTests(unittest.TestCase):
             "HORIZONE_LLAMA_CPP_SERVER_KIND",
             "HORIZONE_LLAMA_CPP_PORT",
             "HORIZONE_LLAMA_CPP_PORT_MAX",
+            "HORIZONE_LLAMA_CPP_GPU_LAYERS",
             "HORIZONE_RUNTIME_DISABLED",
             "HORIZONE_RUNTIME_MODELS_DIR",
             "OLLAMA_API_KEY",
@@ -62,6 +63,7 @@ class ConfigManagerTests(unittest.TestCase):
         os.environ["HORIZONE_LLAMA_CPP_SERVER_KIND"] = "python"
         os.environ["HORIZONE_LLAMA_CPP_PORT"] = "9091"
         os.environ["HORIZONE_LLAMA_CPP_PORT_MAX"] = "9100"
+        os.environ["HORIZONE_LLAMA_CPP_GPU_LAYERS"] = "33"
         os.environ["HORIZONE_RUNTIME_MODELS_DIR"] = "/tmp/horizone-models"
         os.environ["HORIZONE_RUNTIME_DISABLED"] = "true"
 
@@ -79,6 +81,7 @@ class ConfigManagerTests(unittest.TestCase):
         self.assertEqual(config.runtime.llama_cpp_server_kind, "python")
         self.assertEqual(config.runtime.llama_cpp_port, 9091)
         self.assertEqual(config.runtime.llama_cpp_port_max, 9100)
+        self.assertEqual(config.runtime.llama_cpp_gpu_layers, 33)
         self.assertEqual(config.runtime.runtime_models_dir, "/tmp/horizone-models")
         self.assertTrue(config.runtime.runtime_disabled)
 

@@ -11,6 +11,7 @@ class RuntimeConfig:
     llama_cpp_server_kind: str = "native"
     llama_cpp_port: int = 8080
     llama_cpp_port_max: int = 9000
+    llama_cpp_gpu_layers: int | None = None
     runtime_models_dir: str = ""
     runtime_disabled: bool = False
     bootstrap_admin_password: str | None = None

@@ -25,6 +25,7 @@ import {
     showReasoningStatusMessage,
     showToolStatusMessage,
     syncMessagesAutoScrollState,
+    updateAssistantMessageTimer,
     updateStreamingAssistantMessage,
 } from "../message-ui.js";
 import { renderConversationHeader, renderConversations, renderMessages } from "../render.js";
@@ -181,6 +182,9 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         if (payload && ["length", "max_tokens"].includes(payload.finish_reason)) {
             showStatus("The response stopped due to the provider or model token limit.", true);
         }
+        if (payload?.finish_reason === "stream_error") {
+            showStatus("The runtime stream dropped after a partial response.", true);
+        }
     } catch (error) {
         removeTypingMessage();
         if (error.name === "AbortError") {
@@ -230,53 +234,72 @@ async function sendChatTurn({
 }) {
     setActiveGenerationRequestId(requestId);
     let assistantMessageMeta = createPendingAssistantMessage(responderAgent);
+    const turnStartedAt = Date.now();
+    let turnTimer = null;
+    let timerMessage = assistantMessageMeta;
+    assistantMessageMeta.elapsed_seconds = 0;
     appendTypingMessage(assistantMessageMeta);
 
     let streamingAssistantMessage = null;
-    const payload = await sendChatStream(buildChatPayload({
-        conversationId,
-        requestId,
-        responderAgent,
-        contextMessages,
-        toolConfirmation,
-    }), {
-        onStart(payloadData) {
-            if (payloadData?.request_id) {
-                setActiveGenerationRequestId(payloadData.request_id);
-            }
-            if (payloadData?.message_meta) {
-                assistantMessageMeta = {
-                    ...assistantMessageMeta,
-                    ...payloadData.message_meta,
-                };
-            }
-        },
-        onDelta(delta) {
-            if (!streamingAssistantMessage) {
-                removeTypingMessage();
-                streamingAssistantMessage = {
-                    ...assistantMessageMeta,
-                    role: "assistant",
-                    content: "",
-                };
-                state.activeMessages.push(streamingAssistantMessage);
-                appendStreamingAssistantMessage(streamingAssistantMessage);
-            }
+    const syncElapsedSeconds = () => {
+        timerMessage.elapsed_seconds = Math.max(0, Math.floor((Date.now() - turnStartedAt) / 1000));
+        updateAssistantMessageTimer(timerMessage);
+    };
+    turnTimer = window.setInterval(syncElapsedSeconds, 1000);
 
-            streamingAssistantMessage.content += delta;
-            updateStreamingAssistantMessage(streamingAssistantMessage.content);
-        },
-        onToolStart(toolPayload) {
-            showToolStatusMessage(
-                toolPayload?.display_name || toolPayload?.tool_name || "tool",
-                assistantMessageMeta,
-            );
-        },
-        onReasoningStart() {
-            showReasoningStatusMessage(assistantMessageMeta);
-        },
-    });
+    let payload = null;
+    try {
+        payload = await sendChatStream(buildChatPayload({
+            conversationId,
+            requestId,
+            responderAgent,
+            contextMessages,
+            toolConfirmation,
+        }), {
+            onStart(payloadData) {
+                if (payloadData?.request_id) {
+                    setActiveGenerationRequestId(payloadData.request_id);
+                }
+                if (payloadData?.message_meta) {
+                    Object.assign(assistantMessageMeta, payloadData.message_meta, {
+                        elapsed_seconds: timerMessage.elapsed_seconds,
+                    });
+                    timerMessage = streamingAssistantMessage || assistantMessageMeta;
+                }
+            },
+            onDelta(delta) {
+                if (!streamingAssistantMessage) {
+                    removeTypingMessage();
+                    streamingAssistantMessage = {
+                        ...assistantMessageMeta,
+                        role: "assistant",
+                        content: "",
+                    };
+                    timerMessage = streamingAssistantMessage;
+                    syncElapsedSeconds();
+                    state.activeMessages.push(streamingAssistantMessage);
+                    appendStreamingAssistantMessage(streamingAssistantMessage);
+                }
+
+                streamingAssistantMessage.content += delta;
+                updateStreamingAssistantMessage(streamingAssistantMessage.content);
+            },
+            onToolStart(toolPayload) {
+                showToolStatusMessage(
+                    toolPayload?.display_name || toolPayload?.tool_name || "tool",
+                    assistantMessageMeta,
+                );
+            },
+            onReasoningStart() {
+                showReasoningStatusMessage(assistantMessageMeta);
+            },
+        });
+    } finally {
+        window.clearInterval(turnTimer);
+        syncElapsedSeconds();
+    }
     payload.message.tool_events = payload.raw?.tool_events || [];
+    payload.message.elapsed_seconds = timerMessage.elapsed_seconds;
 
     removeTypingMessage();
     if (streamingAssistantMessage) {

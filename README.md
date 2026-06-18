@@ -86,6 +86,20 @@ For the optional llama.cpp Python runtime, install:
 pip install -r requirements-runtime-llamacpp.txt
 ```
 
+On Apple Silicon, make sure the llama.cpp runtime is built with Metal. A CPU-only
+`llama-cpp-python` install can run but will be dramatically slower for models
+such as 12B GGUF files.
+
+```bash
+CMAKE_ARGS="-DGGML_METAL=on" \
+pip install --force-reinstall --no-cache-dir "llama-cpp-python[server]>=0.3,<0.4"
+```
+
+If you use a native `llama-server` binary through `HORIZONE_LLAMA_CPP_BINARY`,
+build or install that binary with Metal enabled (`GGML_METAL=ON`). HORIZONE
+passes GPU layers automatically on Apple Silicon; set
+`HORIZONE_LLAMA_CPP_GPU_LAYERS=0` only when you intentionally want CPU fallback.
+
 Windows and Linux package builds can start from `requirements-windows.txt` or `requirements-linux.txt` and add optional provider/runtime files only when needed.
 
 By default, HORIZONE stores its runtime SQLite database in a user-level app data directory:

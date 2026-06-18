@@ -164,13 +164,15 @@ fn llama_server_path(
             "python",
         ),
         (
-            resource_dir.join("runtime").join(native_executable),
-            "native",
-        ),
-        (
-            resource_dir.join("runtime").join(python_executable),
+            resource_dir
+                .join("_up_")
+                .join("dist")
+                .join("runtime")
+                .join(python_executable),
             "python",
         ),
+        (resource_dir.join("runtime").join(native_executable), "native"),
+        (resource_dir.join("runtime").join(python_executable), "python"),
         (resource_dir.join(native_executable), "native"),
         (resource_dir.join(python_executable), "python"),
     ];

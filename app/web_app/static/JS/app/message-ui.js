@@ -129,6 +129,19 @@ export function appendTypingMessage(message = createPendingAssistantMessage()) {
 }
 
 
+export function updateAssistantMessageTimer(message) {
+    const messageKey = getOrCreateMessageClientKey(message);
+    const timerNode = document.querySelector(
+        `[data-message-key="${cssEscape(messageKey)}"] [data-message-timer="true"]`
+    );
+    if (!timerNode) {
+        return;
+    }
+
+    timerNode.textContent = formatElapsedSeconds(message.elapsed_seconds);
+}
+
+
 export function showToolStatusMessage(toolDisplayName, message = createPendingAssistantMessage()) {
     const normalizedToolName = String(toolDisplayName || "").trim() || "tool";
     if (!document.querySelector("[data-typing-message='true']")) {
@@ -390,6 +403,7 @@ function createMessageMetaMarkup(message, userLabel = "You") {
     if (projectAgentName) {
         return `
             <span class="message__meta-model">${escapeHtml(projectAgentName)}</span>
+            ${createMessageTimerMarkup(message)}
         `;
     }
 
@@ -397,7 +411,33 @@ function createMessageMetaMarkup(message, userLabel = "You") {
         <span class="message__meta-model">${escapeHtml(resolveAssistantModelName(message))}</span>
         <span class="message__meta-separator" aria-hidden="true">|</span>
         <span class="message__meta-profile">${escapeHtml(resolveAssistantProfileName(message))}</span>
+        ${createMessageTimerMarkup(message)}
     `;
+}
+
+
+function createMessageTimerMarkup(message) {
+    if (!Number.isFinite(message?.elapsed_seconds)) {
+        return "";
+    }
+
+    return `
+        <span class="message__meta-separator" aria-hidden="true">|</span>
+        <span class="message__meta-timer" data-message-timer="true">${formatElapsedSeconds(message.elapsed_seconds)}</span>
+    `;
+}
+
+
+function formatElapsedSeconds(seconds) {
+    const safeSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = safeSeconds % 60;
+
+    if (minutes <= 0) {
+        return `${remainingSeconds}s`;
+    }
+
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 

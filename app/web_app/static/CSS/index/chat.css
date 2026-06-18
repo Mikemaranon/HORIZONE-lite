@@ -338,6 +338,12 @@
     color: rgba(30, 31, 25, 0.34);
 }
 
+.message__meta-timer {
+    min-width: 2.2rem;
+    font-variant-numeric: tabular-nums;
+    color: rgba(30, 31, 25, 0.5);
+}
+
 .typing-indicator {
     display: inline-flex;
     gap: 6px;

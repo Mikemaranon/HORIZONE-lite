@@ -109,6 +109,7 @@ class LlamaCppProvider(ModelProvider):
         response_model = model
         message_id = None
         chunk_count = 0
+        stream_error = None
 
         for attempt in range(2):
             try:
@@ -142,7 +143,10 @@ class LlamaCppProvider(ModelProvider):
                     if choice.get("finish_reason") is not None:
                         finish_reason = choice.get("finish_reason")
                 break
-            except ModelOperationError as error:
+            except (ModelOperationError, ProviderUnavailableError, OSError) as error:
+                if self.is_stop_requested(should_stop):
+                    finish_reason = "cancelled"
+                    break
                 can_retry = (
                     attempt == 0
                     and not content_parts
@@ -160,10 +164,16 @@ class LlamaCppProvider(ModelProvider):
                     response_model = model
                     message_id = None
                     continue
+                if content_parts:
+                    stream_error = self._with_runtime_diagnostics(error, model=model)
+                    finish_reason = "stream_error"
+                    break
                 raise self._with_runtime_diagnostics(error, model=model) from error
 
         if self.is_stop_requested(should_stop):
             finish_reason = "cancelled"
+        if finish_reason is None and stream_error:
+            finish_reason = "stream_error"
 
         yield {
             "type": "response",
@@ -176,10 +186,18 @@ class LlamaCppProvider(ModelProvider):
                     "streamed": True,
                     "chunk_count": chunk_count,
                     "cancelled": finish_reason == "cancelled",
+                    "stream_error": stream_error.to_dict() if stream_error else None,
                 },
                 message_id=message_id,
             ),
         }
+
+    def cancel_stream(self) -> bool:
+        if not self.runtime_manager or not hasattr(self.runtime_manager, "stop"):
+            return False
+
+        self.runtime_manager.stop()
+        return True
 
     def _build_chat_payload(self, messages, model, settings, *, stream):
         payload = {

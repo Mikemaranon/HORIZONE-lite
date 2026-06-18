@@ -25,18 +25,15 @@ cargo install tauri-cli --version '^2'
 
 ## Runtime local
 
-El build necesita un runtime local embebido. Usa una de estas opciones.
+El build macOS necesita un `llama-server` nativo embebido. No uses el
+fallback Python/PyInstaller para empaquetar HORIZONE runtime en macOS: puede
+perder Apple Metal Tensor API dentro de la app instalada y degradar mucho la
+inferencia.
 
 Con `llama-server` nativo:
 
 ```bash
 export HORIZONE_LLAMA_CPP_BINARY=/ruta/al/llama-server
-```
-
-O con runtime Python:
-
-```bash
-.venv/bin/pip install -r requirements/requirements-runtime-llamacpp.txt
 ```
 
 ## Build
@@ -70,4 +67,3 @@ Info rapida:
 ```bash
 .venv/bin/python deploy/builds/mac/build_desktop.py info --version 0.1.0
 ```
-

@@ -32,7 +32,7 @@ class FakePaths:
 
 
 class FakeSupervisor:
-    def __init__(self, status="ready"):
+    def __init__(self, status="ready", output_tail=""):
         self.start_status = status
         self.status = "stopped"
         self.error_message = ""
@@ -40,6 +40,7 @@ class FakeSupervisor:
         self.stop_called = False
         self.stop_calls = 0
         self.running = False
+        self.output_tail = output_tail
 
     def start(self, command, *, health_urls=None, timeout_seconds=30, env=None):
         self.start_calls.append(
@@ -62,6 +63,29 @@ class FakeSupervisor:
 
     def is_running(self):
         return self.running
+
+    def read_output_tail(self, *, max_bytes=4096):
+        return self.output_tail[-max_bytes:]
+
+
+class FakeHardwareProfile:
+    def __init__(self, gpu_layers, *, snapshot=None, python_gpu_offload=True):
+        self.gpu_layers = gpu_layers
+        self.model_paths = []
+        self.snapshot_payload = snapshot or {}
+        self.python_gpu_offload = python_gpu_offload
+        self.python_gpu_offload_checks = 0
+
+    def resolve_llama_cpp_gpu_layers(self, model_path):
+        self.model_paths.append(model_path)
+        return self.gpu_layers
+
+    def snapshot(self):
+        return self.snapshot_payload
+
+    def llama_cpp_python_supports_gpu_offload(self):
+        self.python_gpu_offload_checks += 1
+        return self.python_gpu_offload
 
 
 class FakeProcess:
@@ -207,6 +231,7 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
             "HORIZONE_LLAMA_CPP_BINARY",
             "HORIZONE_LLAMA_CPP_PORT",
             "HORIZONE_LLAMA_CPP_PORT_MAX",
+            "HORIZONE_LLAMA_CPP_GPU_LAYERS",
             "HORIZONE_RUNTIME_DISABLED",
             "HORIZONE_RUNTIME_MODELS_DIR",
             "HOST",
@@ -541,7 +566,8 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
         self.assertIn(str(model_path), command)
         self.assertIn("--model_alias", command)
         self.assertIn("runtime-model", command)
-        self.assertEqual(supervisor.start_calls[0]["env"]["GGML_METAL_DEVICES"], "-1")
+        self.assertNotIn("GGML_METAL_DEVICES", supervisor.start_calls[0]["env"])
+        self.assertEqual(snapshot["acceleration"]["runtime_kind"], "python")
 
     def test_runtime_process_does_not_inherit_backend_host_or_port(self):
         db = DBManager()
@@ -599,11 +625,25 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
         )
         supervisor = FakeSupervisor()
 
+        hardware_profile = FakeHardwareProfile(
+            -1,
+            snapshot={
+                "system": "Darwin",
+                "machine": "arm64",
+                "ram_gb": 32,
+                "vram_gb": 0,
+                "is_apple_silicon": True,
+                "memory_kind": "unified",
+            },
+            python_gpu_offload=False,
+        )
+
         manager = LlamaCppRuntimeManager(
             config_manager=config_manager,
             db_manager=db,
             paths=FakePaths(config_manager.runtime.llama_cpp_binary),
             supervisor=supervisor,
+            hardware_profile=hardware_profile,
         )
         snapshot = manager.start_if_available()
 
@@ -612,9 +652,285 @@ class LlamaCppRuntimeManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(command[0], config_manager.runtime.llama_cpp_binary)
         self.assertIn("--model", command)
         self.assertIn("--model_alias", command)
+        self.assertIn("--n_gpu_layers", command)
+        self.assertIn("-1", command)
+        self.assertEqual(snapshot["acceleration"]["gpu_layers"], -1)
+        self.assertIsNone(snapshot["acceleration"]["supported"])
+        self.assertEqual(hardware_profile.python_gpu_offload_checks, 0)
         self.assertNotIn("-m", command)
         self.assertNotIn("--alias", command)
-        self.assertEqual(supervisor.start_calls[0]["env"]["GGML_METAL_DEVICES"], "-1")
+        self.assertNotIn("GGML_METAL_DEVICES", supervisor.start_calls[0]["env"])
+
+    def test_blocks_llama_cpp_python_runtime_without_metal_on_apple_silicon(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor()
+        hardware_profile = FakeHardwareProfile(
+            -1,
+            snapshot={
+                "system": "Darwin",
+                "machine": "arm64",
+                "ram_gb": 32,
+                "vram_gb": 0,
+                "is_apple_silicon": True,
+                "memory_kind": "unified",
+            },
+            python_gpu_offload=False,
+        )
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("", ["python", "-m", "llama_cpp.server"]),
+            supervisor=supervisor,
+            hardware_profile=hardware_profile,
+        )
+        snapshot = manager.start_if_available()
+
+        self.assertEqual(snapshot["status"], "error")
+        self.assertIn("Metal support", snapshot["error_message"])
+        self.assertEqual(snapshot["acceleration"]["backend"], "metal")
+        self.assertFalse(snapshot["acceleration"]["supported"])
+        self.assertEqual(supervisor.start_calls, [])
+
+    def test_allows_explicit_cpu_fallback_on_apple_silicon(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        config_manager = ConfigManager()
+        config_manager.runtime = replace(config_manager.runtime, llama_cpp_gpu_layers=0)
+        supervisor = FakeSupervisor()
+        hardware_profile = FakeHardwareProfile(
+            -1,
+            snapshot={
+                "system": "Darwin",
+                "machine": "arm64",
+                "ram_gb": 32,
+                "vram_gb": 0,
+                "is_apple_silicon": True,
+                "memory_kind": "unified",
+            },
+            python_gpu_offload=False,
+        )
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=config_manager,
+            db_manager=db,
+            paths=FakePaths("", ["python", "-m", "llama_cpp.server"]),
+            supervisor=supervisor,
+            hardware_profile=hardware_profile,
+        )
+        snapshot = manager.start_if_available()
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertEqual(snapshot["status"], "ready")
+        self.assertEqual(snapshot["acceleration"]["backend"], "cpu")
+        self.assertIn("--n_gpu_layers", command)
+        self.assertEqual(command[command.index("--n_gpu_layers") + 1], "0")
+
+    def test_stops_native_runtime_when_logs_report_zero_metal_offload(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor(
+            output_tail="llm_load_tensors: offloaded 0/42 layers to GPU",
+        )
+        hardware_profile = FakeHardwareProfile(
+            -1,
+            snapshot={
+                "system": "Darwin",
+                "machine": "arm64",
+                "ram_gb": 32,
+                "vram_gb": 0,
+                "is_apple_silicon": True,
+                "memory_kind": "unified",
+            },
+        )
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+            hardware_profile=hardware_profile,
+        )
+        snapshot = manager.start_if_available()
+
+        self.assertEqual(snapshot["status"], "error")
+        self.assertIn("did not use Metal acceleration", snapshot["error_message"])
+        self.assertEqual(snapshot["acceleration"]["backend"], "metal")
+        self.assertFalse(snapshot["acceleration"]["supported"])
+        self.assertEqual(supervisor.stop_calls, 1)
+
+    def test_stops_runtime_when_metal_tensor_api_is_disabled(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor(
+            output_tail=(
+                "ggml_metal_device_init: GPU name: MTL0 (Apple M5)\n"
+                "llm_load_tensors: offloaded 49/49 layers to GPU\n"
+                "ggml_metal_library_init_from_source: error compiling source\n"
+                "ggml_metal_device_init: - the tensor API is not supported in this environment - disabling\n"
+            ),
+        )
+        hardware_profile = FakeHardwareProfile(
+            -1,
+            snapshot={
+                "system": "Darwin",
+                "machine": "arm64",
+                "ram_gb": 32,
+                "vram_gb": 0,
+                "is_apple_silicon": True,
+                "memory_kind": "unified",
+            },
+        )
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+            hardware_profile=hardware_profile,
+        )
+        snapshot = manager.start_if_available()
+
+        self.assertEqual(snapshot["status"], "error")
+        self.assertIn("Metal Tensor API", snapshot["error_message"])
+        self.assertFalse(snapshot["acceleration"]["supported"])
+        self.assertEqual(supervisor.stop_calls, 1)
+
+    def test_respects_configured_gpu_layer_count_for_runtime(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        config_manager = ConfigManager()
+        config_manager.runtime = replace(config_manager.runtime, llama_cpp_gpu_layers=12)
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=config_manager,
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+            hardware_profile=FakeHardwareProfile(3),
+        )
+        manager.start_if_available()
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertIn("--n-gpu-layers", command)
+        self.assertEqual(command[command.index("--n-gpu-layers") + 1], "12")
+
+    def test_uses_hardware_profile_gpu_layer_count_for_runtime(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        hardware_profile = FakeHardwareProfile(7)
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+            hardware_profile=hardware_profile,
+        )
+        manager.start_if_available()
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertEqual(hardware_profile.model_paths, [str(model_path)])
+        self.assertIn("--n-gpu-layers", command)
+        self.assertEqual(command[command.index("--n-gpu-layers") + 1], "7")
+
+    def test_omits_gpu_layer_args_when_hardware_profile_has_no_accelerator(self):
+        db = DBManager()
+        model_path = Path(self.temp_dir.name) / "model.gguf"
+        model_path.write_text("gguf", encoding="utf-8")
+        runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = db.models.create("runtime-model", runtime_provider["id"])
+        db.runtime_model_downloads.create(
+            catalog_key="runtime-model",
+            status="ready",
+            source_url="https://example.test/model.gguf",
+            filename="model.gguf",
+            model_config_id=model_id,
+            local_path=str(model_path),
+        )
+        supervisor = FakeSupervisor()
+
+        manager = LlamaCppRuntimeManager(
+            config_manager=ConfigManager(),
+            db_manager=db,
+            paths=FakePaths("/opt/llama-server"),
+            supervisor=supervisor,
+            hardware_profile=FakeHardwareProfile(None),
+        )
+        manager.start_if_available()
+
+        command = supervisor.start_calls[0]["command"]
+        self.assertNotIn("--n-gpu-layers", command)
+        self.assertNotIn("--n_gpu_layers", command)
 
     def test_preserves_configured_metal_device_filter_for_llama_cpp_python_server(self):
         db = DBManager()

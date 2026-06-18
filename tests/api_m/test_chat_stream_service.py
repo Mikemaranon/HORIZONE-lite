@@ -28,6 +28,15 @@ class FakeStreamExecutor:
             yield event
 
 
+class FakeModelManager:
+    def __init__(self):
+        self.cancelled_providers = []
+
+    def cancel_stream(self, provider):
+        self.cancelled_providers.append(provider)
+        return True
+
+
 class ChatStreamServiceTests(IsolatedDatabaseTestCase):
     def test_strip_reasoning_content_removes_complete_and_unopened_think_prefixes(self):
         self.assertEqual(
@@ -312,6 +321,32 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
         self.assertEqual(end_event["data"]["response"]["finish_reason"], "cancelled")
         self.assertEqual(end_event["data"]["response"]["message"]["content"], "")
         self.assertNotIn("stream-cancel", service._active_streams)
+
+    def test_cancel_notifies_active_provider(self):
+        model_manager = FakeModelManager()
+        service = ChatStreamService(
+            db_manager=None,
+            model_manager=model_manager,
+            persistence_service=FakePersistenceService(),
+            executor=FakeStreamExecutor([]),
+        )
+        events = service.iter_stream_events(
+            conversation_id=None,
+            provider="llama_cpp",
+            input_messages=[{"role": "user", "content": "Hi"}],
+            model="runtime-model",
+            generation_settings={},
+            request_id="stream-provider-cancel",
+            assistant_message_meta={},
+        )
+
+        self.assertEqual(next(events)["event"], "start")
+        self.assertTrue(service.cancel("stream-provider-cancel"))
+
+        list(events)
+
+        self.assertEqual(model_manager.cancelled_providers, ["llama_cpp"])
+        self.assertNotIn("stream-provider-cancel", service._active_streams)
 
     def test_iter_stream_events_sanitizes_unexpected_errors_and_releases_stream(self):
         service = ChatStreamService(

@@ -20,6 +20,7 @@ class ConfigManager:
             llama_cpp_server_kind=self._load_llama_cpp_server_kind(),
             llama_cpp_port=self._get_env_int("HORIZONE_LLAMA_CPP_PORT", 8080),
             llama_cpp_port_max=self._get_env_int("HORIZONE_LLAMA_CPP_PORT_MAX", 9000),
+            llama_cpp_gpu_layers=self._load_llama_cpp_gpu_layers(),
             runtime_models_dir=self._load_runtime_models_dir(),
             runtime_disabled=self._get_env_bool("HORIZONE_RUNTIME_DISABLED", False),
             bootstrap_admin_password=os.environ.get("HORIZONE_BOOTSTRAP_ADMIN_PASSWORD"),
@@ -75,6 +76,7 @@ class ConfigManager:
                 "llama_cpp_port": self.runtime.llama_cpp_port,
                 "llama_cpp_port_max": self.runtime.llama_cpp_port_max,
                 "llama_cpp_server_kind": self.runtime.llama_cpp_server_kind,
+                "llama_cpp_gpu_layers": self.runtime.llama_cpp_gpu_layers,
                 "runtime_models_dir": self.runtime.runtime_models_dir,
                 "runtime_disabled": self.runtime.runtime_disabled,
             },
@@ -136,6 +138,16 @@ class ConfigManager:
         if normalized in {"native", "python"}:
             return normalized
         return "native"
+
+    def _load_llama_cpp_gpu_layers(self) -> int | None:
+        raw_value = os.environ.get("HORIZONE_LLAMA_CPP_GPU_LAYERS")
+        if raw_value is None or raw_value.strip() == "":
+            return None
+
+        try:
+            return int(raw_value)
+        except ValueError:
+            return None
 
     def _load_secret_key(self) -> str:
         configured = os.environ.get("SECRET_KEY") or os.environ.get("HORIZONE_SECRET_KEY")

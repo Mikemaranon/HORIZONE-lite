@@ -324,6 +324,43 @@ def has_llama_cpp_python_server() -> bool:
         return False
 
 
+def has_llama_cpp_gpu_offload() -> bool:
+    try:
+        import llama_cpp
+    except ImportError:
+        return False
+
+    supports_gpu_offload = getattr(llama_cpp, "llama_supports_gpu_offload", None)
+    if not callable(supports_gpu_offload):
+        return False
+
+    try:
+        return bool(supports_gpu_offload())
+    except Exception:
+        return False
+
+
+def ensure_macos_llama_cpp_gpu_offload() -> None:
+    if has_llama_cpp_gpu_offload():
+        return
+
+    raise SystemExit(
+        "macOS desktop builds using the Python HORIZONE runtime require "
+        "llama-cpp-python with Metal GPU offload support. Reinstall the runtime dependency "
+        "with Metal enabled, then rebuild HORIZONE."
+    )
+
+
+def ensure_macos_native_llama_server_runtime() -> None:
+    raise SystemExit(
+        "macOS desktop packages must embed a native llama.cpp llama-server binary. "
+        "The PyInstaller llama-cpp-python fallback can lose Apple Metal Tensor API "
+        "inside the installed app, which makes HORIZONE runtime inference much slower. "
+        "Build llama.cpp with Metal enabled and set HORIZONE_LLAMA_CPP_BINARY to that "
+        "llama-server before rebuilding HORIZONE."
+    )
+
+
 def make_executable(path: Path) -> None:
     if not sys.platform.startswith("win"):
         path.chmod(path.stat().st_mode | 0o755)
@@ -355,6 +392,9 @@ def freeze_llama_cpp_python_server(build_root: Path) -> None:
         "PyInstaller is required to freeze the embedded HORIZONE runtime. "
         "Install it in the active environment."
     )
+    if sys.platform == "darwin":
+        ensure_macos_llama_cpp_gpu_offload()
+
     entrypoint = build_root / "horizone_llama_server_entry.py"
     entrypoint.write_text(
         "from llama_cpp.server.__main__ import main\n\n"
@@ -409,6 +449,9 @@ def prepare_runtime_bundle(build_root: Path) -> None:
     if native_binary:
         bundle_native_llama_server(native_binary)
         return
+
+    if sys.platform == "darwin":
+        ensure_macos_native_llama_server_runtime()
 
     if has_llama_cpp_python_server():
         freeze_llama_cpp_python_server(build_root)

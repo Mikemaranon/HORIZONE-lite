@@ -1,5 +1,6 @@
 import io
 import threading
+import zipfile
 from http.cookies import SimpleCookie
 from pathlib import Path
 
@@ -7,6 +8,37 @@ from tests.test_support import ApiTestCase
 from model_m import ProviderUnavailableError
 from api_m.domains.chat_api import ChatAPI
 from app_routes import AppRoutes
+
+
+def build_docx_bytes(text):
+    document_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r>
+        <w:t>{text}</w:t>
+      </w:r>
+    </w:p>
+  </w:body>
+</w:document>"""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", document_xml)
+    return buffer.getvalue()
+
+
+def build_pdf_bytes(text):
+    stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode("latin-1")
+    return (
+        b"%PDF-1.4\n"
+        b"1 0 obj\n"
+        + f"<< /Length {len(stream)} >>\n".encode("ascii")
+        + b"stream\n"
+        + stream
+        + b"\nendstream\n"
+        b"endobj\n"
+        b"%%EOF\n"
+    )
 
 
 class ApiEndpointTests(ApiTestCase):
@@ -1215,6 +1247,8 @@ class ApiEndpointTests(ApiTestCase):
                 "files": [
                     (io.BytesIO(b"Project summary"), "brief.txt"),
                     (io.BytesIO(b"{\"ok\": true}"), "metadata.json"),
+                    (io.BytesIO(build_docx_bytes("DOCX Project summary")), "brief.docx"),
+                    (io.BytesIO(build_pdf_bytes("PDF Project summary")), "brief.pdf"),
                 ],
             },
             headers=self.auth_headers,
@@ -1241,16 +1275,22 @@ class ApiEndpointTests(ApiTestCase):
         )
 
         self.assertEqual(upload_response.status_code, 201)
-        self.assertEqual(len(upload_payload["documents"]), 2)
+        self.assertEqual(len(upload_payload["documents"]), 4)
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(list_response.get_json()["folders"], [])
-        self.assertEqual(len(listed_documents), 2)
-        self.assertEqual(listed_documents[0]["filename"], "brief.txt")
+        self.assertEqual(len(listed_documents), 4)
+        documents_by_filename = {
+            document["filename"]: document
+            for document in listed_documents
+        }
+        self.assertIn("brief.txt", documents_by_filename)
+        self.assertIn("DOCX Project summary", documents_by_filename["brief.docx"]["preview"])
+        self.assertIn("PDF Project summary", documents_by_filename["brief.pdf"]["preview"])
         self.assertIn("Project summary", stored_document["text_content"])
         self.assertEqual(len(stored_chunks), 1)
         self.assertIn("Project summary", stored_chunks[0]["text_content"])
         self.assertEqual(delete_response.status_code, 200)
-        self.assertEqual(len(list_after_delete.get_json()["documents"]), 1)
+        self.assertEqual(len(list_after_delete.get_json()["documents"]), 3)
 
     def test_project_delete_detaches_conversations_and_removes_documents(self):
         project_id = self.db.projects.create("Project to delete", "Keep chats")
@@ -1397,7 +1437,7 @@ class ApiEndpointTests(ApiTestCase):
             data={
                 "project_id": str(project_id),
                 "files": [
-                    (io.BytesIO(b"%PDF-1.4 binary"), "contract.pdf"),
+                    (io.BytesIO(b"\x89PNG\r\n\x1a\nbinary"), "image.png"),
                 ],
             },
             headers=self.auth_headers,

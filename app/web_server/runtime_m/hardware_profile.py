@@ -3,9 +3,15 @@ import platform
 import re
 import shutil
 import subprocess
+from pathlib import Path
+
+from .gguf_metadata import GgufMetadataError, read_gguf_metadata
 
 
 class LocalHardwareProfile:
+    GPU_MEMORY_SAFETY_RATIO = 0.88
+    MODEL_NON_LAYER_OVERHEAD_RATIO = 0.12
+
     def snapshot(self):
         ram_gb = self._get_total_ram_gb()
         vram_gb = self._get_nvidia_vram_gb()
@@ -18,8 +24,35 @@ class LocalHardwareProfile:
             "machine": machine,
             "ram_gb": ram_gb,
             "vram_gb": vram_gb,
+            "is_apple_silicon": is_apple_silicon,
             "memory_kind": "unified" if is_apple_silicon else ("vram" if vram_gb else "system"),
         }
+
+    def resolve_llama_cpp_gpu_layers(self, model_path):
+        hardware = self.snapshot()
+        if hardware.get("is_apple_silicon"):
+            return -1
+
+        vram_gb = float(hardware.get("vram_gb") or 0)
+        if vram_gb <= 0:
+            return None
+
+        return self._estimate_gpu_layers_for_vram(model_path, vram_gb)
+
+    def llama_cpp_python_supports_gpu_offload(self):
+        try:
+            import llama_cpp
+        except (ImportError, OSError):
+            return False
+
+        supports_gpu_offload = getattr(llama_cpp, "llama_supports_gpu_offload", None)
+        if not callable(supports_gpu_offload):
+            return False
+
+        try:
+            return bool(supports_gpu_offload())
+        except Exception:
+            return False
 
     def assess_model(self, entry):
         hardware = self.snapshot()
@@ -107,3 +140,51 @@ class LocalHardwareProfile:
             except ValueError:
                 continue
         return round(max(values), 1) if values else 0
+
+    def _estimate_gpu_layers_for_vram(self, model_path, vram_gb):
+        model_file = Path(model_path)
+        try:
+            model_size_bytes = model_file.stat().st_size
+        except OSError:
+            return None
+
+        block_count = self._read_model_block_count(model_file)
+        if block_count <= 0 or model_size_bytes <= 0:
+            return -1
+
+        available_bytes = vram_gb * self.GPU_MEMORY_SAFETY_RATIO * (1024 ** 3)
+        overhead_bytes = model_size_bytes * self.MODEL_NON_LAYER_OVERHEAD_RATIO
+        layer_budget_bytes = max(0, available_bytes - overhead_bytes)
+        bytes_per_layer = max(1, (model_size_bytes - overhead_bytes) / block_count)
+        estimated_layers = int(layer_budget_bytes // bytes_per_layer)
+
+        if estimated_layers >= block_count:
+            return -1
+
+        return max(0, estimated_layers)
+
+    def _read_model_block_count(self, model_path):
+        try:
+            architecture_metadata = read_gguf_metadata(
+                model_path,
+                keys=("general.architecture",),
+            )
+        except (GgufMetadataError, OSError):
+            return 0
+
+        architecture = str(architecture_metadata.get("general.architecture") or "").strip()
+        if not architecture:
+            return 0
+
+        try:
+            block_metadata = read_gguf_metadata(
+                model_path,
+                keys=(f"{architecture}.block_count",),
+            )
+        except (GgufMetadataError, OSError):
+            return 0
+
+        try:
+            return int(block_metadata.get(f"{architecture}.block_count") or 0)
+        except (TypeError, ValueError):
+            return 0

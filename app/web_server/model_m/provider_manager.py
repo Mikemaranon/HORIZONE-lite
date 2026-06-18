@@ -56,6 +56,13 @@ class ProviderManager:
             should_stop=should_stop,
         )
 
+    def cancel_stream(self, provider_name: str) -> bool:
+        provider = self.get_provider(provider_name)
+        cancel_stream = getattr(provider, "cancel_stream", None)
+        if not callable(cancel_stream):
+            return False
+        return bool(cancel_stream())
+
     def generate_conversation_title(
         self,
         provider_name: str,

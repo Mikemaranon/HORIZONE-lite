@@ -13,6 +13,21 @@ from .chat_sse_presenter import ChatSSEPresenter
 LOGGER = logging.getLogger(__name__)
 
 
+class ActiveChatStream:
+    def __init__(self, *, provider, cancel_callback=None):
+        self.provider = provider
+        self.cancel_event = threading.Event()
+        self.cancel_callback = cancel_callback
+
+    def is_cancelled(self):
+        return self.cancel_event.is_set()
+
+    def cancel(self):
+        self.cancel_event.set()
+        if callable(self.cancel_callback):
+            self.cancel_callback(self.provider)
+
+
 class ChatStreamService:
     DISPLAY_DELTA_SPLIT_THRESHOLD = 48
     DISPLAY_DELTA_TARGET_CHARS = 24
@@ -55,12 +70,12 @@ class ChatStreamService:
 
     def cancel(self, request_id):
         with self._active_streams_lock:
-            cancel_event = self._active_streams.get(request_id)
+            active_stream = self._active_streams.get(request_id)
 
-        if not cancel_event:
+        if not active_stream:
             return False
 
-        cancel_event.set()
+        active_stream.cancel()
         return True
 
     def build_stream_response(
@@ -98,7 +113,7 @@ class ChatStreamService:
         assistant_message_meta,
         tool_context=None,
     ):
-        cancel_event = self._register_stream(request_id)
+        active_stream = self._register_stream(request_id, provider)
 
         try:
             yield self._event(
@@ -123,7 +138,7 @@ class ChatStreamService:
                 input_messages,
                 model,
                 generation_settings,
-                should_stop=cancel_event.is_set,
+                should_stop=active_stream.is_cancelled,
                 tool_context=tool_context,
             )
 
@@ -175,7 +190,7 @@ class ChatStreamService:
                     streamed_text_parts.append(display_delta)
                     yield self._event("delta", {"delta": display_delta})
 
-            was_cancelled = cancel_event.is_set()
+            was_cancelled = active_stream.is_cancelled()
             final_response = self._resolve_final_response(
                 final_response,
                 streamed_text_parts,
@@ -203,7 +218,7 @@ class ChatStreamService:
 
             yield self._event("end", payload)
         except GeneratorExit:
-            cancel_event.set()
+            active_stream.cancel()
             raise
         except ProviderError as error:
             payload = error.to_dict()
@@ -331,15 +346,26 @@ class ChatStreamService:
     def _event(self, event_name, payload):
         return {"event": event_name, "data": payload}
 
-    def _register_stream(self, request_id):
-        cancel_event = threading.Event()
+    def _register_stream(self, request_id, provider):
+        active_stream = ActiveChatStream(
+            provider=provider,
+            cancel_callback=self._cancel_provider_stream,
+        )
         with self._active_streams_lock:
-            self._active_streams[request_id] = cancel_event
-        return cancel_event
+            self._active_streams[request_id] = active_stream
+        return active_stream
 
     def _release_stream(self, request_id):
         with self._active_streams_lock:
             self._active_streams.pop(request_id, None)
+
+    def _cancel_provider_stream(self, provider):
+        cancel_stream = getattr(self.model_manager, "cancel_stream", None)
+        if callable(cancel_stream):
+            try:
+                cancel_stream(provider)
+            except Exception:
+                LOGGER.exception("Provider stream cancellation failed", extra={"provider": provider})
 
     def _iter_display_deltas(self, delta):
         if len(delta) <= self.DISPLAY_DELTA_SPLIT_THRESHOLD:

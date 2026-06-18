@@ -1,2 +1,6 @@
 -r requirements-core.txt
+# Development fallback only. Do not use this PyInstaller runtime for macOS
+# desktop packaging; package a native Metal-enabled llama-server instead.
+# Apple Silicon users should install this with:
+# CMAKE_ARGS="-DGGML_METAL=on" pip install -r requirements/requirements-runtime-llamacpp.txt
 llama-cpp-python[server]>=0.3,<0.4

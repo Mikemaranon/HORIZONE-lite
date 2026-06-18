@@ -890,6 +890,34 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(runtime_manager.start_calls, 2)
         self.assertEqual(len(fake_http.calls), 2)
 
+    def test_llama_cpp_provider_cancel_stream_stops_runtime_manager(self):
+        runtime_manager = FakeRuntimeManager({"status": "ready", "base_url": "http://127.0.0.1:8080"})
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        provider = manager.get_provider("llama_cpp")
+
+        self.assertTrue(provider.cancel_stream())
+
+        self.assertEqual(runtime_manager.stop_calls, 1)
+
+    def test_llama_cpp_provider_stream_chat_returns_cancelled_after_cancel_disconnect(self):
+        runtime_manager = FakeRuntimeManager({"status": "ready", "base_url": "http://127.0.0.1:8080"})
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+        fake_http = FakeHttpClient(sse_error=OSError("socket closed"))
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        events = list(
+            provider.stream_chat(
+                [{"role": "user", "content": "Hola"}],
+                "qwen35",
+                should_stop=lambda: True,
+            )
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["response"]["finish_reason"], "cancelled")
+        self.assertTrue(events[0]["response"]["raw"]["cancelled"])
+
     def test_llama_cpp_provider_adds_runtime_diagnostics_to_decode_errors(self):
         runtime_manager = FakeRuntimeManager(
             {"status": "ready", "base_url": "http://127.0.0.1:8080"},
@@ -923,6 +951,50 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(error.exception.details["model"], "gemma-3-1b-it-q4")
         self.assertIn("incorrect header check", error.exception.details["decode_error"])
         self.assertIn("llama_init_from_model", error.exception.details["runtime_log_tail"])
+
+    def test_llama_cpp_provider_returns_partial_response_when_stream_drops_after_tokens(self):
+        runtime_manager = FakeRuntimeManager(
+            {"status": "ready", "base_url": "http://127.0.0.1:8080"},
+            supervisor=FakeRuntimeSupervisor("disconnected"),
+        )
+        manager = ProviderManager(ConfigManager(), runtime_manager=runtime_manager)
+
+        class DroppingHttpClient(FakeHttpClient):
+            def stream_sse_json(self, url, payload, *, headers=None, provider_name=None):
+                self.calls.append(
+                    {
+                        "method": "POST_STREAM_SSE",
+                        "url": url,
+                        "payload": payload,
+                        "headers": headers or {},
+                        "provider_name": provider_name,
+                    }
+                )
+                yield {
+                    "id": "chatcmpl-runtime",
+                    "model": "gemma-runtime",
+                    "choices": [{"delta": {"content": "Ho"}, "finish_reason": None}],
+                }
+                raise ModelOperationError(
+                    "Provider stream disconnected.",
+                    provider="llama_cpp",
+                )
+
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = DroppingHttpClient()
+
+        events = list(
+            provider.stream_chat(
+                [{"role": "user", "content": "Hola"}],
+                "gemma-runtime",
+            )
+        )
+
+        self.assertEqual(events[0]["delta"], "Ho")
+        self.assertEqual(events[1]["response"]["message"]["content"], "Ho")
+        self.assertEqual(events[1]["response"]["finish_reason"], "stream_error")
+        self.assertIn("stream_error", events[1]["response"]["raw"])
+        self.assertEqual(runtime_manager.stop_calls, 0)
 
     def test_anthropic_provider_chat_uses_messages_api_shape(self):
         db = DBManager()

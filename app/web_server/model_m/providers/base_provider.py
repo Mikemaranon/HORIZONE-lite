@@ -25,6 +25,9 @@ class ModelProvider(ABC):
     def get_availability_error(self):
         return None
 
+    def cancel_stream(self) -> bool:
+        return False
+
     @abstractmethod
     def list_models(self) -> list[dict]:
         raise NotImplementedError

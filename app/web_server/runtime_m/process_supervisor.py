@@ -11,6 +11,9 @@ class ProcessSupervisor:
         "error",
         "errno",
         "failed",
+        "gpu",
+        "metal",
+        "offload",
         "traceback",
         "valueerror",
     )
