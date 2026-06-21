@@ -121,6 +121,7 @@ class ModelConfigServiceTests(IsolatedDatabaseTestCase):
                 "display_name": "Personal Tiny",
                 "provider_id": ollama_provider["id"],
                 "icon_image": "",
+                "reasoning_mode": "off",
             }
         )
 
@@ -128,6 +129,19 @@ class ModelConfigServiceTests(IsolatedDatabaseTestCase):
         self.assertEqual(updated["display_name"], "Personal Tiny")
         self.assertEqual(updated["provider"], "llama_cpp")
         self.assertEqual(updated["provider_id"], runtime_provider["id"])
+        self.assertEqual(updated["reasoning_mode"], "off")
+
+    def test_invalid_model_reasoning_mode_is_rejected(self):
+        provider = self.db.providers.get_first_by_type("ollama")
+
+        with self.assertRaises(RequestError):
+            self.service.create_model(
+                {
+                    "name": "invalid-reasoning",
+                    "provider_id": provider["id"],
+                    "reasoning_mode": "sometimes",
+                }
+            )
 
     def test_runtime_model_delete_removes_download_record_and_file(self):
         runtime_provider = self.db.providers.get_by_builtin_key("horizone_runtime")

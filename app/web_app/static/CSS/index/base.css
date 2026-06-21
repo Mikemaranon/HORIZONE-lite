@@ -150,10 +150,12 @@ select:disabled {
 }
 
 .status-banner {
+    --status-banner-left-space: 0px;
+    --status-banner-right-space: 0px;
     position: fixed;
     top: 50px;
-    left: calc(var(--sidebar-width) / 2);
-    right: calc(var(--sidebar-width) / -2);
+    left: calc((var(--status-banner-left-space) - var(--status-banner-right-space)) / 2);
+    right: calc((var(--status-banner-right-space) - var(--status-banner-left-space)) / 2);
     z-index: 60;
     width: min(calc(100vw - 32px), 560px);
     margin: 0 auto;
@@ -163,12 +165,13 @@ select:disabled {
     border-radius: var(--radius-lg);
     box-shadow: 0 14px 32px rgba(16, 24, 40, 0.12);
     animation: rise-in 0.18s ease;
+    transition: left 0.24s ease, right 0.24s ease;
     pointer-events: auto;
 }
 
 .status-banner__content {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
     padding: 12px 14px;
 }
@@ -208,10 +211,37 @@ select:disabled {
     color: #8e381e;
 }
 
+.app-shell.is-sidebar-open .status-banner {
+    --status-banner-left-space: var(--sidebar-width);
+}
+
+.workspace-stage.is-chat-panel-open .status-banner {
+    --status-banner-right-space: var(--chat-sidebar-width);
+}
+
+.app-body--settings .status-banner {
+    --status-banner-left-space: 338px;
+}
+
+@media (max-width: 1180px) {
+    .workspace-stage.is-chat-panel-open .status-banner {
+        --status-banner-right-space: min(86vw, var(--chat-sidebar-width));
+    }
+}
+
 @media (max-width: 1120px) {
-    .status-banner {
-        left: 0;
-        right: 0;
+    .app-shell.is-sidebar-open .status-banner {
+        --status-banner-left-space: min(86vw, var(--sidebar-width));
+    }
+}
+
+@media (max-width: 1100px) {
+    .app-body--settings .status-banner {
+        --status-banner-left-space: 0px;
+    }
+
+    .app-body--settings.is-settings-sidebar-open .status-banner {
+        --status-banner-left-space: min(320px, calc(100vw - 36px));
     }
 }
 

@@ -2,6 +2,7 @@ __pycache__
 .pytest_cache
 .venv
 .horizone-lite/
+HORIZONE-runtime
 doc/
 agents.md
 TODO

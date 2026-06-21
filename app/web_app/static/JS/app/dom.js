@@ -196,6 +196,8 @@ export const elements = {
     modelDisplayNameInput: document.getElementById("model-display-name-input"),
     modelNameInput: document.getElementById("model-name-input"),
     modelProviderSelect: document.getElementById("model-provider-select"),
+    modelReasoningField: document.getElementById("model-reasoning-field"),
+    modelReasoningSelect: document.getElementById("model-reasoning-select"),
     modelIconInput: document.getElementById("model-icon-input"),
     modelIconDataInput: document.getElementById("model-icon-data-input"),
     modelIconPreview: document.getElementById("model-icon-preview"),

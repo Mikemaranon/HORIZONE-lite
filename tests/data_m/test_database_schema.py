@@ -43,6 +43,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
                 "llama_cpp_runtime_foundation",
                 "message_reasoning_content",
                 "user_avatar_image",
+                "model_reasoning_mode",
             ],
         )
         self.assertIn("idx_messages_conversation_position", message_index_names)
@@ -130,6 +131,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("tags", profile_column_names)
         self.assertIn("display_name", model_column_names)
         self.assertIn("icon_image", model_column_names)
+        self.assertIn("reasoning_mode", model_column_names)
         self.assertIn("project_model_id", conversation_column_names)
         self.assertIn("quick_project_model_ids", conversation_column_names)
         self.assertIn("project_model_id", message_column_names)

@@ -3,10 +3,31 @@ import re
 
 THINK_OPEN_TAG_PREFIX = "<think"
 THINK_CLOSE_TAG = "</think>"
+THINK_MARKER_PREFIXES = (
+    THINK_OPEN_TAG_PREFIX,
+    THINK_CLOSE_TAG,
+    "[think]",
+    "[/think]",
+    "[thinking]",
+    "[/thinking]",
+)
+
+
+def normalize_reasoning_markers(content):
+    text = str(content or "")
+    replacements = (
+        (r"(?is)<thinking\b[^>]*>", "<think>"),
+        (r"(?is)</thinking\s*>", THINK_CLOSE_TAG),
+        (r"(?is)\[(?:think|thinking)\]", "<think>"),
+        (r"(?is)\[/(?:think|thinking)\]", THINK_CLOSE_TAG),
+    )
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text)
+    return text
 
 
 def extract_reasoning_content(content):
-    text = str(content or "")
+    text = normalize_reasoning_markers(content)
     if not text:
         return "", ""
 
@@ -106,6 +127,7 @@ class ReasoningStreamFilter:
         return self._drain(final=True)
 
     def _drain(self, final):
+        self.pending = normalize_reasoning_markers(self.pending)
         output_parts = []
 
         while self.pending:
@@ -213,12 +235,12 @@ class ReasoningStreamFilter:
         lower_pending = self.pending.lower()
         max_tail_length = min(
             len(lower_pending),
-            max(len(THINK_OPEN_TAG_PREFIX), len(THINK_CLOSE_TAG)) - 1,
+            max(len(marker) for marker in THINK_MARKER_PREFIXES) - 1,
         )
 
         for tail_length in range(max_tail_length, 0, -1):
             tail = lower_pending[-tail_length:]
-            if THINK_OPEN_TAG_PREFIX.startswith(tail) or THINK_CLOSE_TAG.startswith(tail):
+            if any(marker.startswith(tail) for marker in THINK_MARKER_PREFIXES):
                 return tail_length
 
         return 0

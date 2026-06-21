@@ -48,6 +48,7 @@ class DatabaseSchemaInitializer:
             "llama_cpp_runtime_foundation": self.ensure_llama_cpp_runtime_foundation,
             "message_reasoning_content": self.ensure_message_reasoning_content,
             "user_avatar_image": self.ensure_user_avatar_image,
+            "model_reasoning_mode": self.ensure_model_reasoning_mode,
         }
 
         for migration in self.versioned_migrations:
@@ -320,4 +321,12 @@ class DatabaseSchemaInitializer:
                 FOREIGN KEY (model_config_id) REFERENCES models(id) ON DELETE SET NULL
             )
             """
+        )
+
+    def ensure_model_reasoning_mode(self, database):
+        self.ensure_column(
+            database,
+            "models",
+            "reasoning_mode",
+            "TEXT NOT NULL DEFAULT 'auto'",
         )

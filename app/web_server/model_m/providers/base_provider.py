@@ -115,8 +115,9 @@ class ModelProvider(ABC):
         finish_reason=None,
         raw_response=None,
         message_id=None,
+        reasoning_content="",
     ) -> dict:
-        return {
+        response = {
             "provider": self.provider_name,
             "model": model,
             "message": {
@@ -128,6 +129,9 @@ class ModelProvider(ABC):
             "message_id": message_id,
             "raw": raw_response or {},
         }
+        if reasoning_content:
+            response["message"]["reasoning_content"] = reasoning_content
+        return response
 
     def build_catalog(self, models: list[dict], error=None) -> dict:
         return {

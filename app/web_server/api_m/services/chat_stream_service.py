@@ -124,11 +124,18 @@ class ChatStreamService:
                     "model": model,
                     "request_id": request_id,
                     "message_meta": assistant_message_meta,
+                    "reasoning_mode": generation_settings.get("_reasoning_mode", "auto"),
+                    "reasoning_enabled": (
+                        provider == "llama_cpp"
+                        and generation_settings.get("_reasoning_mode", "auto") != "off"
+                    ),
                 },
             )
 
             final_response = None
             streamed_text_parts = []
+            structured_reasoning_parts = []
+            reasoning_active = False
             reasoning_filter = ReasoningStreamFilter(
                 hide_unopened_reasoning_prefix=self._may_emit_unopened_reasoning_prefix(model)
             )
@@ -145,12 +152,35 @@ class ChatStreamService:
             for event in event_stream:
                 event_type = event.get("type")
 
+                if event_type == "reasoning_start":
+                    if not reasoning_active:
+                        reasoning_active = True
+                        yield self._event("reasoning_start", {"reasoning_active": True})
+                    continue
+
+                if event_type == "reasoning_delta":
+                    reasoning_delta = event.get("delta") or ""
+                    if reasoning_delta:
+                        structured_reasoning_parts.append(reasoning_delta)
+                    continue
+
+                if event_type == "reasoning_end":
+                    if reasoning_active:
+                        reasoning_active = False
+                        yield self._event("reasoning_end", {"reasoning_active": False})
+                    continue
+
                 if event_type == "delta":
                     delta = event.get("delta") or ""
                     if delta:
                         visible_delta = reasoning_filter.feed(delta)
                         for reasoning_event in reasoning_filter.pop_events():
-                            yield self._event(f"reasoning_{reasoning_event['type']}", {})
+                            if reasoning_event["type"] == "start" and not reasoning_active:
+                                reasoning_active = True
+                                yield self._event("reasoning_start", {"reasoning_active": True})
+                            elif reasoning_event["type"] == "end" and reasoning_active:
+                                reasoning_active = False
+                                yield self._event("reasoning_end", {"reasoning_active": False})
                         if visible_delta:
                             for display_delta in self._iter_display_deltas(visible_delta):
                                 streamed_text_parts.append(display_delta)
@@ -184,20 +214,32 @@ class ChatStreamService:
 
             remaining_delta = reasoning_filter.flush()
             for reasoning_event in reasoning_filter.pop_events():
-                yield self._event(f"reasoning_{reasoning_event['type']}", {})
+                if reasoning_event["type"] == "start" and not reasoning_active:
+                    reasoning_active = True
+                    yield self._event("reasoning_start", {"reasoning_active": True})
+                elif reasoning_event["type"] == "end" and reasoning_active:
+                    reasoning_active = False
+                    yield self._event("reasoning_end", {"reasoning_active": False})
+            if reasoning_active:
+                reasoning_active = False
+                yield self._event("reasoning_end", {"reasoning_active": False})
             if remaining_delta:
                 for display_delta in self._iter_display_deltas(remaining_delta):
                     streamed_text_parts.append(display_delta)
                     yield self._event("delta", {"delta": display_delta})
 
             was_cancelled = active_stream.is_cancelled()
+            captured_reasoning = (
+                "".join(structured_reasoning_parts)
+                or reasoning_filter.reasoning_content
+            )
             final_response = self._resolve_final_response(
                 final_response,
                 streamed_text_parts,
                 provider,
                 model,
                 was_cancelled,
-                reasoning_filter.reasoning_content,
+                captured_reasoning,
             )
 
             if conversation_id:
@@ -334,7 +376,8 @@ class ChatStreamService:
         final_response = sanitize_chat_response(final_response)
         if reasoning_content:
             message = final_response.setdefault("message", {})
-            message.setdefault("reasoning_content", reasoning_content)
+            if not message.get("reasoning_content"):
+                message["reasoning_content"] = reasoning_content
         if was_cancelled:
             final_response["finish_reason"] = "cancelled"
             raw_response = final_response.get("raw") or {}

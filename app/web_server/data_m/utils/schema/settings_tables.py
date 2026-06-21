@@ -41,6 +41,7 @@ SETTINGS_SCHEMA_STATEMENTS = [
         provider_config_id INTEGER,
         provider TEXT NOT NULL,
         icon_image TEXT DEFAULT '',
+        reasoning_mode TEXT NOT NULL DEFAULT 'auto',
         endpoint TEXT DEFAULT '',
         api_key TEXT DEFAULT '',
         is_default INTEGER DEFAULT 0,

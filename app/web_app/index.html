@@ -987,6 +987,17 @@
                             <span>Provider</span>
                             <select id="model-provider-select"></select>
                         </label>
+                        <label id="model-reasoning-field" class="field field--stacked" hidden>
+                            <span>Reasoning</span>
+                            <select id="model-reasoning-select">
+                                <option value="auto">Auto</option>
+                                <option value="on">Enabled</option>
+                                <option value="off">Disabled</option>
+                            </select>
+                            <p class="field__help">
+                                Auto follows the model chat template. The reasoning indicator appears only while reasoning is actually produced.
+                            </p>
+                        </label>
                         <div class="field field--stacked">
                             <span>Model icon</span>
                             <div class="model-icon-field">

@@ -115,7 +115,10 @@ class ProvidersTable:
                    is_builtin, is_system_managed, builtin_key,
                    created_at, updated_at
             FROM providers
-            ORDER BY is_builtin DESC, updated_at DESC, id DESC
+            ORDER BY
+                CASE WHEN builtin_key = 'horizone_runtime' THEN 0 ELSE 1 END,
+                updated_at DESC,
+                id DESC
             """,
             fetchall=True,
         )

@@ -98,6 +98,29 @@ class ChatRequestPreparerTests(IsolatedDatabaseTestCase):
         )
         self.assertEqual(prepared.input_messages[-1]["content"], "review this.")
 
+    def test_prepare_applies_model_reasoning_mode_as_internal_generation_setting(self):
+        profile = self.db.profiles.get_default()
+        runtime_provider = self.db.providers.get_by_builtin_key("horizone_runtime")
+        model_id = self.db.models.create(
+            name="thinking-runtime",
+            provider_config_id=runtime_provider["id"],
+            reasoning_mode="off",
+            is_builtin=True,
+        )
+
+        prepared = self.preparer.prepare(
+            {
+                "model_config_id": model_id,
+                "messages": [{"role": "user", "content": "Answer briefly"}],
+            },
+            default_profile=profile,
+            default_provider="mlx",
+        )
+
+        self.assertEqual(prepared.provider, "llama_cpp")
+        self.assertEqual(prepared.generation_settings["_reasoning_mode"], "off")
+        self.assertEqual(prepared.generation_settings["_model_config_id"], model_id)
+
     def test_prepare_accepts_structured_tool_confirmation(self):
         profile = self.db.profiles.get_default()
 

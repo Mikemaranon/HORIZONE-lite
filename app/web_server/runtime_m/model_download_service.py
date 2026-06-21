@@ -178,6 +178,7 @@ class RuntimeModelDownloadService:
                 name=entry["catalog_key"],
                 display_name=entry["display_name"],
                 provider_config_id=provider["id"],
+                reasoning_mode=existing_model.get("reasoning_mode", "auto"),
                 is_default=existing_model["is_default"],
                 is_builtin=True,
             )

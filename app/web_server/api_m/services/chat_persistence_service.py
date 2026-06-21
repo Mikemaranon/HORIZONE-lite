@@ -143,11 +143,19 @@ class ChatPersistenceService:
 
         provider = response.get("provider") or conversation.get("provider")
         model = response.get("model") or conversation.get("model")
+        model_config = self.db.models.get(conversation.get("model_config_id"))
+        title_settings = {}
+        if model_config:
+            title_settings = {
+                "_model_config_id": model_config["id"],
+                "_reasoning_mode": model_config.get("reasoning_mode", "auto"),
+            }
         generated_title = self._generate_title(
             provider,
             model,
             first_user_message,
             assistant_content,
+            settings=title_settings,
         )
         title = generated_title or self._build_provisional_title(first_user_message)
         if not title:
@@ -159,7 +167,14 @@ class ChatPersistenceService:
 
         self.db.conversations.rename(conversation["id"], title)
 
-    def _generate_title(self, provider, model, first_user_message, assistant_content):
+    def _generate_title(
+        self,
+        provider,
+        model,
+        first_user_message,
+        assistant_content,
+        settings=None,
+    ):
         if not provider or not model:
             return ""
 
@@ -177,6 +192,7 @@ class ChatPersistenceService:
                         "content": assistant_content,
                     },
                 ],
+                settings=settings,
             )
         except Exception:
             LOGGER.warning("Conversation title generation failed", exc_info=True)

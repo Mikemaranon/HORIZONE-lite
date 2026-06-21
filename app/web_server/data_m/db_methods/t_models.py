@@ -15,6 +15,7 @@ class ModelsTable:
         provider_config_id,
         display_name="",
         icon_image="",
+        reasoning_mode="auto",
         is_default=False,
         is_builtin=False,
     ):
@@ -23,9 +24,10 @@ class ModelsTable:
         _, model_id = self.db.execute(
             """
             INSERT INTO models (
-                name, display_name, provider_config_id, provider, icon_image, endpoint, api_key, is_default, is_builtin
+                name, display_name, provider_config_id, provider, icon_image, reasoning_mode,
+                endpoint, api_key, is_default, is_builtin
             )
-            VALUES (?, ?, ?, ?, ?, '', '', ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)
             """,
             (
                 name,
@@ -33,6 +35,7 @@ class ModelsTable:
                 provider_config_id,
                 provider["provider_type"],
                 icon_image,
+                self._normalize_reasoning_mode(reasoning_mode),
                 int(is_default),
                 int(is_builtin),
             ),
@@ -47,7 +50,7 @@ class ModelsTable:
     def get(self, model_id):
         _, row = self.db.execute(
             """
-            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.is_default, m.is_builtin,
+            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.reasoning_mode, m.is_default, m.is_builtin,
                    m.created_at, m.updated_at,
                    p.name, p.provider_type, p.is_builtin
             FROM models AS m
@@ -63,7 +66,7 @@ class ModelsTable:
     def get_default(self):
         _, row = self.db.execute(
             """
-            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.is_default, m.is_builtin,
+            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.reasoning_mode, m.is_default, m.is_builtin,
                    m.created_at, m.updated_at,
                    p.name, p.provider_type, p.is_builtin
             FROM models AS m
@@ -80,7 +83,7 @@ class ModelsTable:
     def get_by_provider_and_name(self, provider, name):
         _, row = self.db.execute(
             """
-            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.is_default, m.is_builtin,
+            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.reasoning_mode, m.is_default, m.is_builtin,
                    m.created_at, m.updated_at,
                    p.name, p.provider_type, p.is_builtin
             FROM models AS m
@@ -98,7 +101,7 @@ class ModelsTable:
     def get_by_id_and_provider_type(self, model_id, provider_type):
         _, row = self.db.execute(
             """
-            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.is_default, m.is_builtin,
+            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.reasoning_mode, m.is_default, m.is_builtin,
                    m.created_at, m.updated_at,
                    p.name, p.provider_type, p.is_builtin
             FROM models AS m
@@ -115,7 +118,7 @@ class ModelsTable:
     def all(self):
         _, rows = self.db.execute(
             """
-            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.is_default, m.is_builtin,
+            SELECT m.id, m.name, m.display_name, m.provider_config_id, m.provider, m.icon_image, m.reasoning_mode, m.is_default, m.is_builtin,
                    m.created_at, m.updated_at,
                    p.name, p.provider_type, p.is_builtin
             FROM models AS m
@@ -134,6 +137,7 @@ class ModelsTable:
         provider_config_id,
         display_name="",
         icon_image="",
+        reasoning_mode="auto",
         is_default=False,
         is_builtin=False,
     ):
@@ -147,6 +151,7 @@ class ModelsTable:
                 provider_config_id = ?,
                 provider = ?,
                 icon_image = ?,
+                reasoning_mode = ?,
                 is_default = ?,
                 is_builtin = ?,
                 updated_at = CURRENT_TIMESTAMP
@@ -158,6 +163,7 @@ class ModelsTable:
                 provider_config_id,
                 provider["provider_type"],
                 icon_image,
+                self._normalize_reasoning_mode(reasoning_mode),
                 int(is_default),
                 int(is_builtin),
                 model_id,
@@ -422,6 +428,10 @@ class ModelsTable:
             return normalized
         return str(technical_name or "").strip()
 
+    def _normalize_reasoning_mode(self, reasoning_mode):
+        normalized = str(reasoning_mode or "auto").strip().lower()
+        return normalized if normalized in {"auto", "on", "off"} else "auto"
+
     def _require_provider(self, provider_config_id):
         _, row = self.db.execute(
             """
@@ -456,8 +466,8 @@ class ModelsTable:
         if not row:
             return None
 
-        provider_name = row[10] or row[4]
-        provider_type = row[11] or row[4]
+        provider_name = row[11] or row[4]
+        provider_type = row[12] or row[4]
         return {
             "id": row[0],
             "name": row[1],
@@ -465,12 +475,13 @@ class ModelsTable:
             "provider_id": row[3],
             "provider": provider_type,
             "icon_image": row[5] or "",
+            "reasoning_mode": row[6] or "auto",
             "provider_name": provider_name,
             "provider_type": provider_type,
-            "is_default": bool(row[6]),
-            "is_builtin": bool(row[7]),
-            "created_at": row[8],
-            "updated_at": row[9],
+            "is_default": bool(row[7]),
+            "is_builtin": bool(row[8]),
+            "created_at": row[9],
+            "updated_at": row[10],
         }
 
     def _serialize_provider(self, row):

@@ -1,5 +1,5 @@
 from api_m.services import ChatStreamService
-from api_m.services.reasoning_content_filter import strip_reasoning_content
+from api_m.services.reasoning_content_filter import ReasoningStreamFilter, strip_reasoning_content
 from data_m import DBManager
 from model_m import ProviderUnavailableError
 from tests.test_support import IsolatedDatabaseTestCase
@@ -46,6 +46,25 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
         self.assertEqual(
             strip_reasoning_content("private notes\n</think>\n\nVisible answer"),
             "Visible answer",
+        )
+        self.assertEqual(
+            strip_reasoning_content("<thinking>private</thinking>Visible"),
+            "Visible",
+        )
+        self.assertEqual(
+            strip_reasoning_content("[thinking]private[/thinking]Visible"),
+            "Visible",
+        )
+
+    def test_reasoning_stream_filter_handles_chunked_bracket_thinking_markers(self):
+        reasoning_filter = ReasoningStreamFilter()
+
+        self.assertEqual(reasoning_filter.feed("[thin"), "")
+        self.assertEqual(reasoning_filter.feed("king]private[/thinking]Visible"), "Visible")
+        self.assertEqual(reasoning_filter.reasoning_content, "private")
+        self.assertEqual(
+            [event["type"] for event in reasoning_filter.pop_events()],
+            ["start", "end"],
         )
 
     def test_iter_stream_events_yields_domain_events_without_flask_response(self):
@@ -141,6 +160,62 @@ class ChatStreamServiceTests(IsolatedDatabaseTestCase):
             "private notes",
         )
         self.assertTrue(events[-1]["data"]["response"]["raw"]["reasoning_content_hidden"])
+
+    def test_iter_stream_events_forwards_structured_runtime_reasoning_to_existing_ui_events(self):
+        service = ChatStreamService(
+            db_manager=None,
+            model_manager=None,
+            persistence_service=FakePersistenceService(),
+            executor=FakeStreamExecutor(
+                [
+                    {"type": "reasoning_start"},
+                    {"type": "reasoning_delta", "delta": "Private plan"},
+                    {"type": "reasoning_end"},
+                    {"type": "delta", "delta": "Visible answer"},
+                    {
+                        "type": "response",
+                        "response": {
+                            "provider": "llama_cpp",
+                            "model": "gemma-thinking",
+                            "message": {
+                                "role": "assistant",
+                                "content": "Visible answer",
+                                "reasoning_content": "Private plan",
+                            },
+                            "usage": {},
+                            "finish_reason": "stop",
+                            "raw": {},
+                        },
+                    },
+                ]
+            ),
+            display_delta_delay_seconds=0,
+        )
+
+        events = list(
+            service.iter_stream_events(
+                conversation_id=None,
+                provider="llama_cpp",
+                input_messages=[{"role": "user", "content": "Hi"}],
+                model="gemma-thinking",
+                generation_settings={"_reasoning_mode": "on"},
+                request_id="stream-structured-reasoning",
+                assistant_message_meta={},
+            )
+        )
+
+        self.assertEqual(
+            [event["event"] for event in events],
+            ["start", "reasoning_start", "reasoning_end", "delta", "end"],
+        )
+        self.assertTrue(events[0]["data"]["reasoning_enabled"])
+        self.assertEqual(events[0]["data"]["reasoning_mode"], "on")
+        self.assertEqual(events[1]["data"], {"reasoning_active": True})
+        self.assertEqual(events[2]["data"], {"reasoning_active": False})
+        self.assertEqual(
+            events[-1]["data"]["response"]["message"]["reasoning_content"],
+            "Private plan",
+        )
 
     def test_iter_stream_events_hides_unopened_reasoning_prefix(self):
         service = ChatStreamService(

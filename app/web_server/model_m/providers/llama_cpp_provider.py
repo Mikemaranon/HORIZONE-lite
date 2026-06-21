@@ -91,6 +91,7 @@ class LlamaCppProvider(ModelProvider):
             finish_reason=choice.get("finish_reason"),
             raw_response=response,
             message_id=response.get("id"),
+            reasoning_content=self._extract_reasoning_content(message),
         )
 
     def stream_chat(
@@ -104,6 +105,8 @@ class LlamaCppProvider(ModelProvider):
         payload = self._build_chat_payload(messages, model, settings, stream=True)
         base_url = self._get_base_url(settings=settings)
         content_parts = []
+        reasoning_parts = []
+        reasoning_active = False
         usage = {}
         finish_reason = None
         response_model = model
@@ -132,8 +135,22 @@ class LlamaCppProvider(ModelProvider):
 
                     choice = (chunk.get("choices") or [{}])[0]
                     delta = choice.get("delta") or {}
+                    reasoning_text = self._extract_reasoning_content(delta)
+                    if reasoning_text:
+                        if not reasoning_active:
+                            reasoning_active = True
+                            yield {"type": "reasoning_start"}
+                        reasoning_parts.append(reasoning_text)
+                        yield {
+                            "type": "reasoning_delta",
+                            "delta": reasoning_text,
+                        }
+
                     text = delta.get("content") or ""
                     if text:
+                        if reasoning_active:
+                            reasoning_active = False
+                            yield {"type": "reasoning_end"}
                         content_parts.append(text)
                         yield {
                             "type": "delta",
@@ -150,6 +167,7 @@ class LlamaCppProvider(ModelProvider):
                 can_retry = (
                     attempt == 0
                     and not content_parts
+                    and not reasoning_parts
                     and not self.is_stop_requested(should_stop)
                     and self._restart_after_runtime_decode_error(
                         error,
@@ -164,11 +182,14 @@ class LlamaCppProvider(ModelProvider):
                     response_model = model
                     message_id = None
                     continue
-                if content_parts:
+                if content_parts or reasoning_parts:
                     stream_error = self._with_runtime_diagnostics(error, model=model)
                     finish_reason = "stream_error"
                     break
                 raise self._with_runtime_diagnostics(error, model=model) from error
+
+        if reasoning_active:
+            yield {"type": "reasoning_end"}
 
         if self.is_stop_requested(should_stop):
             finish_reason = "cancelled"
@@ -189,6 +210,7 @@ class LlamaCppProvider(ModelProvider):
                     "stream_error": stream_error.to_dict() if stream_error else None,
                 },
                 message_id=message_id,
+                reasoning_content="".join(reasoning_parts),
             ),
         }
 
@@ -219,7 +241,22 @@ class LlamaCppProvider(ModelProvider):
         if common.get("stop") is not None:
             payload["stop"] = common["stop"]
 
+        reasoning_mode = str((settings or {}).get("_reasoning_mode") or "auto").lower()
+        if reasoning_mode in {"on", "off"}:
+            payload["chat_template_kwargs"] = {
+                "enable_thinking": reasoning_mode == "on",
+            }
+
         return payload
+
+    def _extract_reasoning_content(self, message):
+        if not isinstance(message, dict):
+            return ""
+        return str(
+            message.get("reasoning_content")
+            or message.get("reasoning")
+            or ""
+        )
 
     def _get_base_url(self, settings=None):
         model_config_id = (settings or {}).get("_model_config_id")

@@ -663,6 +663,7 @@ async function readModelFormValues() {
         display_name: elements.modelDisplayNameInput?.value.trim() || "",
         name: elements.modelNameInput?.value.trim() || "",
         provider_id: Number(elements.modelProviderSelect?.value || "0") || undefined,
+        reasoning_mode: elements.modelReasoningSelect?.value || "auto",
         icon_image: elements.modelIconDataInput?.value || "",
         is_default: Boolean(elements.modelDefaultInput?.checked),
         is_builtin: elements.modelBuiltinInput?.value === "true",
@@ -684,6 +685,9 @@ function populateModelModal(model = null) {
     elements.modelNameInput.value = model?.name || "";
     elements.modelProviderSelect.innerHTML = getModelProviderOptionsMarkup(model?.provider_id || state.providers[0]?.id || null);
     elements.modelProviderSelect.value = String(model?.provider_id || state.providers[0]?.id || "");
+    if (elements.modelReasoningSelect) {
+        elements.modelReasoningSelect.value = model?.reasoning_mode || "auto";
+    }
     elements.modelDefaultInput.checked = Boolean(model?.is_default);
     syncRuntimeModelModalFields(isRuntimeModel);
     if (elements.modelIconInput) {
@@ -696,6 +700,7 @@ function populateModelModal(model = null) {
 function syncRuntimeModelModalFields(isRuntimeModel) {
     const technicalNameField = elements.modelNameInput?.closest(".field");
     const providerField = elements.modelProviderSelect?.closest(".field");
+    const reasoningField = elements.modelReasoningField;
 
     if (technicalNameField) {
         technicalNameField.hidden = Boolean(isRuntimeModel);
@@ -703,12 +708,18 @@ function syncRuntimeModelModalFields(isRuntimeModel) {
     if (providerField) {
         providerField.hidden = Boolean(isRuntimeModel);
     }
+    if (reasoningField) {
+        reasoningField.hidden = !isRuntimeModel;
+    }
 
     if (elements.modelNameInput) {
         elements.modelNameInput.disabled = Boolean(isRuntimeModel);
     }
     if (elements.modelProviderSelect) {
         elements.modelProviderSelect.disabled = Boolean(isRuntimeModel);
+    }
+    if (elements.modelReasoningSelect) {
+        elements.modelReasoningSelect.disabled = !isRuntimeModel;
     }
 }
 

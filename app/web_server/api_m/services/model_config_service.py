@@ -83,6 +83,7 @@ class ModelConfigService:
             "display_name": display_name or name,
             "provider_config_id": provider_config_id,
             "icon_image": self._parse_icon_image(data.get("icon_image")),
+            "reasoning_mode": self._parse_reasoning_mode(data.get("reasoning_mode")),
             "is_default": bool(data.get("is_default", False)),
             "is_builtin": bool(data.get("is_builtin", False)),
         }
@@ -95,6 +96,9 @@ class ModelConfigService:
             "display_name": display_name or current_model["name"],
             "provider_config_id": current_model["provider_id"],
             "icon_image": self._parse_icon_image(data.get("icon_image")),
+            "reasoning_mode": self._parse_reasoning_mode(
+                data.get("reasoning_mode", current_model.get("reasoning_mode", "auto"))
+            ),
             "is_default": bool(data.get("is_default", False)),
             "is_builtin": True,
         }
@@ -136,6 +140,12 @@ class ModelConfigService:
         if len(icon_image) > 14_500_000:
             raise RequestError("icon_image is too large")
         return icon_image
+
+    def _parse_reasoning_mode(self, raw_value):
+        reasoning_mode = str(raw_value or "auto").strip().lower()
+        if reasoning_mode not in {"auto", "on", "off"}:
+            raise RequestError("reasoning_mode must be auto, on, or off")
+        return reasoning_mode
 
     def _delete_runtime_model_files(self, downloads):
         if not downloads or not self.runtime_config:

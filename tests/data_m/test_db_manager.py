@@ -84,6 +84,29 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         self.assertTrue(runtime_provider["is_system_managed"])
         self.assertEqual(runtime_provider["endpoint"], "")
 
+    def test_lists_runtime_provider_first_then_by_latest_edit(self):
+        db = DBManager()
+        older_provider_id = db.providers.create("Older custom", "cloud")
+        newer_provider_id = db.providers.create("Newer custom", "cloud")
+        db.db.execute(
+            "UPDATE providers SET updated_at = ? WHERE id = ?",
+            ("2026-01-01 10:00:00", older_provider_id),
+        )
+        db.db.execute(
+            "UPDATE providers SET updated_at = ? WHERE id = ?",
+            ("2026-01-02 10:00:00", newer_provider_id),
+        )
+
+        providers = db.providers.all()
+
+        self.assertEqual(providers[0]["builtin_key"], "horizone_runtime")
+        custom_provider_names = [
+            provider["name"]
+            for provider in providers
+            if provider["id"] in {older_provider_id, newer_provider_id}
+        ]
+        self.assertEqual(custom_provider_names, ["Newer custom", "Older custom"])
+
     def test_system_managed_runtime_provider_is_repaired_on_boot(self):
         db = DBManager()
         runtime_provider = db.providers.get_by_builtin_key("horizone_runtime")

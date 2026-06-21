@@ -90,6 +90,11 @@ class ChatRequestPreparer:
         )
         if model_config_id:
             generation_settings["_model_config_id"] = model_config_id
+        if model_config:
+            generation_settings["_reasoning_mode"] = model_config.get(
+                "reasoning_mode",
+                "auto",
+            )
 
         request_messages = self._build_server_side_request_messages(
             conversation,

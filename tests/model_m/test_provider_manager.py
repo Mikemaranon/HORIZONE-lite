@@ -697,7 +697,11 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
                 "model": "gemma-3-1b-it-q4",
                 "choices": [
                     {
-                        "message": {"role": "assistant", "content": "Hola desde llama.cpp"},
+                        "message": {
+                            "role": "assistant",
+                            "content": "Hola desde llama.cpp",
+                            "reasoning_content": "Internal plan",
+                        },
                         "finish_reason": "stop",
                     }
                 ],
@@ -715,6 +719,7 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
                 "top_p": 0.8,
                 "max_tokens": 128,
                 "_model_config_id": 42,
+                "_reasoning_mode": "off",
             },
         )
 
@@ -731,8 +736,10 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertEqual(payload["top_p"], 0.8)
         self.assertEqual(payload["max_tokens"], 128)
         self.assertFalse(payload["stream"])
+        self.assertEqual(payload["chat_template_kwargs"], {"enable_thinking": False})
         self.assertEqual(fake_http.calls[0]["headers"]["Accept-Encoding"], "identity")
         self.assertEqual(response["message"]["content"], "Hola desde llama.cpp")
+        self.assertEqual(response["message"]["reasoning_content"], "Internal plan")
         self.assertEqual(response["message_id"], "chatcmpl-runtime")
 
     def test_llama_cpp_provider_raises_when_runtime_cannot_start(self):
@@ -836,6 +843,73 @@ class ProviderManagerTests(IsolatedDatabaseTestCase):
         self.assertTrue(fake_http.calls[0]["payload"]["stream"])
         self.assertEqual(fake_http.calls[0]["payload"]["stream_options"]["include_usage"], True)
         self.assertEqual(fake_http.calls[0]["headers"]["Accept-Encoding"], "identity")
+
+    def test_llama_cpp_provider_stream_chat_exposes_structured_reasoning_events(self):
+        manager = ProviderManager(ConfigManager())
+        fake_http = FakeHttpClient(
+            sse_events=[
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "thinking-model",
+                    "choices": [
+                        {
+                            "delta": {"reasoning_content": "Check the premise. "},
+                            "finish_reason": None,
+                        }
+                    ],
+                },
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "thinking-model",
+                    "choices": [
+                        {
+                            "delta": {"reasoning_content": "Answer briefly."},
+                            "finish_reason": None,
+                        }
+                    ],
+                },
+                {
+                    "id": "chatcmpl-runtime",
+                    "model": "thinking-model",
+                    "choices": [
+                        {
+                            "delta": {"content": "Visible answer"},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                },
+            ]
+        )
+        provider = manager.get_provider("llama_cpp")
+        provider.http_client = fake_http
+
+        events = list(
+            provider.stream_chat(
+                [{"role": "user", "content": "Think"}],
+                "thinking-model",
+                {"_reasoning_mode": "on"},
+            )
+        )
+
+        self.assertEqual(
+            [event["type"] for event in events],
+            [
+                "reasoning_start",
+                "reasoning_delta",
+                "reasoning_delta",
+                "reasoning_end",
+                "delta",
+                "response",
+            ],
+        )
+        self.assertEqual(
+            events[-1]["response"]["message"]["reasoning_content"],
+            "Check the premise. Answer briefly.",
+        )
+        self.assertEqual(
+            fake_http.calls[0]["payload"]["chat_template_kwargs"],
+            {"enable_thinking": True},
+        )
 
     def test_llama_cpp_provider_stream_chat_restarts_runtime_once_before_tokens(self):
         runtime_manager = FakeRuntimeManager({"status": "ready", "base_url": "http://127.0.0.1:8080"})

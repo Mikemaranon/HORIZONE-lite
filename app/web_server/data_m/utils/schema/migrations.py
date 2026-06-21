@@ -24,6 +24,7 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("models", "provider_config_id", "INTEGER"),
     ColumnMigration("models", "display_name", "TEXT DEFAULT ''"),
     ColumnMigration("models", "icon_image", "TEXT DEFAULT ''"),
+    ColumnMigration("models", "reasoning_mode", "TEXT NOT NULL DEFAULT 'auto'"),
     ColumnMigration("messages", "model_config_id", "INTEGER"),
     ColumnMigration("messages", "model_name", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "project_model_id", "INTEGER"),
@@ -53,4 +54,5 @@ VERSIONED_SCHEMA_MIGRATIONS = [
     SchemaMigration(6, "llama_cpp_runtime_foundation"),
     SchemaMigration(7, "message_reasoning_content"),
     SchemaMigration(8, "user_avatar_image"),
+    SchemaMigration(9, "model_reasoning_mode"),
 ]
