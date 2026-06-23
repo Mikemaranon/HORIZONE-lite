@@ -71,6 +71,45 @@ class ToolManager:
             for tool in self._list_active_tools(tool_context=tool_context)
         ]
 
+    def validate_tool_directives(self, directives, *, tool_context=None):
+        normalized_directives = [dict(directive) for directive in (directives or [])]
+        if not normalized_directives:
+            return []
+
+        available_names = {
+            tool.get("name")
+            for tool in self._list_active_tools(tool_context=tool_context)
+            if tool.get("is_available") is not False
+        }
+        regular_tools = {
+            tool.get("name"): tool
+            for tool in self.list_tools(include_inactive=True, refresh=True)
+        }
+        workspace_tools = {
+            tool.get("name"): tool
+            for tool in self.list_workspace_tools(include_inactive=True)
+        }
+
+        for directive in normalized_directives:
+            tool_name = str(directive.get("tool_name") or "").strip()
+            if tool_name in available_names:
+                continue
+
+            known_tool = regular_tools.get(tool_name) or workspace_tools.get(tool_name)
+            if not known_tool:
+                raise ValueError(f"Unknown tool command: /{tool_name}")
+            if known_tool.get("is_active") is False:
+                raise ValueError(f"Tool command is inactive: /{tool_name}")
+            if known_tool.get("is_available") is False:
+                raise ValueError(f"Tool command is unavailable: /{tool_name}")
+            if tool_name in workspace_tools:
+                raise ValueError(
+                    f"Project tool command requires a connected project workspace: /{tool_name}"
+                )
+            raise ValueError(f"Tool command is unavailable for this conversation: /{tool_name}")
+
+        return normalized_directives
+
     def build_tool_aware_messages(self, messages, *, tool_context=None):
         tools = self._list_active_tools(tool_context=tool_context)
         if not tools:

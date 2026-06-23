@@ -153,3 +153,56 @@ class ChatRequestPreparerTests(IsolatedDatabaseTestCase):
                 "reason": "User approved the write.",
             },
         )
+
+    def test_prepare_parses_and_validates_tool_directives_against_active_user_message(self):
+        profile = self.db.profiles.get_default()
+        content = "/current_date tell me today. /web_search find the latest KOI match"
+        expected = [
+            {
+                "tool_name": "current_date",
+                "instruction": "tell me today.",
+                "start": 0,
+                "end": 29,
+            },
+            {
+                "tool_name": "web_search",
+                "instruction": "find the latest KOI match",
+                "start": 29,
+                "end": len(content),
+            },
+        ]
+
+        prepared = self.preparer.prepare(
+            {
+                "messages": [{"role": "user", "content": content}],
+                "provider": "ollama",
+                "model": "qwen3",
+                "tool_directives": expected,
+            },
+            default_profile=profile,
+            default_provider="mlx",
+        )
+
+        self.assertEqual(prepared.tool_directives, expected)
+
+    def test_prepare_rejects_tool_directives_that_do_not_match_message(self):
+        profile = self.db.profiles.get_default()
+
+        with self.assertRaisesRegex(ChatRequestError, "do not match"):
+            self.preparer.prepare(
+                {
+                    "messages": [{"role": "user", "content": "/current_date now"}],
+                    "provider": "ollama",
+                    "model": "qwen3",
+                    "tool_directives": [
+                        {
+                            "tool_name": "web_search",
+                            "instruction": "now",
+                            "start": 0,
+                            "end": 17,
+                        }
+                    ],
+                },
+                default_profile=profile,
+                default_provider="mlx",
+            )

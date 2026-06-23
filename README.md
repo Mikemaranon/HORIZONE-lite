@@ -95,9 +95,11 @@ CMAKE_ARGS="-DGGML_METAL=on" \
 pip install --force-reinstall --no-cache-dir "llama-cpp-python[server]>=0.3,<0.4"
 ```
 
-If you use a native `llama-server` binary through `HORIZONE_LLAMA_CPP_BINARY`,
-build or install that binary with Metal enabled (`GGML_METAL=ON`). HORIZONE
-passes GPU layers automatically on Apple Silicon; set
+The macOS desktop build includes a pinned native ARM64 `llama-server` with
+Metal, so building and running the packaged application does not require
+Ollama, Homebrew, or a separately installed runtime. `HORIZONE_LLAMA_CPP_BINARY`
+remains available as a development override. HORIZONE passes GPU layers
+automatically on Apple Silicon; set
 `HORIZONE_LLAMA_CPP_GPU_LAYERS=0` only when you intentionally want CPU fallback.
 
 Windows and Linux package builds can start from `requirements-windows.txt` or `requirements-linux.txt` and add optional provider/runtime files only when needed.

@@ -82,6 +82,41 @@ class DesktopBuildCommonTestCase(unittest.TestCase):
         self.assertIn("native llama.cpp llama-server", message)
         self.assertIn("Metal Tensor API", message)
 
+    def test_resolve_native_llama_server_uses_vendored_runtime(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_root = Path(temp_dir)
+            binary = runtime_root / "macos-arm64" / "llama-server"
+            binary.parent.mkdir(parents=True)
+            binary.write_bytes(b"runtime")
+
+            with patch.dict(common.os.environ, {}, clear=True):
+                with patch.object(common, "VENDORED_RUNTIME_ROOT", runtime_root):
+                    with patch.object(common.sys, "platform", "darwin"):
+                        with patch.object(common.host_platform, "machine", return_value="arm64"):
+                            resolved = common.resolve_native_llama_server_binary()
+
+        self.assertEqual(resolved, binary)
+
+    def test_configured_runtime_overrides_vendored_runtime(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            configured = temp_root / "configured-llama-server"
+            configured.write_bytes(b"configured")
+            runtime_root = temp_root / "vendored"
+            vendored = runtime_root / "macos-arm64" / "llama-server"
+            vendored.parent.mkdir(parents=True)
+            vendored.write_bytes(b"vendored")
+
+            with patch.dict(
+                common.os.environ,
+                {"HORIZONE_LLAMA_CPP_BINARY": str(configured)},
+                clear=True,
+            ):
+                with patch.object(common, "VENDORED_RUNTIME_ROOT", runtime_root):
+                    resolved = common.resolve_native_llama_server_binary()
+
+        self.assertEqual(resolved, configured)
+
 
 if __name__ == "__main__":
     unittest.main()

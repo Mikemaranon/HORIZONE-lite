@@ -25,12 +25,19 @@ cargo install tauri-cli --version '^2'
 
 ## Runtime local
 
-El build macOS necesita un `llama-server` nativo embebido. No uses el
-fallback Python/PyInstaller para empaquetar HORIZONE runtime en macOS: puede
-perder Apple Metal Tensor API dentro de la app instalada y degradar mucho la
+El repositorio incluye su propio `llama-server` ARM64 con Metal en:
+
+```text
+deploy/desktop/runtime/macos-arm64/llama-server
+```
+
+El build lo detecta y lo incluye automáticamente, por lo que no requiere
+Ollama, Homebrew ni otro runtime instalado. No uses el fallback
+Python/PyInstaller para empaquetar HORIZONE runtime en macOS: puede perder
+Apple Metal Tensor API dentro de la app instalada y degradar mucho la
 inferencia.
 
-Con `llama-server` nativo:
+Para probar temporalmente otro `llama-server` nativo:
 
 ```bash
 export HORIZONE_LLAMA_CPP_BINARY=/ruta/al/llama-server

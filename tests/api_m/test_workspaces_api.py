@@ -5,6 +5,137 @@ from tests.test_support import ApiTestCase
 
 
 class WorkspacesApiTests(ApiTestCase):
+    def test_forced_tool_chain_resumes_after_write_confirmation_without_repeating_completed_tools(self):
+        workspace_root = Path(self.temp_dir.name) / "forced-chain-workspace"
+        workspace_root.mkdir()
+        project_id = self.db.projects.create("Forced chain project")
+        self.db.project_workspaces.upsert(project_id, str(workspace_root), "Workspace")
+        profile = self.db.profiles.get_default()
+        conversation_id = self.db.conversations.create(
+            title="Forced confirmation",
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+        date_tool = self.db.tools.get_by_name("current_date")
+        self.client.patch(
+            "/api/tools",
+            json={"id": date_tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+        date_runs = {"count": 0}
+
+        def run_date(arguments):
+            date_runs["count"] += 1
+            return {"date": "2026-06-22"}
+
+        self.api_manager.services.tool_registry._runtime_catalog["current_date"]["runner"] = run_date
+        calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            calls["count"] += 1
+            system_content = messages[0]["content"]
+            all_content = "\n".join(message["content"] for message in messages)
+            if "explicitly invoked /workspace_write_file" in system_content:
+                self.assertIn("Tool result for current_date", all_content)
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": (
+                            '{"tool_call":{"name":"workspace_write_file","arguments":'
+                            '{"path":"notes.txt","content":"hello","overwrite":false,'
+                            '"create_dirs":false}}}'
+                        ),
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+            if "explicitly invoked /workspace_read_file" in system_content:
+                self.assertIn("Tool result for workspace_write_file", all_content)
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"workspace_read_file","arguments":{"path":"notes.txt"}}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {"role": "assistant", "content": "Created and read notes.txt."},
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "forced-confirmed-final",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        content = (
+            "/current_date get today "
+            "/workspace_write_file create notes.txt "
+            "/workspace_read_file read it"
+        )
+        initial_response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": content}],
+            },
+            headers=self.auth_headers,
+        )
+        initial_payload = initial_response.get_json()["response"]
+        pending_event = initial_payload["raw"]["tool_events"][1]
+        pending_message_id = initial_payload["message"]["id"]
+
+        self.assertEqual(initial_payload["finish_reason"], "confirmation_required")
+        self.assertEqual(date_runs["count"], 1)
+        self.client.patch(
+            "/api/chat/tool-confirmations",
+            json={
+                "message_id": pending_message_id,
+                "tool_event_index": 1,
+                "status": "confirming",
+            },
+            headers=self.auth_headers,
+        )
+        resume_response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [
+                    {"role": "user", "content": content},
+                    {"role": "assistant", "content": initial_payload["message"]["content"]},
+                ],
+                "tool_confirmation": {
+                    "name": pending_event["tool_name"],
+                    "arguments": pending_event["arguments"],
+                    "reason": pending_event.get("reason", ""),
+                    "source_message_id": pending_message_id,
+                    "source_event_index": 1,
+                },
+            },
+            headers=self.auth_headers,
+        )
+        resume_payload = resume_response.get_json()["response"]
+
+        self.assertEqual(resume_response.status_code, 200)
+        self.assertEqual(date_runs["count"], 1)
+        self.assertEqual(
+            [event["tool_name"] for event in resume_payload["raw"]["tool_events"]],
+            ["workspace_write_file", "workspace_read_file"],
+        )
+        self.assertEqual((workspace_root / "notes.txt").read_text(encoding="utf-8"), "hello")
+
     def test_project_workspace_can_connect_index_read_and_search(self):
         workspace_root = Path(self.temp_dir.name) / "workspace"
         workspace_root.mkdir()

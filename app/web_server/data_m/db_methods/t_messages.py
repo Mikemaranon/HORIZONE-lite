@@ -20,6 +20,7 @@ class MessagesTable:
         reasoning_content="",
         tool_events=None,
         provider_message_id=None,
+        elapsed_seconds=None,
     ):
         if position is None:
             position = self._next_position(conversation_id)
@@ -30,9 +31,9 @@ class MessagesTable:
             INSERT INTO messages (
                 conversation_id, role, content, position, project_model_id, project_model_name,
                 model_config_id, model_name, profile_id, profile_name, reasoning_content,
-                tool_events, provider_message_id
+                tool_events, provider_message_id, elapsed_seconds
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 conversation_id,
@@ -48,6 +49,7 @@ class MessagesTable:
                 reasoning_content or "",
                 self._serialize_tool_events(tool_events),
                 provider_message_id,
+                elapsed_seconds,
             ),
             lastrowid=True
         )
@@ -71,6 +73,7 @@ class MessagesTable:
                     reasoning_content=message.get("reasoning_content", ""),
                     tool_events=message.get("tool_events"),
                     provider_message_id=message.get("provider_message_id"),
+                    elapsed_seconds=message.get("elapsed_seconds"),
                 )
             )
 
@@ -82,7 +85,7 @@ class MessagesTable:
             SELECT id, conversation_id, role, content, position,
                    project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
-                   reasoning_content, tool_events, provider_message_id, created_at
+                   reasoning_content, tool_events, provider_message_id, elapsed_seconds, created_at
             FROM messages
             WHERE id = ?
             """,
@@ -97,7 +100,7 @@ class MessagesTable:
             SELECT id, conversation_id, role, content, position,
                    project_model_id, project_model_name,
                    model_config_id, model_name, profile_id, profile_name,
-                   reasoning_content, tool_events, provider_message_id, created_at
+                   reasoning_content, tool_events, provider_message_id, elapsed_seconds, created_at
             FROM messages
             WHERE conversation_id = ?
             ORDER BY position ASC, id ASC
@@ -130,6 +133,16 @@ class MessagesTable:
                 self._serialize_tool_events(tool_events),
                 message_id,
             )
+        )
+
+    def update_elapsed_seconds(self, message_id, elapsed_seconds):
+        self.db.execute(
+            """
+            UPDATE messages
+            SET elapsed_seconds = ?
+            WHERE id = ?
+            """,
+            (elapsed_seconds, message_id),
         )
 
     def _next_position(self, conversation_id):
@@ -187,7 +200,8 @@ class MessagesTable:
             "reasoning_content": row[11] or "",
             "tool_events": self._parse_tool_events(row[12]),
             "provider_message_id": row[13],
-            "created_at": row[14],
+            "elapsed_seconds": row[14],
+            "created_at": row[15],
         }
 
     def _serialize_tool_events(self, tool_events):

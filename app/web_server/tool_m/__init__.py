@@ -1,6 +1,7 @@
 from .tool_call_orchestrator import ToolCallOrchestrator
 from .tool_call_parser import ToolCallParseError, ToolCallParser, ToolCallRequest, ToolDecision
 from .tool_call_policy import ToolCallPolicy
+from .tool_command_parser import ToolCommandParser
 from .tool_catalog import ToolCatalog
 from .tool_contract import ToolContractError
 from .tool_executor import ToolExecutionError, ToolExecutor
@@ -15,6 +16,7 @@ __all__ = [
     "ToolCallParser",
     "ToolCallPolicy",
     "ToolCallRequest",
+    "ToolCommandParser",
     "ToolDecision",
     "ToolCatalog",
     "ToolContractError",

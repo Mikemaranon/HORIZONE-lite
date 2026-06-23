@@ -232,17 +232,26 @@
 .settings-page__panel #settings-models-list,
 .settings-page__panel #settings-profiles-list,
 .settings-page__panel #settings-tools-list {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
     align-items: stretch;
     max-height: none;
     overflow-y: visible;
     padding-right: 0;
 }
 
-.settings-space #settings-models-list,
-.settings-page__panel #settings-models-list {
-    grid-auto-rows: 132px;
-    grid-template-columns: repeat(auto-fit, minmax(285px, 1fr));
+.settings-space #settings-tools-list,
+.settings-page__panel #settings-tools-list {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+}
+
+:is(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) {
+    grid-auto-rows: minmax(132px, auto);
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    align-items: stretch;
+    gap: 12px;
 }
 
 .settings-space .profile-summary-card,
@@ -253,10 +262,14 @@
     height: 100%;
 }
 
-.settings-space #settings-models-list .profile-summary-card,
-.settings-page__panel #settings-models-list .profile-summary-card {
-    height: 132px;
-    min-width: 285px;
+:where(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) .profile-summary-card {
+    height: auto;
+    min-width: 290px;
+    min-height: 132px;
     gap: 8px;
     padding-block: 12px;
     grid-template-rows: minmax(0, 1fr) auto;
@@ -281,16 +294,22 @@
     overflow-wrap: anywhere;
 }
 
-.settings-space #settings-models-list .profile-summary-card__personality,
-.settings-page__panel #settings-models-list .profile-summary-card__personality {
+:where(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) .profile-summary-card__personality {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.settings-space #settings-models-list .profile-summary-card__name,
-.settings-page__panel #settings-models-list .profile-summary-card__name {
+:where(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) .profile-summary-card__name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -309,14 +328,20 @@
     margin-left: 0;
 }
 
-.settings-space #settings-models-list .profile-summary-card__footer,
-.settings-page__panel #settings-models-list .profile-summary-card__footer {
+:where(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) .profile-summary-card__footer {
     align-items: flex-end;
     gap: 8px 10px;
 }
 
-.settings-space #settings-models-list .profile-summary-card__tags,
-.settings-page__panel #settings-models-list .profile-summary-card__tags {
+:where(.settings-space, .settings-page__panel) :is(
+    #settings-providers-list,
+    #settings-models-list,
+    #settings-profiles-list
+) .profile-summary-card__tags {
     min-width: 0;
 }
 
@@ -1029,6 +1054,27 @@
     display: grid;
     gap: 4px;
     min-width: 0;
+}
+
+#chat-profile-card .chat-profile-card__heading strong,
+#chat-profile-card .chat-profile-card__heading span {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chat-profile-card .chat-profile-card__tags {
+    flex-wrap: nowrap;
+}
+
+#chat-profile-card .chat-profile-card__tag {
+    flex: 0 0 auto;
+}
+
+#chat-profile-card .chat-profile-card__tag.is-overflow-hidden {
+    display: none;
 }
 
 .chat-profile-card__heading strong,

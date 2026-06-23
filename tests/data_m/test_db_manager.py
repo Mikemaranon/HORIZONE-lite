@@ -197,6 +197,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
             profile_id=profile["id"],
             profile_name=profile["name"],
             reasoning_content="I considered the greeting.",
+            elapsed_seconds=12,
         )
 
         project = db.projects.get(project_id)
@@ -215,6 +216,7 @@ class DBManagerTests(IsolatedDatabaseTestCase):
         )
         self.assertEqual(messages[1]["tool_events"], [])
         self.assertEqual(messages[1]["reasoning_content"], "I considered the greeting.")
+        self.assertEqual(messages[1]["elapsed_seconds"], 12)
 
         db.conversations.rename(conversation_id, "Workspace kickoff")
         renamed_conversation = db.conversations.get(conversation_id)

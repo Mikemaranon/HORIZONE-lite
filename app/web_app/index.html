@@ -28,7 +28,8 @@
                     <nav class="sidebar-links" aria-label="Quick links">
                         <a
                             class="sidebar-link"
-                            href="https://github.com/Mikemaranon/HORIZONE"
+                            target="_blank"
+                            href="https://mikemaranon.github.io/HORIZONE"
                             rel="noreferrer"
                         >
                             <span class="sidebar-link__label">
@@ -445,6 +446,13 @@
                                     class="composer-mention-menu"
                                     role="listbox"
                                     aria-label="Mention an agent"
+                                    hidden
+                                ></div>
+                                <div
+                                    id="composer-command-menu"
+                                    class="composer-mention-menu"
+                                    role="listbox"
+                                    aria-label="Choose a tool command"
                                     hidden
                                 ></div>
                                 <div class="composer__actions">
@@ -1302,12 +1310,13 @@
                         </label>
                         <label class="field field--stacked">
                             <span>Description</span>
-                            <textarea id="project-description-input" rows="3" placeholder="Short context to recognize this project..."></textarea>
+                            <textarea class="project-customize-textarea" id="project-description-input" rows="3" placeholder="Short context to recognize this project..."></textarea>
                         </label>
                         <label class="field field--stacked">
                             <span>Project system prompt</span>
                             <textarea
                                 id="project-system-prompt-input"
+                                class="project-customize-textarea"
                                 rows="8"
                                 placeholder="Define tone, constraints, and context that should guide this project's chats..."
                             ></textarea>

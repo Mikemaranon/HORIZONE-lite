@@ -4,6 +4,16 @@ from tests.test_support import ApiTestCase
 
 
 class ToolsApiTests(ApiTestCase):
+    def _create_chat(self, title="Command chat", project_id=None):
+        profile = self.db.profiles.get_default()
+        return self.db.conversations.create(
+            title=title,
+            project_id=project_id,
+            profile_id=profile["id"],
+            provider="ollama",
+            model="qwen3",
+        )
+
     def test_tools_endpoint_lists_builtin_catalog(self):
         response = self.client.get("/api/tools", headers=self.auth_headers)
         payload = response.get_json()
@@ -245,11 +255,254 @@ def run(arguments):
             "2026-05-12",
             payload["response"]["raw"]["tool_events"][0]["tool_summary"],
         )
-
         stored_messages = self.db.messages.for_conversation(conversation_id)
         stored_tool_event = stored_messages[-1]["tool_events"][0]
         self.assertEqual(stored_tool_event["tool_name"], "current_date_override")
         self.assertIn("2026-05-12", stored_tool_event["tool_summary"])
+
+    def test_chat_endpoint_forces_current_date_without_tool_selection(self):
+        tool = self.db.tools.get_by_name("current_date")
+        self.client.patch(
+            "/api/tools",
+            json={"id": tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+        self.api_manager.services.tool_registry._runtime_catalog["current_date"]["runner"] = (
+            lambda arguments: {"date": "2026-06-22", "timezone": "Europe/Madrid"}
+        )
+        model_calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            model_calls["count"] += 1
+            self.assertIn("Tool result for current_date", messages[-1]["content"])
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {"role": "assistant", "content": "Today is 2026-06-22."},
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "forced-date-api",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        content = "/current_date tell me today"
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": self._create_chat(),
+                "messages": [{"role": "user", "content": content}],
+                "tool_directives": [
+                    {
+                        "tool_name": "current_date",
+                        "instruction": "tell me today",
+                        "start": 0,
+                        "end": len(content),
+                    }
+                ],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(model_calls["count"], 1)
+        self.assertEqual(payload["response"]["raw"]["tool_events"][0]["tool_name"], "current_date")
+
+    def test_chat_endpoint_forced_chain_preserves_result_dependency(self):
+        for name in ("current_date", "web_search"):
+            tool = self.db.tools.get_by_name(name)
+            self.client.patch(
+                "/api/tools",
+                json={"id": tool["id"], "is_active": True},
+                headers=self.auth_headers,
+            )
+        registry = self.api_manager.services.tool_registry._runtime_catalog
+        registry["current_date"]["runner"] = lambda arguments: {"date": "2026-06-22"}
+        registry["web_search"]["runner"] = lambda arguments: {
+            "query": arguments["query"],
+            "results": [],
+        }
+        calls = {"count": 0}
+
+        def fake_chat(provider, messages, model, settings):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                self.assertIn("Tool result for current_date", messages[-1]["content"])
+                return {
+                    "provider": provider,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"KOI latest match 2026-06-22"}}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {"role": "assistant", "content": "Latest match found."},
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "forced-chain-api",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        content = "/current_date get today /web_search find KOI's latest match"
+        split = content.index("/web_search")
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": self._create_chat("Forced chain"),
+                "messages": [{"role": "user", "content": content}],
+                "tool_directives": [
+                    {"tool_name": "current_date", "instruction": "get today", "start": 0, "end": split},
+                    {"tool_name": "web_search", "instruction": "find KOI's latest match", "start": split, "end": len(content)},
+                ],
+            },
+            headers=self.auth_headers,
+        )
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls["count"], 2)
+        self.assertEqual(
+            [event["tool_name"] for event in payload["response"]["raw"]["tool_events"]],
+            ["current_date", "web_search"],
+        )
+
+    def test_chat_endpoint_rejects_unknown_inactive_and_contextless_project_commands(self):
+        cases = [
+            ("/unknown do it", "Unknown tool command"),
+            ("/current_date now", "inactive"),
+            ("/workspace_search query", "connected project workspace"),
+        ]
+        for content, expected_error in cases:
+            response = self.client.post(
+                "/api/chat",
+                json={
+                    "conversation_id": self._create_chat(expected_error),
+                    "messages": [{"role": "user", "content": content}],
+                },
+                headers=self.auth_headers,
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn(expected_error, response.get_json()["error"]["message"])
+
+    def test_streaming_forced_current_date_emits_tool_events_and_persists_trace(self):
+        tool = self.db.tools.get_by_name("current_date")
+        self.client.patch(
+            "/api/tools",
+            json={"id": tool["id"], "is_active": True},
+            headers=self.auth_headers,
+        )
+        self.api_manager.services.tool_registry._runtime_catalog["current_date"]["runner"] = (
+            lambda arguments: {"date": "2026-06-22"}
+        )
+        self.model_manager.stream_chat = lambda *args, **kwargs: iter(
+            [
+                {"type": "delta", "delta": "Today is 2026-06-22."},
+                {
+                    "type": "response",
+                    "response": {
+                        "provider": "ollama",
+                        "model": "qwen3",
+                        "message": {"role": "assistant", "content": "Today is 2026-06-22."},
+                        "usage": {},
+                        "finish_reason": "stop",
+                        "message_id": "forced-date-stream",
+                        "raw": {},
+                    },
+                },
+            ]
+        )
+        conversation_id = self._create_chat("Forced stream")
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": conversation_id,
+                "messages": [{"role": "user", "content": "/current_date now"}],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+        )
+        body = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("event: tool_start", body)
+        self.assertIn("event: tool_result", body)
+        self.assertIn('"tool_name": "current_date"', body)
+        self.assertEqual(
+            self.db.messages.for_conversation(conversation_id)[-1]["tool_events"][0]["tool_name"],
+            "current_date",
+        )
+
+    def test_streaming_forced_date_and_web_search_preserves_event_order(self):
+        for name in ("current_date", "web_search"):
+            tool = self.db.tools.get_by_name(name)
+            self.client.patch(
+                "/api/tools",
+                json={"id": tool["id"], "is_active": True},
+                headers=self.auth_headers,
+            )
+        registry = self.api_manager.services.tool_registry._runtime_catalog
+        registry["current_date"]["runner"] = lambda arguments: {"date": "2026-06-22"}
+        registry["web_search"]["runner"] = lambda arguments: {
+            "query": arguments["query"],
+            "results": [],
+        }
+
+        def fake_chat(provider, messages, model, settings):
+            self.assertIn("Tool result for current_date", messages[-1]["content"])
+            return {
+                "provider": provider,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool_call":{"name":"web_search","arguments":{"query":"KOI latest match 2026-06-22"}}}',
+                },
+                "usage": {},
+                "finish_reason": None,
+                "message_id": None,
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        self.model_manager.stream_chat = lambda *args, **kwargs: iter(
+            [
+                {"type": "delta", "delta": "Found it."},
+                {
+                    "type": "response",
+                    "response": {
+                        "provider": "ollama",
+                        "model": "qwen3",
+                        "message": {"role": "assistant", "content": "Found it."},
+                        "usage": {},
+                        "finish_reason": "stop",
+                        "message_id": "forced-chain-stream",
+                        "raw": {},
+                    },
+                },
+            ]
+        )
+        content = "/current_date get today /web_search find KOI"
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "conversation_id": self._create_chat("Forced chain stream"),
+                "messages": [{"role": "user", "content": content}],
+                "stream": True,
+            },
+            headers=self.auth_headers,
+        )
+        body = response.get_data(as_text=True)
+
+        self.assertLess(body.index('"tool_name": "current_date"'), body.index('"tool_name": "web_search"'))
+        self.assertIn('"finish_reason": "stop"', body)
 
     def test_chat_endpoint_rechecks_temporal_claim_after_correction(self):
         tool = self.db.tools.get_by_name("web_search")

@@ -1,6 +1,7 @@
 import html
 import re
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
@@ -31,6 +32,21 @@ TOOL_USE_WHEN = [
 TOOL_RISK_LEVEL = "external_network"
 
 SEARCH_ENDPOINT = "https://duckduckgo.com/html/?q={query}"
+SEARCH_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/137.0.0.0 Safari/537.36 HORIZONE/0.1"
+)
+BOT_CHALLENGE_MARKERS = (
+    "anomaly-modal",
+    "duckduckgo.com/anomaly.js",
+    "Unfortunately, bots use DuckDuckGo too.",
+)
+NO_RESULTS_MARKERS = (
+    'class="no-results"',
+    "No results found",
+    "No results.",
+)
 RESULT_PATTERN = re.compile(
     r'<a[^>]*class="result__a"[^>]*href="(?P<url>[^"]+)"[^>]*>(?P<title>.*?)</a>',
     re.IGNORECASE | re.DOTALL,
@@ -40,6 +56,10 @@ SNIPPET_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 TAG_PATTERN = re.compile(r"<[^>]+>")
+
+
+class WebSearchError(RuntimeError):
+    pass
 
 
 def run(arguments: dict) -> dict:
@@ -53,14 +73,35 @@ def run(arguments: dict) -> dict:
     request = Request(
         SEARCH_ENDPOINT.format(query=quote_plus(query)),
         headers={
-            "User-Agent": "HORIZONE/0.1",
+            "User-Agent": SEARCH_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.8",
         },
     )
 
-    with urlopen(request, timeout=8) as response:
-        payload = response.read().decode("utf-8", errors="ignore")
+    try:
+        with urlopen(request, timeout=8) as response:
+            status = int(getattr(response, "status", 200) or 200)
+            content_type = str(response.headers.get("content-type") or "").lower()
+            payload = response.read().decode("utf-8", errors="ignore")
+    except HTTPError as error:
+        raise WebSearchError(
+            f"The web search service returned HTTP {error.code}."
+        ) from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise WebSearchError("The web search service could not be reached.") from error
+
+    if _is_bot_challenge(payload):
+        raise WebSearchError("The web search service blocked automated access.")
+    if status != 200:
+        raise WebSearchError(f"The web search service returned HTTP {status}.")
+    if content_type and "html" not in content_type:
+        raise WebSearchError("The web search service returned an unsupported response.")
 
     results = _extract_results(payload, max_results)
+    if not results and not _is_explicit_no_results(payload):
+        raise WebSearchError("The web search service returned an unrecognized response.")
+
     return {
         "query": query,
         "results": results,
@@ -90,6 +131,16 @@ def _extract_results(payload, max_results):
         )
 
     return results
+
+
+def _is_bot_challenge(payload):
+    normalized_payload = str(payload or "").lower()
+    return any(marker.lower() in normalized_payload for marker in BOT_CHALLENGE_MARKERS)
+
+
+def _is_explicit_no_results(payload):
+    normalized_payload = str(payload or "").lower()
+    return any(marker.lower() in normalized_payload for marker in NO_RESULTS_MARKERS)
 
 
 def _normalize_result_url(url):

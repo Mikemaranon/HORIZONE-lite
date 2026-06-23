@@ -10,6 +10,8 @@ import { renderApp } from "../app-runtime.js";
 import { closeComposerMentionMenu } from "../agent-mentions.js";
 import { extractAgentMentionTurns } from "../agent-mention-utils.js";
 import { setLoading, syncComposerAvailability, syncComposerHighlight } from "../composer-ui.js";
+import { closeComposerCommandMenu } from "../tool-commands.js";
+import { extractToolCommandDirectives } from "../tool-command-utils.js";
 import { confirmAction } from "../dialogs.js";
 import { elements } from "../dom.js";
 import {
@@ -32,6 +34,7 @@ import { renderConversationHeader, renderConversations, renderMessages } from ".
 import { getActualProvider, getSelectedModel } from "../provider-helpers.js";
 import {
     buildConversationTitle,
+    getAvailableCommandTools,
     getSelectedModelConfigId,
     getMentionableProjectAgents,
     getSelectedProfileId,
@@ -125,18 +128,30 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
         const responderTurns = mentionTurns.length
             ? mentionTurns.map((turn) => ({
                 responderAgent: turn.agent,
+                toolDirectives: serializeToolDirectives(extractToolCommandDirectives(
+                    turn.content,
+                    getAvailableCommandTools(),
+                )),
                 contextMessages: [
                     ...previousMessages,
                     { role: "user", content: turn.content },
                 ],
             }))
-            : [{ responderAgent: null, contextMessages: null }];
+            : [{
+                responderAgent: null,
+                contextMessages: null,
+                toolDirectives: serializeToolDirectives(extractToolCommandDirectives(
+                    content,
+                    getAvailableCommandTools(),
+                )),
+            }];
 
         setActiveMessages(requestMessages);
         enableMessagesAutoScroll();
         renderMessages();
         elements.composerInput.value = "";
         closeComposerMentionMenu();
+        closeComposerCommandMenu();
         autoResizeComposerHeight();
         syncComposerHighlight();
 
@@ -148,6 +163,7 @@ export async function handleComposerSubmit(event, { ensureActiveConversation }) 
                 requestId: responderTurns.length === 1 ? requestId : createRequestId(),
                 responderAgent: responderTurn.responderAgent,
                 contextMessages: responderTurn.contextMessages,
+                toolDirectives: responderTurn.toolDirectives,
             });
             activeTurnMessageCount = null;
 
@@ -231,6 +247,7 @@ async function sendChatTurn({
     responderAgent = null,
     contextMessages = null,
     toolConfirmation = null,
+    toolDirectives = [],
 }) {
     setActiveGenerationRequestId(requestId);
     let assistantMessageMeta = createPendingAssistantMessage(responderAgent);
@@ -255,6 +272,7 @@ async function sendChatTurn({
             responderAgent,
             contextMessages,
             toolConfirmation,
+            toolDirectives,
         }), {
             onStart(payloadData) {
                 if (payloadData?.request_id) {
@@ -299,7 +317,9 @@ async function sendChatTurn({
         syncElapsedSeconds();
     }
     payload.message.tool_events = payload.raw?.tool_events || [];
-    payload.message.elapsed_seconds = timerMessage.elapsed_seconds;
+    if (!Number.isFinite(payload.message.elapsed_seconds)) {
+        payload.message.elapsed_seconds = timerMessage.elapsed_seconds;
+    }
 
     removeTypingMessage();
     if (streamingAssistantMessage) {
@@ -328,6 +348,7 @@ function buildChatPayload({
     responderAgent = null,
     contextMessages = null,
     toolConfirmation = null,
+    toolDirectives = [],
 }) {
     if (!responderAgent) {
         return {
@@ -341,6 +362,7 @@ function buildChatPayload({
             profile_id: getSelectedProfileId(),
             request_id: requestId,
             ...(toolConfirmation ? { tool_confirmation: toolConfirmation } : {}),
+            ...(toolDirectives.length ? { tool_directives: toolDirectives } : {}),
         };
     }
 
@@ -356,7 +378,18 @@ function buildChatPayload({
         profile_id: responderAgent.profile_id || getSelectedProfileId(),
         request_id: requestId,
         ...(toolConfirmation ? { tool_confirmation: toolConfirmation } : {}),
+        ...(toolDirectives.length ? { tool_directives: toolDirectives } : {}),
     };
+}
+
+
+function serializeToolDirectives(directives) {
+    return (directives || []).map(({ tool_name, instruction, start, end }) => ({
+        tool_name,
+        instruction,
+        start,
+        end,
+    }));
 }
 
 
@@ -418,6 +451,8 @@ export async function handleToolConfirmationClick(event) {
                 name: toolEvent.tool_name,
                 arguments: toolEvent.arguments || {},
                 reason: toolEvent.reason || "",
+                source_message_id: message.id,
+                source_event_index: toolEventIndex,
             },
         });
         markToolConfirmationConfirmed(toolEvent);

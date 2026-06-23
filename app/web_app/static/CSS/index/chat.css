@@ -86,6 +86,19 @@
 
 .agent-mention-token {
     color: var(--agent-mention-color, var(--accent-strong));
+}
+
+.tool-command-token {
+    color: var(--accent);
+}
+
+.message__content .agent-mention-token {
+    font-weight: 650;
+}
+
+.message__content .tool-command-token,
+.composer-mention-menu .tool-command-token {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
     font-weight: 650;
 }
 

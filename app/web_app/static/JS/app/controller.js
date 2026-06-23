@@ -6,6 +6,13 @@ import {
     handleComposerMentionKeyDown,
     handleComposerMentionMenuClick,
 } from "./agent-mentions.js";
+import {
+    closeComposerCommandMenu,
+    handleComposerCommandDocumentClick,
+    handleComposerCommandInput,
+    handleComposerCommandKeyDown,
+    handleComposerCommandMenuClick,
+} from "./tool-commands.js";
 import { autoResizeComposer, syncComposerHighlightScroll } from "./composer-ui.js";
 import { handleReasoningTraceMessageClick, handleToolTraceMessageClick } from "./message-ui.js";
 import {
@@ -237,16 +244,18 @@ export function bindUI() {
     }));
     elements.sendButton?.addEventListener("click", handleSendButtonClick);
     elements.composerInput.addEventListener("keydown", (event) => {
-        if (!handleComposerMentionKeyDown(event)) {
+        if (!handleComposerCommandKeyDown(event) && !handleComposerMentionKeyDown(event)) {
             handleComposerKeyDown(event);
         }
     });
     elements.composerInput.addEventListener("input", () => {
         autoResizeComposer();
         handleComposerMentionInput();
+        handleComposerCommandInput();
     });
     elements.composerInput.addEventListener("scroll", syncComposerHighlightScroll);
     elements.composerMentionMenu?.addEventListener("click", handleComposerMentionMenuClick);
+    elements.composerCommandMenu?.addEventListener("click", handleComposerCommandMenuClick);
     elements.conversationTitle?.addEventListener("click", handleConversationTitleClick);
     elements.conversationTitle?.addEventListener("input", handleConversationTitleInput);
     elements.conversationTitle?.addEventListener("keydown", handleConversationTitleKeyDown);
@@ -398,6 +407,7 @@ export function bindUI() {
             elements.composerInput.value = element.dataset.prompt || "";
             autoResizeComposer();
             closeComposerMentionMenu();
+            closeComposerCommandMenu();
             elements.composerInput.focus();
         });
     });
@@ -406,6 +416,7 @@ export function bindUI() {
     document.addEventListener("click", handleProjectModelDocumentClick);
     document.addEventListener("click", handleDocumentToolClick);
     document.addEventListener("click", handleComposerMentionDocumentClick);
+    document.addEventListener("click", handleComposerCommandDocumentClick);
     document.addEventListener("input", handleDocumentInput);
     bindSidebarViewportChangeListener();
     syncChatSidebarSections();

@@ -26,6 +26,7 @@ export const elements = {
     composerHighlight: document.getElementById("composer-highlight"),
     composerInput: document.getElementById("composer-input"),
     composerMentionMenu: document.getElementById("composer-mention-menu"),
+    composerCommandMenu: document.getElementById("composer-command-menu"),
     composerHint: document.getElementById("composer-hint"),
     newChatButton: document.getElementById("new-chat-button"),
     newProjectButton: document.getElementById("new-project-button"),

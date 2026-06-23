@@ -49,6 +49,7 @@ class DatabaseSchemaInitializer:
             "message_reasoning_content": self.ensure_message_reasoning_content,
             "user_avatar_image": self.ensure_user_avatar_image,
             "model_reasoning_mode": self.ensure_model_reasoning_mode,
+            "message_elapsed_seconds": self.ensure_message_elapsed_seconds,
         }
 
         for migration in self.versioned_migrations:
@@ -96,6 +97,9 @@ class DatabaseSchemaInitializer:
         database.execute(
             f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
         )
+
+    def ensure_message_elapsed_seconds(self, database):
+        self.ensure_column(database, "messages", "elapsed_seconds", "INTEGER")
 
     def ensure_project_models_shape(self, database):
         _, rows = database.execute(

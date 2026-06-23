@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import uuid
 
+from tool_m import ToolCommandParser
+
 
 class ChatRequestError(ValueError):
     pass
@@ -26,6 +28,7 @@ class PreparedChatRequest:
     stream_requested: bool
     assistant_message_meta: dict
     tool_confirmation: dict | None
+    tool_directives: list[dict]
 
 
 class ChatRequestPreparer:
@@ -33,10 +36,19 @@ class ChatRequestPreparer:
     MAX_MESSAGES_PER_REQUEST = 100
     MAX_MESSAGE_CONTENT_CHARS = 20000
 
-    def __init__(self, db_manager, context_builder, request_id_resolver=None):
+    MAX_TOOL_DIRECTIVES = 20
+
+    def __init__(
+        self,
+        db_manager,
+        context_builder,
+        request_id_resolver=None,
+        tool_command_parser=None,
+    ):
         self.db = db_manager
         self.context_builder = context_builder
         self.request_id_resolver = request_id_resolver or self._resolve_request_id
+        self.tool_command_parser = tool_command_parser or ToolCommandParser()
 
     def prepare(self, data, default_profile, default_provider):
         self._validate_messages(data)
@@ -131,6 +143,7 @@ class ChatRequestPreparer:
                 project_model=project_model,
             ),
             tool_confirmation=self._parse_tool_confirmation(data.get("tool_confirmation")),
+            tool_directives=self._parse_tool_directives(data, input_request_messages),
         )
 
     def _validate_messages(self, data):
@@ -390,11 +403,81 @@ class ChatRequestPreparer:
         if not isinstance(arguments, dict):
             raise ChatRequestError("tool_confirmation.arguments must be an object")
 
-        return {
+        confirmation = {
             "name": name,
             "arguments": arguments,
             "reason": str(raw_confirmation.get("reason") or "").strip(),
         }
+        source_message_id = self._parse_optional_int(
+            raw_confirmation.get("source_message_id"),
+            "tool_confirmation.source_message_id",
+        )
+        source_event_index = self._parse_optional_int(
+            raw_confirmation.get("source_event_index"),
+            "tool_confirmation.source_event_index",
+        )
+        if (source_message_id is None) != (source_event_index is None):
+            raise ChatRequestError(
+                "tool_confirmation source_message_id and source_event_index are required together"
+            )
+        if source_message_id is not None:
+            confirmation["source_message_id"] = source_message_id
+            confirmation["source_event_index"] = source_event_index
+        return confirmation
+
+    def _parse_tool_directives(self, data, input_request_messages):
+        command_content = self._active_user_message_content(input_request_messages)
+        parsed_directives = self.tool_command_parser.parse(command_content)
+        if len(parsed_directives) > self.MAX_TOOL_DIRECTIVES:
+            raise ChatRequestError(
+                f"A message may contain at most {self.MAX_TOOL_DIRECTIVES} tool commands"
+            )
+
+        if "tool_directives" not in data:
+            return parsed_directives
+
+        raw_directives = data.get("tool_directives")
+        if not isinstance(raw_directives, list):
+            raise ChatRequestError("tool_directives must be a list")
+        if len(raw_directives) > self.MAX_TOOL_DIRECTIVES:
+            raise ChatRequestError(
+                f"tool_directives may include at most {self.MAX_TOOL_DIRECTIVES} items"
+            )
+
+        normalized_directives = []
+        for index, directive in enumerate(raw_directives):
+            if not isinstance(directive, dict):
+                raise ChatRequestError(f"tool_directives[{index}] must be an object")
+            start = directive.get("start")
+            end = directive.get("end")
+            if (
+                not isinstance(start, int)
+                or isinstance(start, bool)
+                or not isinstance(end, int)
+                or isinstance(end, bool)
+            ):
+                raise ChatRequestError(
+                    f"tool_directives[{index}].start and end must be integers"
+                )
+            normalized_directives.append(
+                {
+                    "tool_name": str(directive.get("tool_name") or "").strip().lower(),
+                    "instruction": str(directive.get("instruction") or "").strip(),
+                    "start": start,
+                    "end": end,
+                }
+            )
+
+        if normalized_directives != parsed_directives:
+            raise ChatRequestError(
+                "tool_directives do not match the tool commands in the active user message"
+            )
+        return parsed_directives
+
+    def _active_user_message_content(self, messages):
+        if messages and messages[-1].get("role") == "user":
+            return self._normalize_message_content(messages[-1].get("content"))
+        return ""
 
     def _build_assistant_message_meta(self, model_config, profile, provider, model, project_model=None):
         return {

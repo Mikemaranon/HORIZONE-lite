@@ -33,6 +33,7 @@ SCHEMA_MIGRATIONS = [
     ColumnMigration("messages", "profile_name", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "reasoning_content", "TEXT DEFAULT ''"),
     ColumnMigration("messages", "tool_events", "TEXT DEFAULT ''"),
+    ColumnMigration("messages", "elapsed_seconds", "INTEGER"),
     ColumnMigration("providers", "resolved_adapter", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "resolved_metadata", "TEXT DEFAULT ''"),
     ColumnMigration("providers", "is_system_managed", "INTEGER DEFAULT 0"),
@@ -55,4 +56,5 @@ VERSIONED_SCHEMA_MIGRATIONS = [
     SchemaMigration(7, "message_reasoning_content"),
     SchemaMigration(8, "user_avatar_image"),
     SchemaMigration(9, "model_reasoning_mode"),
+    SchemaMigration(10, "message_elapsed_seconds"),
 ]

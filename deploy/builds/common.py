@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import platform as host_platform
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,7 @@ WEB_APP_ROOT = APP_ROOT / "web_app"
 REQUIREMENTS_ROOT = ROOT / "requirements"
 BACKEND_DIST_ROOT = DESKTOP_ROOT / "dist" / "backend"
 RUNTIME_DIST_ROOT = DESKTOP_ROOT / "dist" / "runtime"
+VENDORED_RUNTIME_ROOT = DESKTOP_ROOT / "runtime"
 
 NATIVE_LLAMA_SERVER_NAME = "llama-server"
 PYTHON_LLAMA_SERVER_NAME = "horizone-llama-server"
@@ -305,6 +307,10 @@ def resolve_native_llama_server_binary() -> Path | None:
         path = Path(configured).expanduser()
         return path if path.is_file() else None
 
+    vendored = vendored_native_llama_server_binary()
+    if vendored:
+        return vendored
+
     discovered = shutil.which(executable_name(NATIVE_LLAMA_SERVER_NAME))
     if discovered:
         return Path(discovered)
@@ -315,6 +321,47 @@ def resolve_native_llama_server_binary() -> Path | None:
             return Path(discovered)
 
     return None
+
+
+def normalized_machine() -> str:
+    machine = host_platform.machine().lower()
+    return {
+        "aarch64": "arm64",
+        "amd64": "x86_64",
+    }.get(machine, machine)
+
+
+def vendored_native_llama_server_binary() -> Path | None:
+    platform_name = normalize_platform()
+    runtime_dir = VENDORED_RUNTIME_ROOT / f"{platform_name}-{normalized_machine()}"
+    candidate = runtime_dir / executable_name(NATIVE_LLAMA_SERVER_NAME)
+    return candidate if candidate.is_file() else None
+
+
+def ensure_macos_native_llama_server_is_compatible(binary: Path) -> None:
+    try:
+        architectures = subprocess.run(
+            ["lipo", "-archs", str(binary)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+        dependencies = subprocess.run(
+            ["otool", "-L", str(binary)],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"Could not inspect native macOS llama-server: {binary}") from error
+
+    if "arm64" not in architectures:
+        raise SystemExit(f"Native macOS llama-server does not contain arm64 code: {binary}")
+    if "/Metal.framework/" not in dependencies:
+        raise SystemExit(
+            "Native macOS llama-server must link Apple Metal directly so the packaged "
+            f"runtime remains self-contained: {binary}"
+        )
 
 
 def has_llama_cpp_python_server() -> bool:
@@ -447,6 +494,8 @@ def prepare_runtime_bundle(build_root: Path) -> None:
 
     native_binary = resolve_native_llama_server_binary()
     if native_binary:
+        if sys.platform == "darwin":
+            ensure_macos_native_llama_server_is_compatible(native_binary)
         bundle_native_llama_server(native_binary)
         return
 

@@ -113,6 +113,7 @@ class ChatStreamService:
         assistant_message_meta,
         tool_context=None,
     ):
+        response_started_at = time.perf_counter()
         active_stream = self._register_stream(request_id, provider)
 
         try:
@@ -248,6 +249,10 @@ class ChatStreamService:
                     final_response,
                     assistant_message_meta,
                 )
+                self.persistence_service.persist_elapsed_seconds(
+                    final_response,
+                    time.perf_counter() - response_started_at,
+                )
 
             payload = {
                 "response": final_response,
@@ -306,6 +311,7 @@ class ChatStreamService:
         assistant_message_meta,
         response,
     ):
+        response_started_at = time.perf_counter()
         yield self._event(
             "start",
             {
@@ -332,6 +338,10 @@ class ChatStreamService:
                 conversation_id,
                 response,
                 assistant_message_meta,
+            )
+            self.persistence_service.persist_elapsed_seconds(
+                response,
+                time.perf_counter() - response_started_at,
             )
 
         payload = {

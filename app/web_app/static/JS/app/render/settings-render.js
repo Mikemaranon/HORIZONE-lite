@@ -16,6 +16,8 @@ import {
 } from "../state-actions.js";
 import { state } from "../state.js";
 
+let chatProfileTagsResizeObserver = null;
+
 
 export function renderSettingsSpace() {
     elements.settingsSpace.hidden = state.workspaceMode !== "settings";
@@ -975,13 +977,7 @@ function createToolCardMarkup(tool, toggleAttribute) {
     const isEnabled = Boolean(tool.is_active);
     const toolLabel = tool.display_name || tool.name;
     const toggleActionLabel = `${isEnabled ? "Disable" : "Enable"} ${toolLabel}`;
-    const badges = [
-        tool.is_builtin
-            ? `<span class="profile-summary-card__tag">Built in</span>`
-            : `<span class="profile-summary-card__tag">Custom</span>`,
-        `<span class="profile-summary-card__tag">${escapeHtml(tool.name)}</span>`,
-        `<span class="profile-summary-card__tag">${escapeHtml(tool.filename || "tool.py")}</span>`,
-    ].join("");
+    const filenameBadge = `<span class="profile-summary-card__tag">${escapeHtml(tool.filename || "tool.py")}</span>`;
 
     return `
         <article class="chat-tool-card${isEnabled ? " is-enabled" : ""}">
@@ -990,7 +986,7 @@ function createToolCardMarkup(tool, toggleAttribute) {
                     <strong>${escapeHtml(toolLabel)}</strong>
                 </div>
                 <p>${escapeHtml(tool.description || "No description.")}</p>
-                <div class="chat-tool-card__meta">${badges}</div>
+                <div class="chat-tool-card__meta">${filenameBadge}</div>
             </div>
             <button
                 class="chat-tool-card__toggle"
@@ -1051,6 +1047,7 @@ function renderChatProfileCard() {
     const profile = (state.profiles || []).find((item) => item.id === Number(selectedProfileId)) || null;
 
     if (!profile) {
+        chatProfileTagsResizeObserver?.disconnect();
         if (elements.editProfileButton) {
             elements.editProfileButton.disabled = true;
         }
@@ -1064,12 +1061,16 @@ function renderChatProfileCard() {
 
     const tags = Array.isArray(profile.tags) ? profile.tags.slice(0, PROFILE_SETTINGS_PREVIEW_TAGS) : [];
     const tagsMarkup = tags.length
-        ? tags.map((tag) => `<span class="chat-profile-card__tag">${escapeHtml(tag)}</span>`).join("")
-        : `<span class="chat-profile-card__tag chat-profile-card__tag--muted">No tags</span>`;
-    const defaultBadge = profile.is_default
-        ? `<span class="chat-profile-card__badge">Default</span>`
-        : "";
-
+        ? tags.map((tag) => `
+            <span class="chat-profile-card__tag chat-profile-card__tag--truncate">
+                <span class="chat-profile-card__tag-text">${escapeHtml(tag)}</span>
+            </span>
+        `).join("")
+        : `
+            <span class="chat-profile-card__tag chat-profile-card__tag--muted chat-profile-card__tag--truncate">
+                <span class="chat-profile-card__tag-text">No tags</span>
+            </span>
+        `;
     elements.chatProfileCard.innerHTML = `
         <article class="chat-profile-card__surface">
             <div class="chat-profile-card__top">
@@ -1077,20 +1078,59 @@ function renderChatProfileCard() {
                     <strong>${escapeHtml(profile.name)}</strong>
                     <span>${escapeHtml(profile.personality || "No personality defined")}</span>
                 </div>
-                ${defaultBadge}
-            </div>
-            <div class="chat-profile-card__meta">
-                <span class="chat-profile-card__metric">Temp ${escapeHtml(String(profile.temperature ?? 0.7))}</span>
-                <span class="chat-profile-card__metric">Top P ${escapeHtml(String(profile.top_p ?? 1))}</span>
-                <span class="chat-profile-card__metric">Max ${escapeHtml(String(profile.max_tokens ?? 2048))}</span>
             </div>
             <div class="chat-profile-card__tags">${tagsMarkup}</div>
         </article>
     `;
+    observeChatProfileTags();
 
     if (elements.editProfileButton) {
         elements.editProfileButton.disabled = false;
     }
+}
+
+
+function observeChatProfileTags() {
+    const tagsContainer = elements.chatProfileCard?.querySelector(".chat-profile-card__tags");
+    if (!tagsContainer) {
+        return;
+    }
+
+    chatProfileTagsResizeObserver?.disconnect();
+    if (typeof ResizeObserver === "function") {
+        chatProfileTagsResizeObserver = new ResizeObserver(syncChatProfileTagsVisibility);
+        chatProfileTagsResizeObserver.observe(tagsContainer);
+    }
+    window.requestAnimationFrame(syncChatProfileTagsVisibility);
+}
+
+
+function syncChatProfileTagsVisibility() {
+    const tagsContainer = elements.chatProfileCard?.querySelector(".chat-profile-card__tags");
+    if (!tagsContainer) {
+        return;
+    }
+
+    const tags = Array.from(tagsContainer.children);
+    tags.forEach((tag) => tag.classList.remove("is-overflow-hidden"));
+
+    const containerBounds = tagsContainer.getBoundingClientRect();
+    let rowIsFull = false;
+    tags.forEach((tag) => {
+        if (rowIsFull) {
+            tag.classList.add("is-overflow-hidden");
+            return;
+        }
+
+        const tagBounds = tag.getBoundingClientRect();
+        const tagText = tag.querySelector(".chat-profile-card__tag-text");
+        const textIsClipped = Boolean(tagText && tagText.scrollWidth > tagText.clientWidth + 1);
+        const tagFits = tagBounds.right <= containerBounds.right + 0.5 && !textIsClipped;
+        if (!tagFits) {
+            tag.classList.add("is-overflow-hidden");
+            rowIsFull = true;
+        }
+    });
 }
 
 

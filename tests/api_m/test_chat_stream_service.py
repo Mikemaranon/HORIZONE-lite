@@ -8,9 +8,15 @@ from tests.test_support import IsolatedDatabaseTestCase
 class FakePersistenceService:
     def __init__(self):
         self.finalized = []
+        self.elapsed_seconds = []
 
     def finalize_response(self, conversation_id, response, assistant_message_meta=None):
         self.finalized.append((conversation_id, response, assistant_message_meta))
+
+    def persist_elapsed_seconds(self, response, elapsed_seconds):
+        normalized = max(0, int(elapsed_seconds))
+        response.setdefault("message", {})["elapsed_seconds"] = normalized
+        self.elapsed_seconds.append(normalized)
 
 
 class FakeStreamExecutor:

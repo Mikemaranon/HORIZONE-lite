@@ -49,6 +49,7 @@ CHAT_SCHEMA_STATEMENTS = [
         reasoning_content TEXT DEFAULT '',
         tool_events TEXT DEFAULT '',
         provider_message_id TEXT,
+        elapsed_seconds INTEGER,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
         FOREIGN KEY (project_model_id) REFERENCES project_models(id) ON DELETE SET NULL,

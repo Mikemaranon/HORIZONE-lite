@@ -69,6 +69,7 @@ class ChatPersistenceService:
             reasoning_content=assistant_message.get("reasoning_content", ""),
             tool_events=normalized_tool_events,
             provider_message_id=response.get("message_id"),
+            elapsed_seconds=assistant_message.get("elapsed_seconds"),
         )
         stored_message = self.db.messages.get(message_id)
         if stored_message:
@@ -83,6 +84,16 @@ class ChatPersistenceService:
             response["message"]["tool_events"] = normalized_tool_events
         self._confirm_matching_workspace_write_requests(conversation_id, normalized_tool_events)
         return stored_message
+
+    def persist_elapsed_seconds(self, response, elapsed_seconds):
+        assistant_message = response.get("message") or {}
+        message_id = assistant_message.get("id")
+        if not message_id:
+            return
+
+        normalized_elapsed_seconds = max(0, int(elapsed_seconds))
+        self.db.messages.update_elapsed_seconds(message_id, normalized_elapsed_seconds)
+        assistant_message["elapsed_seconds"] = normalized_elapsed_seconds
 
     def update_tool_confirmation_status(self, message_id, tool_event_index, status):
         message = self.db.messages.get(message_id)

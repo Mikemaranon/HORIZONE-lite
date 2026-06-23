@@ -1,10 +1,43 @@
 import unittest
 
-from tool_m import ToolCallParser, ToolCallPolicy, ToolCatalog
+from tool_m import ToolCallParser, ToolCallPolicy, ToolCatalog, ToolCommandParser
 from tool_m.tool_call_parser import ToolCallParseError
 
 
 class ToolCallingTests(unittest.TestCase):
+    def test_command_parser_preserves_order_instructions_and_boundaries(self):
+        directives = ToolCommandParser().parse(
+            "/current_date tell me the date. /web_search use it for KOI"
+        )
+
+        self.assertEqual(
+            directives,
+            [
+                {
+                    "tool_name": "current_date",
+                    "instruction": "tell me the date.",
+                    "start": 0,
+                    "end": 32,
+                },
+                {
+                    "tool_name": "web_search",
+                    "instruction": "use it for KOI",
+                    "start": 32,
+                    "end": 58,
+                },
+            ],
+        )
+
+    def test_command_parser_ignores_urls_and_prefix_collisions(self):
+        directives = ToolCommandParser().parse(
+            "https://example.com path/to /current now /current_date later"
+        )
+
+        self.assertEqual(
+            [(item["tool_name"], item["instruction"]) for item in directives],
+            [("current", "now"), ("current_date", "later")],
+        )
+
     def test_catalog_serializes_declarative_metadata(self):
         catalog = ToolCatalog(
             [
@@ -26,6 +59,29 @@ class ToolCallingTests(unittest.TestCase):
         self.assertIn("workspace_search", messages[0]["content"])
         self.assertIn("find project files", messages[0]["content"])
         self.assertEqual(messages[1]["role"], "user")
+
+    def test_forced_tool_prompt_shows_required_argument_shape(self):
+        catalog = ToolCatalog(
+            [
+                {
+                    "name": "web_search",
+                    "description": "Searches the web.",
+                    "parameters": {
+                        "query": {"type": "string", "required": True},
+                        "max_results": {"type": "integer", "default": 5},
+                    },
+                }
+            ]
+        )
+
+        messages = catalog.build_forced_planning_messages(
+            [{"role": "user", "content": "/web_search find KOI"}],
+            "web_search",
+            "find KOI",
+        )
+
+        self.assertIn('"query":"<required string>"', messages[0]["content"])
+        self.assertNotIn('"arguments":{}', messages[0]["content"])
 
     def test_parser_accepts_json_with_surrounding_text_and_reason(self):
         parser = ToolCallParser()

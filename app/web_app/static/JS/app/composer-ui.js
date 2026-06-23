@@ -1,7 +1,7 @@
-import { createMentionedContentMarkup } from "./agent-mention-markup.js";
+import { createComposerContentMarkup } from "./composer-content-markup.js";
 import { elements } from "./dom.js";
 import { getSelectedModel, getSelectedModelConfig } from "./provider-helpers.js";
-import { getMentionableProjectAgents } from "./selectors.js";
+import { getAvailableCommandTools, getMentionableProjectAgents } from "./selectors.js";
 import { state } from "./state.js";
 
 
@@ -17,9 +17,10 @@ export function syncComposerHighlight() {
         return;
     }
 
-    elements.composerHighlight.innerHTML = createMentionedContentMarkup(
+    elements.composerHighlight.innerHTML = createComposerContentMarkup(
         elements.composerInput.value,
         getMentionableProjectAgents(),
+        getAvailableCommandTools(),
     ) || "<br>";
     elements.composerInput.closest(".composer__input-wrap")?.classList.add("is-highlight-ready");
     syncComposerHighlightScroll();

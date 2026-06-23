@@ -97,6 +97,49 @@ export function getMentionableProjectAgents(conversation = state.activeConversat
 }
 
 
+export function getAvailableCommandTools(conversation = state.activeConversation) {
+    const regularTools = (state.tools || []).filter((tool) => (
+        tool?.is_active !== false && tool?.is_available !== false
+    ));
+    const hasProjectWorkspace = Boolean(
+        (conversation?.project_id || state.activeProjectId) && state.projectWorkspace
+    );
+    const workspaceTools = hasProjectWorkspace
+        ? (state.workspaceTools || []).filter((tool) => (
+            tool?.is_active !== false && tool?.is_available !== false
+        ))
+        : [];
+    const uniqueTools = new Map();
+    for (const tool of [...regularTools, ...workspaceTools]) {
+        const name = String(tool?.name || "").trim();
+        if (name && !uniqueTools.has(name)) {
+            uniqueTools.set(name, {
+                ...tool,
+                is_active: true,
+                is_available: true,
+            });
+        }
+    }
+    return [...uniqueTools.values()];
+}
+
+
+export function getKnownCommandTools() {
+    const uniqueTools = new Map();
+    for (const tool of [...(state.tools || []), ...(state.workspaceTools || [])]) {
+        const name = String(tool?.name || "").trim();
+        if (name && !uniqueTools.has(name)) {
+            uniqueTools.set(name, {
+                ...tool,
+                is_active: true,
+                is_available: true,
+            });
+        }
+    }
+    return [...uniqueTools.values()];
+}
+
+
 export function getProjectAgentDisplayName(agent) {
     if (!agent) {
         return "custom";

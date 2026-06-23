@@ -5,6 +5,7 @@ const selectorsModuleUrl = new URL("../../app/web_app/static/JS/app/selectors.js
 
 const { state } = await import(stateModuleUrl);
 const {
+    getAvailableCommandTools,
     getMentionableProjectAgents,
     getProjectAgentNameForConversation,
     getProjectAgentNameForMessage,
@@ -47,6 +48,14 @@ Object.assign(state, {
             profile: { id: 10, name: "Global" },
         },
     ],
+    tools: [
+        { name: "current_date", is_active: true, is_available: true },
+        { name: "disabled", is_active: false, is_available: true },
+    ],
+    workspaceTools: [
+        { name: "workspace_search", is_active: true, is_available: true },
+    ],
+    projectWorkspace: null,
 });
 
 assert.equal(
@@ -101,6 +110,19 @@ assert.deepEqual(
     getMentionableProjectAgents(state.activeConversation).map((agent) => agent.id),
     [100, 101],
     "project chats should expose every project agent for mentions"
+);
+
+assert.deepEqual(
+    getAvailableCommandTools().map((tool) => tool.name),
+    ["current_date"],
+    "project tools should stay hidden until the active project has a connected workspace",
+);
+
+state.projectWorkspace = { id: 9, project_id: 42 };
+assert.deepEqual(
+    getAvailableCommandTools().map((tool) => tool.name),
+    ["current_date", "workspace_search"],
+    "active project tools should become command suggestions with a connected workspace",
 );
 
 state.activeConversation = {

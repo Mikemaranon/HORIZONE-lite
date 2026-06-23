@@ -31,6 +31,19 @@ class ToolCallOrchestrator:
         should_stop=None,
         tool_context=None,
     ):
+        forced_state = self._build_forced_chain_state(tool_context)
+        if forced_state:
+            return self._chat_forced_chain(
+                provider_name,
+                messages,
+                model,
+                settings,
+                tool_catalog=tool_catalog,
+                should_stop=should_stop,
+                tool_context=tool_context,
+                forced_state=forced_state,
+            )
+
         planning_messages = tool_catalog.build_planning_messages(messages)
         final_messages = tool_catalog.build_answer_messages(messages)
         tool_events = []
@@ -145,6 +158,20 @@ class ToolCallOrchestrator:
         should_stop=None,
         tool_context=None,
     ):
+        forced_state = self._build_forced_chain_state(tool_context)
+        if forced_state:
+            yield from self._stream_forced_chain(
+                provider_name,
+                messages,
+                model,
+                settings,
+                tool_catalog=tool_catalog,
+                should_stop=should_stop,
+                tool_context=tool_context,
+                forced_state=forced_state,
+            )
+            return
+
         planning_messages = tool_catalog.build_planning_messages(messages)
         final_messages = tool_catalog.build_answer_messages(messages)
         tool_events = []
@@ -276,6 +303,295 @@ class ToolCallOrchestrator:
             should_stop=should_stop,
         )
 
+    def _chat_forced_chain(
+        self,
+        provider_name,
+        messages,
+        model,
+        settings,
+        *,
+        tool_catalog,
+        should_stop,
+        tool_context,
+        forced_state,
+    ):
+        final_messages, chain_messages = self._build_forced_chain_messages(
+            messages,
+            tool_catalog,
+            forced_state["completed_events"],
+        )
+        tool_events = []
+        for index in range(forced_state["current_index"], len(forced_state["directives"])):
+            if self._is_stop_requested(should_stop):
+                return self._build_cancelled_response(provider_name, model, tool_events)
+
+            directive = forced_state["directives"][index]
+            tool_call = self._resolve_forced_tool_call(
+                provider_name,
+                chain_messages,
+                model,
+                settings,
+                directive,
+                tool_catalog=tool_catalog,
+                confirmed_tool_call=(
+                    forced_state.get("confirmed_tool_call")
+                    if index == forced_state["current_index"]
+                    else None
+                ),
+            )
+            tool_event = self._execute_tool_call(
+                tool_call,
+                tool_catalog=tool_catalog,
+                tool_context=tool_context,
+            )
+            tool_events.append(tool_event)
+            if self._requires_confirmation(tool_event):
+                self._attach_forced_chain_state(
+                    tool_event,
+                    forced_state["directives"],
+                    index,
+                    [*forced_state["completed_events"], *tool_events[:-1]],
+                )
+                return self._build_confirmation_response(provider_name, model, tool_events)
+            if not tool_event.get("ok"):
+                return self._build_failed_tool_response(provider_name, model, tool_events)
+
+            exchange_messages = self.execution_trace.build_exchange_messages(tool_call, tool_event)
+            final_messages.extend(exchange_messages)
+            chain_messages.extend(exchange_messages)
+
+        final_response = self.model_manager.chat(
+            provider_name,
+            final_messages,
+            model,
+            settings or {},
+        )
+        return self._finalize_response(
+            final_response,
+            tool_events,
+            provider_name=provider_name,
+            model=model,
+        )
+
+    def _stream_forced_chain(
+        self,
+        provider_name,
+        messages,
+        model,
+        settings,
+        *,
+        tool_catalog,
+        should_stop,
+        tool_context,
+        forced_state,
+    ):
+        final_messages, chain_messages = self._build_forced_chain_messages(
+            messages,
+            tool_catalog,
+            forced_state["completed_events"],
+        )
+        tool_events = []
+        for index in range(forced_state["current_index"], len(forced_state["directives"])):
+            if self._is_stop_requested(should_stop):
+                yield {
+                    "type": "response",
+                    "response": self._build_cancelled_response(provider_name, model, tool_events),
+                }
+                return
+
+            directive = forced_state["directives"][index]
+            tool_call = self._resolve_forced_tool_call(
+                provider_name,
+                chain_messages,
+                model,
+                settings,
+                directive,
+                tool_catalog=tool_catalog,
+                confirmed_tool_call=(
+                    forced_state.get("confirmed_tool_call")
+                    if index == forced_state["current_index"]
+                    else None
+                ),
+            )
+            yield self._build_tool_start_stream_event(tool_call, tool_catalog)
+            tool_event = self._execute_tool_call(
+                tool_call,
+                tool_catalog=tool_catalog,
+                tool_context=tool_context,
+            )
+            tool_events.append(tool_event)
+            yield self._build_tool_result_stream_event(tool_event)
+            if self._requires_confirmation(tool_event):
+                self._attach_forced_chain_state(
+                    tool_event,
+                    forced_state["directives"],
+                    index,
+                    [*forced_state["completed_events"], *tool_events[:-1]],
+                )
+                yield {
+                    "type": "response",
+                    "response": self._build_confirmation_response(
+                        provider_name,
+                        model,
+                        tool_events,
+                    ),
+                }
+                return
+            if not tool_event.get("ok"):
+                failure_response = self._build_failed_tool_response(
+                    provider_name,
+                    model,
+                    tool_events,
+                )
+                content = (failure_response.get("message") or {}).get("content", "")
+                if content:
+                    yield {"type": "delta", "delta": content}
+                yield {"type": "response", "response": failure_response}
+                return
+
+            exchange_messages = self.execution_trace.build_exchange_messages(tool_call, tool_event)
+            final_messages.extend(exchange_messages)
+            chain_messages.extend(exchange_messages)
+
+        yield from self._stream_final_response(
+            provider_name,
+            final_messages,
+            model,
+            settings or {},
+            tool_events,
+            should_stop=should_stop,
+        )
+
+    def _build_forced_chain_state(self, tool_context):
+        context = tool_context or {}
+        resume = context.get("forced_tool_resume")
+        if isinstance(resume, dict) and resume.get("directives"):
+            return {
+                "directives": list(resume["directives"]),
+                "current_index": int(resume.get("current_index") or 0),
+                "completed_events": list(resume.get("completed_events") or []),
+                "confirmed_tool_call": self._build_confirmed_tool_call(context),
+            }
+
+        directives = context.get("forced_tool_directives")
+        if not directives:
+            return None
+        return {
+            "directives": list(directives),
+            "current_index": 0,
+            "completed_events": [],
+            "confirmed_tool_call": None,
+        }
+
+    def _build_forced_chain_messages(self, messages, tool_catalog, completed_events):
+        final_messages = tool_catalog.build_answer_messages(messages)
+        chain_messages = [*list(messages or [])]
+        for tool_event in completed_events:
+            tool_call = ToolCallRequest(
+                name=str(tool_event.get("tool_name") or "").strip(),
+                arguments=dict(tool_event.get("arguments") or {}),
+                reason=str(tool_event.get("reason") or "").strip(),
+            )
+            exchange_messages = self.execution_trace.build_exchange_messages(tool_call, tool_event)
+            final_messages.extend(exchange_messages)
+            chain_messages.extend(exchange_messages)
+        return final_messages, chain_messages
+
+    def _resolve_forced_tool_call(
+        self,
+        provider_name,
+        messages,
+        model,
+        settings,
+        directive,
+        *,
+        tool_catalog,
+        confirmed_tool_call=None,
+    ):
+        tool_name = str(directive.get("tool_name") or "").strip()
+        if confirmed_tool_call:
+            if confirmed_tool_call.name != tool_name:
+                raise ValueError("Confirmed tool call does not match the forced command chain")
+            return confirmed_tool_call
+
+        runtime_tool = tool_catalog.get(tool_name)
+        if not runtime_tool:
+            return ToolCallRequest(
+                name=tool_name,
+                arguments={},
+                reason=str(directive.get("instruction") or "").strip(),
+            )
+        if not (runtime_tool.get("parameters") or {}):
+            return ToolCallRequest(
+                name=tool_name,
+                arguments={},
+                reason=str(directive.get("instruction") or f"User invoked /{tool_name}").strip(),
+            )
+
+        planning_messages = tool_catalog.build_forced_planning_messages(
+            messages,
+            tool_name,
+            directive.get("instruction"),
+        )
+        last_error = ""
+        for _ in range(2):
+            response = self.model_manager.chat(
+                provider_name,
+                planning_messages,
+                model,
+                settings or {},
+            )
+            try:
+                tool_call = self._parse_tool_call(response)
+            except ToolCallParseError as error:
+                tool_call = None
+                last_error = str(error)
+            if tool_call and tool_call.name == tool_name:
+                validation_error = self._validate_arguments(
+                    runtime_tool,
+                    tool_call.arguments,
+                )
+                if not validation_error:
+                    return tool_call
+                last_error = validation_error
+            elif tool_call:
+                last_error = f"Expected {tool_name}, received {tool_call.name}."
+            else:
+                last_error = last_error or f"Expected arguments for {tool_name}."
+            self._append_user_instruction(
+                planning_messages,
+                (
+                    f"Invalid forced tool arguments: {last_error} "
+                    f"Return one tool_call for {tool_name} only."
+                ),
+            )
+
+        return ToolCallRequest(
+            name=tool_name,
+            arguments={},
+            reason=f"Argument planning failed: {last_error}",
+        )
+
+    def _attach_forced_chain_state(
+        self,
+        tool_event,
+        directives,
+        current_index,
+        completed_events,
+    ):
+        tool_event["forced_chain"] = {
+            "directives": [dict(directive) for directive in directives],
+            "current_index": current_index,
+            "completed_events": [
+                {
+                    key: value
+                    for key, value in dict(event).items()
+                    if key != "forced_chain"
+                }
+                for event in completed_events
+            ],
+        }
+
     def _parse_tool_call(self, response):
         return self.tool_call_parser.parse_response(response)
 
@@ -406,6 +722,18 @@ class ToolCallOrchestrator:
         *,
         should_stop=None,
     ):
+        if self._last_tool_failed(tool_events):
+            failure_response = self._build_failed_tool_response(
+                provider_name,
+                model,
+                tool_events,
+            )
+            content = (failure_response.get("message") or {}).get("content", "")
+            if content:
+                yield {"type": "delta", "delta": content}
+            yield {"type": "response", "response": failure_response}
+            return
+
         final_response = None
         for event in self.model_manager.stream_chat(
             provider_name,
@@ -519,6 +847,14 @@ class ToolCallOrchestrator:
             if schema.get("required") and name not in arguments:
                 return f"Missing required argument: {name}."
 
+            if (
+                schema.get("required")
+                and schema.get("type") == "string"
+                and isinstance(arguments.get(name), str)
+                and not arguments[name].strip()
+            ):
+                return f"Argument '{name}' must not be empty."
+
             if name in arguments and not self._matches_type(arguments[name], schema.get("type")):
                 expected_type = schema.get("type")
                 return f"Argument '{name}' must be {expected_type}."
@@ -578,6 +914,9 @@ class ToolCallOrchestrator:
 
     def _finalize_response(self, response, tool_events, *, provider_name, model):
         response = self._attach_tool_events(response, tool_events)
+        if self._last_tool_failed(tool_events):
+            return self._build_failed_tool_response(provider_name, model, tool_events)
+
         try:
             final_tool_call = self._parse_tool_call(response)
         except ToolCallParseError:
@@ -586,6 +925,17 @@ class ToolCallOrchestrator:
         if not tool_events or not final_tool_call:
             return response
 
+        fallback_response = self._build_tool_only_fallback_response(
+            provider_name,
+            model,
+            tool_events,
+        )
+        return self._attach_tool_events(fallback_response, tool_events)
+
+    def _last_tool_failed(self, tool_events):
+        return bool(tool_events and not tool_events[-1].get("ok"))
+
+    def _build_failed_tool_response(self, provider_name, model, tool_events):
         fallback_response = self._build_tool_only_fallback_response(
             provider_name,
             model,

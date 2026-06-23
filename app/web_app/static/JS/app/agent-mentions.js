@@ -137,6 +137,9 @@ function renderComposerMentionMenu() {
         `;
     }).join("");
     elements.composerMentionMenu.hidden = false;
+    elements.composerMentionMenu
+        .querySelector(".is-active")
+        ?.scrollIntoView({ block: "nearest" });
 }
 
 

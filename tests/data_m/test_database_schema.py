@@ -44,6 +44,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
                 "message_reasoning_content",
                 "user_avatar_image",
                 "model_reasoning_mode",
+                "message_elapsed_seconds",
             ],
         )
         self.assertIn("idx_messages_conversation_position", message_index_names)
@@ -142,6 +143,7 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
         self.assertIn("profile_name", message_column_names)
         self.assertIn("reasoning_content", message_column_names)
         self.assertIn("tool_events", message_column_names)
+        self.assertIn("elapsed_seconds", message_column_names)
         self.assertIn("idx_messages_conversation_position", message_index_names)
         self.assertIn("display_name", tool_column_names)
         self.assertIn("is_system_managed", provider_column_names)
@@ -265,3 +267,56 @@ class DatabaseSchemaTests(IsolatedDatabaseTestCase):
 
         self.assertIn("avatar_image", user_column_names)
         self.assertIn("user_avatar_image", migration_names)
+
+    def test_existing_migrated_database_receives_message_elapsed_seconds_column(self):
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                CREATE TABLE schema_migrations (
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            for version, name in [
+                (1, "legacy_column_backfills"),
+                (2, "project_models_shape"),
+                (3, "project_model_defaults"),
+                (4, "chat_integrity_indexes"),
+                (5, "hot_path_indexes"),
+                (6, "llama_cpp_runtime_foundation"),
+                (7, "message_reasoning_content"),
+                (8, "user_avatar_image"),
+                (9, "model_reasoning_mode"),
+            ]:
+                connection.execute(
+                    "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
+                    (version, name),
+                )
+            connection.execute(
+                """
+                CREATE TABLE messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    conversation_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    position INTEGER NOT NULL
+                )
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        database = Database()
+
+        _, message_columns = database.execute("PRAGMA table_info(messages)", fetchall=True)
+        _, migration = database.execute(
+            "SELECT name FROM schema_migrations WHERE version = 10",
+            fetchone=True,
+        )
+
+        self.assertIn("elapsed_seconds", {column[1] for column in message_columns})
+        self.assertEqual(migration[0], "message_elapsed_seconds")

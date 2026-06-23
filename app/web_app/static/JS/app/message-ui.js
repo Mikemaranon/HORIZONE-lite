@@ -1,4 +1,4 @@
-import { createMentionedContentMarkup } from "./agent-mention-markup.js";
+import { createComposerContentMarkup } from "./composer-content-markup.js";
 import { elements } from "./dom.js";
 import { createModelAvatarMarkup, escapeHtml } from "./html.js";
 import { renderMarkdown } from "./markdown.js";
@@ -6,6 +6,7 @@ import { closeToolTraceModal, openToolTraceModal } from "./modal-ui.js";
 import { applySyntaxHighlighting } from "./syntax-highlight.js";
 import {
     getModelConfigById,
+    getKnownCommandTools,
     getModelDisplayNameById,
     getMentionableProjectAgents,
     getProjectAgentNameForMessage,
@@ -30,7 +31,11 @@ export function createMessageMarkup(message, options = {}) {
     const roleLabel = isUser ? "You" : null;
     const contentClass = isUser ? "message__content--plain" : "message__content--markdown";
     const renderedContent = isUser
-        ? createMentionedContentMarkup(message.content || "", getMentionableProjectAgents())
+        ? createComposerContentMarkup(
+            message.content || "",
+            getMentionableProjectAgents(),
+            getKnownCommandTools(),
+        )
         : renderMarkdown(message.content || "");
     const reasoningTraceMarkup = isUser ? "" : createPersistentReasoningStatusMarkup(message);
     const persistentToolStatusMarkup = isUser ? "" : createPersistentToolStatusListMarkup(message, options);

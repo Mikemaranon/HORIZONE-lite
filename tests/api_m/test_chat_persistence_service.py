@@ -107,3 +107,26 @@ class ChatPersistenceServiceTests(IsolatedDatabaseTestCase):
             messages[0]["tool_events"][0]["policy"]["status"],
             "confirmed",
         )
+
+    def test_elapsed_seconds_are_persisted_on_the_assistant_message(self):
+        conversation_id = self.db.conversations.create(
+            title="Timed response",
+            provider="ollama",
+            model="qwen3",
+        )
+        service = ChatPersistenceService(
+            self.db,
+            FailingTitleModelManager(),
+            generate_titles=False,
+        )
+        response = {
+            "message": {"role": "assistant", "content": "Done"},
+            "raw": {},
+        }
+
+        service.finalize_response(conversation_id, response)
+        service.persist_elapsed_seconds(response, 7.9)
+
+        stored_message = self.db.messages.for_conversation(conversation_id)[0]
+        self.assertEqual(response["message"]["elapsed_seconds"], 7)
+        self.assertEqual(stored_message["elapsed_seconds"], 7)

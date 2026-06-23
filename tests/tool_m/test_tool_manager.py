@@ -777,3 +777,291 @@ def run(arguments):
 
         self.assertIn("I used web search", response["message"]["content"])
         self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "web_search")
+
+    def test_forced_parameterless_tool_skips_selection_and_generates_one_answer(self):
+        tool = self.db.tools.get_by_name("current_date")
+        self.manager.set_tool_active(tool["id"], True)
+        self.registry._runtime_catalog["current_date"]["runner"] = lambda arguments: {
+            "date": "2026-06-22",
+        }
+        calls = []
+
+        def fake_chat(provider_name, messages, model, settings):
+            calls.append(messages)
+            self.assertIn("Tool result for current_date", messages[-1]["content"])
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {"role": "assistant", "content": "Today is 2026-06-22."},
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "forced-date",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "/current_date tell me today"}],
+            "qwen3",
+            {},
+            tool_context={
+                "forced_tool_directives": [
+                    {
+                        "tool_name": "current_date",
+                        "instruction": "tell me today",
+                        "start": 0,
+                        "end": 27,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(response["raw"]["tool_events"][0]["tool_name"], "current_date")
+
+    def test_forced_chain_uses_first_result_to_plan_second_tool(self):
+        date_tool = self.db.tools.get_by_name("current_date")
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(date_tool["id"], True)
+        self.manager.set_tool_active(search_tool["id"], True)
+        self.registry._runtime_catalog["current_date"]["runner"] = lambda arguments: {
+            "date": "2026-06-22",
+        }
+        self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: {
+            "query": arguments["query"],
+            "results": [],
+        }
+        calls = {"count": 0}
+
+        def fake_chat(provider_name, messages, model, settings):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                self.assertIn("Tool result for current_date", messages[-1]["content"])
+                self.assertIn("Selected tool", messages[0]["content"])
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"KOI latest match 2026-06-22"}}}',
+                    },
+                    "usage": {},
+                    "finish_reason": None,
+                    "message_id": None,
+                    "raw": {},
+                }
+            self.assertIn("Tool result for current_date", "\n".join(item["content"] for item in messages))
+            self.assertIn("Tool result for web_search", messages[-1]["content"])
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {"role": "assistant", "content": "Done."},
+                "usage": {},
+                "finish_reason": "stop",
+                "message_id": "forced-chain",
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        directives = [
+            {"tool_name": "current_date", "instruction": "get today", "start": 0, "end": 24},
+            {"tool_name": "web_search", "instruction": "find KOI", "start": 24, "end": 44},
+        ]
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "/current_date get today /web_search find KOI"}],
+            "qwen3",
+            {},
+            tool_context={"forced_tool_directives": directives},
+        )
+
+        self.assertEqual(calls["count"], 2)
+        self.assertEqual(
+            [event["tool_name"] for event in response["raw"]["tool_events"]],
+            ["current_date", "web_search"],
+        )
+
+    def test_forced_tool_retries_when_model_omits_required_arguments(self):
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(search_tool["id"], True)
+        executed = []
+        self.registry._runtime_catalog["web_search"]["runner"] = lambda arguments: (
+            executed.append(arguments) or {"query": arguments["query"], "results": []}
+        )
+        calls = {"count": 0}
+
+        def fake_chat(provider_name, messages, model, settings):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{}}}',
+                    },
+                    "raw": {},
+                }
+            if calls["count"] == 2:
+                self.assertIn("Missing required argument: query", messages[-1]["content"])
+                return {
+                    "provider": provider_name,
+                    "model": model,
+                    "message": {
+                        "role": "assistant",
+                        "content": '{"tool_call":{"name":"web_search","arguments":{"query":"KOI latest match"}}}',
+                    },
+                    "raw": {},
+                }
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {"role": "assistant", "content": "Search completed."},
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "/web_search find KOI's latest match"}],
+            "qwen3",
+            {},
+            tool_context={
+                "forced_tool_directives": [
+                    {
+                        "tool_name": "web_search",
+                        "instruction": "find KOI's latest match",
+                        "start": 0,
+                        "end": 39,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(calls["count"], 3)
+        self.assertEqual(executed, [{"query": "KOI latest match"}])
+        self.assertTrue(response["raw"]["tool_events"][0]["ok"])
+
+    def test_forced_tool_stops_without_final_generation_when_arguments_remain_invalid(self):
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(search_tool["id"], True)
+        calls = {"count": 0}
+
+        def fake_chat(provider_name, messages, model, settings):
+            calls["count"] += 1
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool_call":{"name":"web_search","arguments":{}}}',
+                },
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "/web_search find today's date"}],
+            "qwen3",
+            {},
+            tool_context={
+                "forced_tool_directives": [
+                    {
+                        "tool_name": "web_search",
+                        "instruction": "find today's date",
+                        "start": 0,
+                        "end": 29,
+                    }
+                ]
+            },
+        )
+
+        self.assertEqual(calls["count"], 2)
+        self.assertIn("Missing required argument: query", response["message"]["content"])
+        self.assertFalse(response["raw"]["tool_events"][0]["ok"])
+
+    def test_streaming_forced_tool_failure_does_not_call_final_model(self):
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(search_tool["id"], True)
+        planning_calls = {"count": 0}
+        stream_calls = {"count": 0}
+
+        def fake_chat(provider_name, messages, model, settings):
+            planning_calls["count"] += 1
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {
+                    "role": "assistant",
+                    "content": '{"tool_call":{"name":"web_search","arguments":{}}}',
+                },
+                "raw": {},
+            }
+
+        def fake_stream_chat(*args, **kwargs):
+            stream_calls["count"] += 1
+            return iter(())
+
+        self.model_manager.chat = fake_chat
+        self.model_manager.stream_chat = fake_stream_chat
+        events = list(
+            self.manager.stream_chat(
+                "ollama",
+                [{"role": "user", "content": "/web_search find today's date"}],
+                "qwen3",
+                {},
+                tool_context={
+                    "forced_tool_directives": [
+                        {
+                            "tool_name": "web_search",
+                            "instruction": "find today's date",
+                            "start": 0,
+                            "end": 29,
+                        }
+                    ]
+                },
+            )
+        )
+
+        self.assertEqual(planning_calls["count"], 2)
+        self.assertEqual(stream_calls["count"], 0)
+        self.assertEqual(events[-1]["type"], "response")
+        self.assertIn("Missing required argument: query", events[-1]["response"]["message"]["content"])
+
+    def test_failed_selected_tool_replaces_unsupported_model_answer(self):
+        search_tool = self.db.tools.get_by_name("web_search")
+        self.manager.set_tool_active(search_tool["id"], True)
+
+        def fail_search(arguments):
+            raise RuntimeError("The web search service blocked automated access.")
+
+        self.registry._runtime_catalog["web_search"]["runner"] = fail_search
+        calls = {"count": 0}
+
+        def fake_chat(provider_name, messages, model, settings):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                content = '{"tool_call":{"name":"web_search","arguments":{"query":"today date"}}}'
+            else:
+                content = "Today is Monday, November 10, 2024."
+            return {
+                "provider": provider_name,
+                "model": model,
+                "message": {"role": "assistant", "content": content},
+                "raw": {},
+            }
+
+        self.model_manager.chat = fake_chat
+        response = self.manager.chat(
+            "ollama",
+            [{"role": "user", "content": "Search the web for today's date"}],
+            "qwen3",
+            {},
+        )
+
+        self.assertEqual(calls["count"], 2)
+        self.assertNotIn("November 10, 2024", response["message"]["content"])
+        self.assertIn("blocked automated access", response["message"]["content"])
+        self.assertFalse(response["raw"]["tool_events"][0]["ok"])

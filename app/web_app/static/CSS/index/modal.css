@@ -607,6 +607,11 @@
     box-sizing: border-box;
 }
 
+.project-customize-textarea {
+    resize: none;
+    overflow-y: auto;
+}
+
 .project-models-form .checkbox-field {
     align-self: start;
     min-height: 28px;
